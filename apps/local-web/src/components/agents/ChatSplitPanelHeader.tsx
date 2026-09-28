@@ -550,7 +550,7 @@ export function ProjectMetaHover({
             onMouseEnter={scheduleOpen}
             onMouseLeave={scheduleClose}
           >
-            Sin proyecto asociado
+            No project
           </span>
         )}
       </PopoverTrigger>
@@ -603,13 +603,13 @@ function ProjectFicha({ project }: { project: AgentProject }) {
       {/* Zona scrolleable */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {project.description ? (
-          <FichaSection title="Descripción">
+          <FichaSection title="Description">
             <CollapsibleText text={project.description} />
           </FichaSection>
         ) : null}
 
         {project.folderPath ? (
-          <FichaSection title="Carpeta local">
+          <FichaSection title="Local folder">
             <p
               className="text-foreground/90 break-all font-mono text-[11.5px] leading-relaxed"
               title={project.folderPath}
@@ -620,7 +620,7 @@ function ProjectFicha({ project }: { project: AgentProject }) {
         ) : null}
 
         {project.agentContext ? (
-          <FichaSection title="Contexto para el agente">
+          <FichaSection title="Agent context">
             <CollapsibleText text={project.agentContext} />
           </FichaSection>
         ) : null}
@@ -631,7 +631,7 @@ function ProjectFicha({ project }: { project: AgentProject }) {
         {formatSessionCount(project.sessionCount)}
         {project.createdAt ? (
           <>
-            {' · creado '}
+            {' · created '}
             {formatCreatedAt(project.createdAt)}
           </>
         ) : null}
@@ -685,12 +685,12 @@ function CollapsibleText({ text }: { text: string }) {
           {expanded ? (
             <>
               <ChevronDown className="size-3 rotate-180" aria-hidden />
-              Ver menos
+              Show less
             </>
           ) : (
             <>
               <ChevronDown className="-rotate-90 size-3" aria-hidden />
-              Ver más
+              Show more
             </>
           )}
         </button>
@@ -707,11 +707,11 @@ function NoProjectFicha() {
       </span>
       <div className="min-w-0 flex-1">
         <h3 className="text-foreground text-[13px] font-semibold">
-          Sin proyecto asociado
+          No project
         </h3>
         <p className="text-muted-foreground mt-1 text-[12px] leading-relaxed">
-          Este chat no está vinculado a ningún proyecto. Podés asociarlo
-          desde el selector de proyecto del composer.
+          This chat is not linked to a project. You can assign one from the
+          project picker in the composer.
         </p>
       </div>
     </div>
@@ -736,7 +736,7 @@ function FichaSection({
 }
 
 function formatSessionCount(count: number): string {
-  if (count === 0) return 'Sin chats'
+  if (count === 0) return 'No chats'
   if (count === 1) return '1 chat'
   return `${count} chats`
 }
@@ -744,7 +744,7 @@ function formatSessionCount(count: number): string {
 function formatCreatedAt(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString('es-ES', {
+  return d.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
