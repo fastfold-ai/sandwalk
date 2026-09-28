@@ -245,7 +245,7 @@ fn ensure_authorization_requested() {
     if AUTHORIZATION_REQUESTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    unsafe {
+    {
         let center = UNUserNotificationCenter::currentNotificationCenter();
         let options = UNAuthorizationOptions::Alert
             | UNAuthorizationOptions::Sound

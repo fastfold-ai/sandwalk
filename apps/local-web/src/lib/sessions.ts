@@ -294,7 +294,7 @@ export function groupTabItems(
     // Mixed hydration: `chatIds` holds `session_*` and `term_*` ids in
     // the order the user arranged the panes. Look each id up in both
     // pools and keep the original order.
-    const children: GroupChild[] = group.itemIds.flatMap(id => {
+    const children: GroupChild[] = group.itemIds.flatMap((id): GroupChild[] => {
       const session = groupChildrenById.get(id)
       if (session) return [{ kind: 'chat' as const, id, session }]
       const term = terminalsById.get(id)

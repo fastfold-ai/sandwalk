@@ -120,7 +120,6 @@ export function SessionTabs({
   onClearSelection,
   onCreateSplitFromSelection,
   terminals,
-  onCloseTerminal,
   onCreateTerminal,
   onRenameTerminal,
   onToggleTerminalOrganizeLabel,

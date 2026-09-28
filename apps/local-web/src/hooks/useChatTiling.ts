@@ -357,13 +357,6 @@ export function reconcileTreeFromRefs(
   return current
 }
 
-function pruneUnknownChats(tree: PaneNode, known: Set<string>): PaneNode | null {
-  if (tree.type === 'chat') return known.has(tree.chatId) ? tree : null
-  // Terminals & typed refs are preserved regardless of the chat-only known set.
-  if (tree.type === 'terminal' || tree.type === 'ref') return tree
-  return pruneBranch(tree, node => pruneUnknownChats(node, known))
-}
-
 function pruneUnknownItems(
   tree: PaneNode,
   known: Map<string, WorkspaceItemRef['kind']>

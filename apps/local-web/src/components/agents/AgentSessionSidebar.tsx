@@ -41,7 +41,6 @@ import { cn } from '@/lib/utils'
 
 import { SidebarBatchBar } from './session-sidebar/sidebar-batch-bar'
 import { SidebarSessionList } from './session-sidebar/sidebar-session-list'
-import { SidebarTerminalsSection } from './session-sidebar/sidebar-terminals-section'
 
 type SessionSection = TabItemSection
 
@@ -170,7 +169,6 @@ export function AgentSessionSidebar({
   setDeleteTarget,
   onLogout,
   onRefreshUser,
-  terminals,
   onCloseTerminal,
   onRemoveTerminalFromSplit,
   activeTerminalId,

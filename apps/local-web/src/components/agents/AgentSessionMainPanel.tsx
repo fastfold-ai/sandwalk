@@ -296,8 +296,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const {
     terminals,
     refresh: refreshTerminals,
-    addOptimistic: addTerminalOptimistic,
-    removeOptimistic: removeTerminalOptimistic
+    addOptimistic: addTerminalOptimistic
   } = useAppTerminals(client, activeProjectId)
 
   /**
@@ -348,7 +347,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     if (!activeGroup) return null
     try {
       const created = await client.createSession({
-        title: null,
         workspacePath: null,
         projectId: activeProjectId ?? null
       })

@@ -84,7 +84,7 @@ export default function App() {
   // create appears everywhere without per-consumer fetching).
   const terminalsLive = useAppTerminals(
     bootstrap.client,
-    bootstrap.activeProjectId ?? null
+    ui.projectScopeId ?? null
   )
   const handleDeleteTerminalGlobal = useCallback(
     async (terminalId: string) => {
@@ -182,7 +182,7 @@ export default function App() {
   // navigates to it. Handled at the shell so it works from any page.
   // Declared AFTER `bootstrap` so `bootstrap.client` isn't in TDZ.
   const bootstrapClientForShortcut = bootstrap.client
-  const bootstrapActiveProjectIdForShortcut = bootstrap.activeProjectId
+  const bootstrapActiveProjectIdForShortcut = ui.projectScopeId
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey

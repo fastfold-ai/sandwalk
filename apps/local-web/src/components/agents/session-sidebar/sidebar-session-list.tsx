@@ -17,8 +17,7 @@ import {
   Pin,
   Search,
   SquareTerminal,
-  Trash2,
-  X
+  Trash2
 } from 'lucide-react'
 import {
   type Dispatch,

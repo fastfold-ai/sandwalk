@@ -65,7 +65,6 @@ export function useSessionActionsCrudSessions({
   tabsScopeKey,
   sessionId,
   sessionIdRef,
-  sessions,
   setSessions,
   setOpenTabsByProject,
   setLastSessionByScope,
@@ -417,8 +416,8 @@ export function useSessionActionsCrudSessions({
       navigate(
         neighbor
           ? `/agents/${neighbor}`
-          : scopeProjectId
-            ? `/projects/${scopeProjectId}`
+          : activeProjectId
+            ? `/projects/${activeProjectId}`
             : '/'
       )
     }

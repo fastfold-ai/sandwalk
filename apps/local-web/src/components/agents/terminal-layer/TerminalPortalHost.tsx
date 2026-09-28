@@ -175,7 +175,6 @@ export function TerminalPortalHost({
     const unsub = registry.subscribe(terminalId, listener)
     return unsub
     // schedulePosition se resuelve en tiempo de invocación.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry, terminalId])
 
   const rafRef = useRef<number | null>(null)
@@ -302,7 +301,11 @@ export function TerminalPortalHost({
           if (cancelled) return
           const info = existing[0] ?? (await client.createPtySession(terminalId))
           if (cancelled) return
-          ptyRef.current = info as PtyInfo
+          ptyRef.current = {
+            id: info.id,
+            session_id: info.sessionId,
+            title: info.title
+          }
         }
         const info = ptyRef.current
         // FAS-107 X4 Capa 2 · restaurar buffer persistido ANTES de
@@ -533,7 +536,6 @@ export function TerminalPortalHost({
     // Deps vacías: el efecto corre una sola vez al mount del componente.
     // client, terminalId, registry son estables por instancia. El
     // hostNode NO debe estar aquí — su cambio no debe destruir el xterm.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Effect 2 · Attach del xterm al hostNode. Patrón VSCode `_attached`:
@@ -575,7 +577,6 @@ export function TerminalPortalHost({
       host.removeEventListener('contextmenu', onContextMenu)
       // NO dispose del xterm. El buffer sobrevive al cambio de host.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hostNode])
 
   if (!layerRoot) return null

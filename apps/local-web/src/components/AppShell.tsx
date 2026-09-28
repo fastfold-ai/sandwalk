@@ -108,15 +108,15 @@ export function AppShell(props: AppShellProps) {
           showSessionTabs={props.showSessionTabs}
           terminals={props.terminals ?? []}
           promptRenameTerminal={props.onRenameTerminal ?? (() => {})}
-          deleteTerminalPermanently={
-            props.onCloseTerminal ?? (async () => {})
-          }
-          toggleTerminalOrganizeLabel={
-            props.onToggleTerminalOrganizeLabel ?? (async () => {})
-          }
-          moveTerminalToProject={
-            props.onMoveTerminalToProject ?? (async () => {})
-          }
+          deleteTerminalPermanently={async terminalId => {
+            await props.onCloseTerminal?.(terminalId)
+          }}
+          toggleTerminalOrganizeLabel={async (terminalId, label) => {
+            await props.onToggleTerminalOrganizeLabel?.(terminalId, label)
+          }}
+          moveTerminalToProject={async (terminalId, projectId) => {
+            await props.onMoveTerminalToProject?.(terminalId, projectId)
+          }}
           isHome={props.isHome}
           isLibrary={props.isLibrary}
           isSites={props.isSites}

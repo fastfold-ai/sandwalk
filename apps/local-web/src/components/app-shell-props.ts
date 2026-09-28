@@ -282,7 +282,6 @@ export type AppShellProps = {
   setTabGroupColor: (groupId: string, color: string | null) => void
   /** X4.2b: pin/unpin del grupo (asimetría §3.2). */
   setTabGroupPinned: (groupId: string, pinned: boolean) => void
-  setTabGroupPinned: (groupId: string, pinned: boolean) => void
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
   setTabGroupLayoutForMonitor: (
     groupId: string,

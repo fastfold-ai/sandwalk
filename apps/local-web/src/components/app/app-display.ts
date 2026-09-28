@@ -6,7 +6,7 @@ import type {
 
 import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view-helpers'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
-import { groupTabItems, type TabItem } from '@/lib/sessions'
+import { type GroupChild, groupTabItems, type TabItem } from '@/lib/sessions'
 import { assertNever } from '@/lib/strip-item'
 
 export function resolveSelectedIntegrationKey(
@@ -173,9 +173,13 @@ export function buildSessionSidebarModel(input: {
     .map<TabItem | null>(id => {
       const group = groupsById.get(id)
       if (group) {
-        const children = group.itemIds
-          .map(cid => sessionsById.get(cid))
-          .filter((s): s is AgentSession => Boolean(s))
+        const children = group.itemIds.flatMap((cid): GroupChild[] => {
+          const session = sessionsById.get(cid)
+          if (session) return [{ kind: 'chat', id: cid, session }]
+          const terminal = terminalsById.get(cid)
+          if (terminal) return [{ kind: 'terminal', id: cid, terminal }]
+          return []
+        })
         return {
           kind: 'group',
           id: group.id,
@@ -218,8 +222,10 @@ export function buildSessionSidebarModel(input: {
         case 'terminal':
           return (item.terminal.projectId ?? null) === input.activeProjectId
         case 'group':
-          return item.children.some(
-            s => s.projectId === input.activeProjectId
+          return item.children.some(child =>
+            child.kind === 'chat'
+              ? child.session.projectId === input.activeProjectId
+              : (child.terminal.projectId ?? null) === input.activeProjectId
           )
         default:
           return assertNever(item)

@@ -310,7 +310,6 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     removeChatFromGroup: input.tabGroupsStore.removeFromGroup,
     setTabGroupColor: input.tabGroupsStore.setGroupColor,
     setTabGroupPinned: input.tabGroupsStore.setGroupPinned,
-    setTabGroupPinned: input.tabGroupsStore.setGroupPinned,
     setTabGroupActiveChat: input.tabGroupsStore.setGroupActiveChat,
     setTabGroupLayoutForMonitor:
       input.tabGroupsStore.setGroupLayoutForMonitor,

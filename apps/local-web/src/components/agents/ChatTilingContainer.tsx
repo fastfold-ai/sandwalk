@@ -6,7 +6,6 @@ import type {
   SessionGroup,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
-import { X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
@@ -357,7 +356,7 @@ export function ChatTilingContainer({
                 focused={focused}
                 focusPanel={focusPanel}
                 client={terminalClient}
-                terminals={terminals}
+                terminals={terminals ?? []}
                 onSplit={handleSplit}
                 onClose={onCloseTerminal}
                 canClose={chatIds.length > 1}
