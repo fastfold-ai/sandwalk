@@ -38,6 +38,9 @@ class EventProcessorCoreMixin:
 
         self.full_text: list[str] = []
         self.tool_calls: list[dict] = []
+        # Model turns that returned neither text nor tool calls (see
+        # ``_note_empty_model_turn``): stop reason + content block types.
+        self.empty_model_turns: list[dict] = []
         self.inflight: dict[str, dict] = {}
         self.streamed_len = 0
         self.model_call_count = 0

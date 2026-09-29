@@ -8,6 +8,8 @@ mod dictation;
 mod tts;
 mod lan_scan;
 mod multi_window;
+#[cfg(target_os = "macos")]
+mod notification_click;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -886,11 +888,15 @@ pub fn run() {
             tts::set_active_tts_model,
             tts::cancel_tts,
             tts::speak_tts,
+            #[cfg(target_os = "macos")]
+            notification_click::sandwalk_notify,
         ])
         .setup(|app| {
             dictation::manage_dictation(app);
             tts::manage_tts(app);
             ensure_server_helper();
+            #[cfg(target_os = "macos")]
+            notification_click::install_delegate(app.handle().clone());
             let cold_route = initial_desktop_route();
             let api_base = control_plane_api_base();
             #[cfg(target_os = "macos")]
@@ -943,6 +949,20 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 focus_main_window(app_handle);
+            }
+            // FAS-107 X4 Capa 2 · al Cmd+Q, avisar al frontend para que
+            // serialice cada xterm y haga PUT del snapshot al backend
+            // ANTES de que el proceso Python muera. Damos ~600ms de
+            // ventana (los PUTs son locales, no red). Sin esto, el user
+            // pierde el output visible al reabrir Sandwalk.
+            //
+            // El evento `sandwalk:force-save-snapshots` lo escucha cada
+            // `TerminalPortalHost` y dispara su `saveSnapshot()`. El
+            // resultado es best-effort: si falla no bloqueamos el
+            // shutdown.
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                let _ = app_handle.emit("sandwalk:force-save-snapshots", ());
+                std::thread::sleep(std::time::Duration::from_millis(600));
             }
         });
 }

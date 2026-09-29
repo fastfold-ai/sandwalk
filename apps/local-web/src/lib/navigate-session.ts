@@ -15,10 +15,14 @@ export async function navigateToSession(args: {
   navigate: NavigateFunction
 }) {
   args.openSessionTab(args.id)
+  // FAS-107 Q1: terminals live under their own route (`/terminals/:id`),
+  // not `/agents/:id`. Detect by prefix and short-circuit the prefetch
+  // (there are no messages to prefetch for a terminal PTY).
+  const isTerminal = args.id.startsWith('term_')
   // Group ids (`grp_*`) are tab wrappers, not sessions — the group's own
   // `SessionChatMount`s handle their prefetch per real chat id when they
   // mount. Skip the outer prefetch so we don't 404 on /sessions/grp_*/messages.
-  if (!isSessionGroupId(args.id)) {
+  if (!isSessionGroupId(args.id) && !isTerminal) {
     await Promise.race([
       Promise.resolve(args.prefetchSessionMessages(args.id)),
       new Promise<void>(resolve => {
@@ -26,5 +30,5 @@ export async function navigateToSession(args: {
       })
     ])
   }
-  args.navigate(`/agents/${args.id}`)
+  args.navigate(isTerminal ? `/terminals/${args.id}` : `/agents/${args.id}`)
 }

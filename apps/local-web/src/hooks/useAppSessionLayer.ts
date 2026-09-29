@@ -17,6 +17,7 @@ import { buildConversationTimeline } from '@/components/agents/transcript'
 import { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
 import { usePrefetchSessionMessages } from '@/hooks/useAppRouteContext'
 import { useChatScroll } from '@/hooks/useChatScroll'
+import { useLatestRef } from '@/hooks/useLatestRef'
 import { useSessionActions } from '@/hooks/useSessionActions'
 import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
@@ -60,6 +61,13 @@ type SessionLayerArgs = {
    * on blur dropped mux delivery until focus/reload.
    */
   enableTranscriptStream?: boolean
+  /**
+   * When false (a split group is showing), the shell does not subscribe to
+   * the active chat's per-token state: the panes render their own mounts,
+   * so a token would otherwise re-render App and everything under it.
+   * Actions and refs stay wired; only the reactive slice is skipped.
+   */
+  subscribeActiveChat?: boolean
   sessionIdRef: MutableRefObject<string | null>
   session: AgentSession | null
   activeProjectId: string | null
@@ -96,8 +104,12 @@ type SessionLayerArgs = {
 }
 
 export function useAppSessionLayer(args: SessionLayerArgs) {
-  const chat = useSessionChatState(args.sessionId)
+  const chat = useSessionChatState(
+    args.subscribeActiveChat === false ? null : args.sessionId
+  )
   args.setChatBySessionIdRef.current = chat.setChatBySessionId
+  const sessionsRef = useLatestRef(args.sessions)
+  const tabGroupsRef = useLatestRef(args.tabGroups)
 
   useSessionChatStream({
     client: args.client,
@@ -105,7 +117,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     sessionId:
       args.enableTranscriptStream === false ? null : args.sessionId,
     sessionIdRef: args.sessionIdRef,
-    sessions: args.sessions,
+    sessionsRef,
     chatBySessionIdRef: chat.chatBySessionIdRef,
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
@@ -134,6 +146,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     sessionIdRef: args.sessionIdRef,
     session: args.session,
     sessions: args.sessions,
+    sessionsRef,
     setSessions: args.setSessions,
     activeProject: args.activeProject,
     openTabsByProject: args.openTabsByProject,
@@ -146,6 +159,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     openTabIds: args.openTabIds,
     setOpenTabIds: args.setOpenTabIds,
     tabGroups: args.tabGroups,
+    tabGroupsRef,
     patchChat: chat.patchChat,
     setChatBySessionId: chat.setChatBySessionId,
     composerLiveRef: chat.composerLiveRef,

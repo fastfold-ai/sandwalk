@@ -135,6 +135,12 @@ export function useWorkspacePanelState({
   }, [])
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    // S1: terminals no tienen filesystem propio (no son sesiones de chat).
+    // X4.4-hotfix: los grupos (`grp_*`) tampoco — son contenedores de
+    // tabs, no sesiones reales. Sin estos guards se dispara
+    // `listFiles(grp_...)` que 404 en el backend y ensucia la consola.
+    if (sessionId.startsWith('term_')) return
+    if (sessionId.startsWith('grp_')) return
     if (!options?.silent) setRefreshing(true)
     try {
       const next = await client.listFiles(sessionId)

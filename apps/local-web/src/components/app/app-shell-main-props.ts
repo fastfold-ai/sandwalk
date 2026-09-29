@@ -67,6 +67,25 @@ export type AppShellMainProps = {
   isDashboardMcp: boolean
   isDashboardSpecialists: boolean
   client: LocalAgentClient
+  /** FAS-107 W1: terminales conocidos — se usan para montar los
+   *  `TerminalPortalHost` que sobreviven a cambios de layout. */
+  terminals: import('@sandwalk/agent-ui-core').TerminalSession[]
+  /** X2 Fix 1 (parte 2): abre el dialog de rename del shell para un
+   *  terminal. Se pasa al `AgentSessionMainPanel` para que el strip
+   *  y otros disparadores locales usen la MISMA vía (dialog), en vez
+   *  de un `window.prompt` duplicado que en Tauri Mac no muestra nada. */
+  promptRenameTerminal: (terminalId: string) => void
+  /** X3 Fase 3: handlers del shell — fuente única para acciones de
+   *  terminal desde cualquier superficie (strip / sidebar / pane header). */
+  deleteTerminalPermanently: (terminalId: string) => Promise<void>
+  toggleTerminalOrganizeLabel: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => Promise<void>
+  moveTerminalToProject: (
+    terminalId: string,
+    projectId: string | null
+  ) => Promise<void>
   navigate: NavigateFunction
   location: Location
   dashboardSection: DashboardSection
@@ -225,6 +244,8 @@ export type AppShellMainProps = {
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
+  /** X4.2b: pin/unpin del grupo (asimetría §3.2). */
+  setTabGroupPinned: (groupId: string, pinned: boolean) => void
   closeTabGroup: (groupId: string) => void
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void

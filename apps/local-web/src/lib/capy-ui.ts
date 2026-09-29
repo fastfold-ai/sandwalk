@@ -134,6 +134,18 @@ export function createDoubleTap(windowMs = CAPY_HANDS_FREE_WINDOW_MS) {
   }
 }
 
+/** `{ rows, cols }` from an untrusted `ui.command` payload, or null. */
+export function parseGridLayout(
+  raw: unknown
+): { rows: number; cols: number } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const rows = Number((raw as { rows?: unknown }).rows)
+  const cols = Number((raw as { cols?: unknown }).cols)
+  if (!Number.isInteger(rows) || !Number.isInteger(cols)) return null
+  if (rows < 1 || cols < 1 || rows > 16 || cols > 16) return null
+  return { rows, cols }
+}
+
 export function applyCapyOpenSplit(
   sessionIds: string[],
   createSplitGroup: (ids: string[]) => string | null,

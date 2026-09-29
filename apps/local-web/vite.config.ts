@@ -8,7 +8,9 @@ const pkg = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
 ) as { version?: string }
 
-const tauri = Boolean(process.env.TAURI_ENV_PLATFORM || process.env.TAURI_PLATFORM)
+const tauri = Boolean(
+  process.env.TAURI_ENV_PLATFORM || process.env.TAURI_PLATFORM
+)
 const apiProxy = {
   '/v1': {
     target: process.env.SANDWALK_API_URL || 'http://127.0.0.1:8787',
@@ -32,7 +34,17 @@ export default defineConfig({
     port: Number(process.env.VITE_PORT || (tauri ? 1420 : 8969)),
     strictPort: true,
     // Same-origin /v1/* would otherwise return index.html (JSON parse '<').
-    proxy: apiProxy
+    proxy: apiProxy,
+    // Test artifacts are HTML: without this, `test:coverage` and the e2e
+    // harness full-reload the dev window (and the Tauri app) mid-session.
+    watch: {
+      ignored: [
+        '**/coverage/**',
+        '**/e2e/.report/**',
+        '**/e2e/.artifacts/**',
+        '**/e2e/results/**'
+      ]
+    }
   },
   preview: {
     host: '127.0.0.1',

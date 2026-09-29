@@ -27,6 +27,16 @@ class PtyLifecycleMixin:
             return None
         return session.info
 
+    def get_session(self, session_id: str, pty_id: str) -> PtySession | None:
+        """FAS-107 X4 Capa 2 · devuelve el `PtySession` completo (con
+        acceso al `output_log`). Usado por el endpoint de snapshot para
+        leer el log en memoria antes de fallback a disco.
+        """
+        session = self._sessions.get(pty_id)
+        if session is None or session.info.session_id != session_id:
+            return None
+        return session
+
     async def create(
         self,
         *,

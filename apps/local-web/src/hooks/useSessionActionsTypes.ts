@@ -26,7 +26,13 @@ export type UseSessionActionsArgs = {
   stripSessionId: string | null
   sessionIdRef: MutableRefObject<string | null>
   session: AgentSession | null
+  /**
+   * Render-time sessions list. Only the selection hook (sidebar bulk
+   * actions) needs it; tab/crud handlers read `sessionsRef` so per-pane
+   * mounts don't re-render when an unrelated row changes.
+   */
   sessions: AgentSession[]
+  sessionsRef: MutableRefObject<AgentSession[]>
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
   activeProject: AgentProject | null
   openTabsByProject: Record<string, string[]>
@@ -48,6 +54,8 @@ export type UseSessionActionsArgs = {
    * yet.
    */
   tabGroups: SessionGroup[]
+  /** Latest `tabGroups` by ref — read only inside handlers. */
+  tabGroupsRef: MutableRefObject<SessionGroup[]>
   patchChat: (
     id: string,
     patch:

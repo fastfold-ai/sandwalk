@@ -4,7 +4,8 @@ import type {
   AgentSession,
   AgentTodo,
   PendingHitlApproval,
-  SessionGroup
+  SessionGroup,
+  TerminalSession
 } from '@sandwalk/agent-ui-core'
 
 import type { TranscriptTool } from '@/components/agents/ToolCard'
@@ -196,6 +197,15 @@ export function groupSessions(sessions: AgentSession[]) {
  * chats hijos. Los helpers downstream (visibleSessionIds, sidebar-session-
  * list, dropdown de tabs) iteran sobre `TabItem[]` y renderizan según kind.
  */
+/**
+ * FAS-107: a split-view group's panes can be chats OR terminals — the
+ * renderer needs to know which so it picks the right icon and click
+ * handler. `GroupChild` is the mixed union used by `TabItem.children`.
+ */
+export type GroupChild =
+  | { kind: 'chat'; id: string; session: AgentSession }
+  | { kind: 'terminal'; id: string; terminal: TerminalSession }
+
 export type TabItem =
   | {
       kind: 'chat'
@@ -207,7 +217,15 @@ export type TabItem =
       kind: 'group'
       id: string
       group: SessionGroup
-      children: AgentSession[]
+      children: GroupChild[]
+      lastActivity: number
+    }
+  | {
+      // FAS-107: terminals interleave with chats in the sidebar sections
+      // (Today / Yesterday / …) instead of living in a separate strip.
+      kind: 'terminal'
+      id: string
+      terminal: TerminalSession
       lastActivity: number
     }
 
@@ -235,7 +253,9 @@ export function groupTabItems(
    * list (cross-project splits). Falls back to `sessions` when omitted so
    * existing callers stay unchanged.
    */
-  sessionsForGroupChildren?: AgentSession[]
+  sessionsForGroupChildren?: AgentSession[],
+  /** FAS-107: terminals get interleaved into the same date buckets. */
+  terminals: TerminalSession[] = []
 ): TabItemSection[] {
   const now = new Date()
   const today = new Date(
@@ -251,12 +271,18 @@ export function groupTabItems(
     sessionsForGroupChildren && sessionsForGroupChildren !== sessions
       ? new Map(sessionsForGroupChildren.map(s => [s.id, s]))
       : sessionsById
+  const terminalsById = new Map<string, TerminalSession>()
+  for (const term of terminals) terminalsById.set(term.id, term)
 
-  const chatIdsInGroups = new Set<string>()
-  for (const g of groups) for (const id of g.chatIds) chatIdsInGroups.add(id)
+  // FAS-107: `group.itemIds` may include `term_*` ids (splits accept both).
+  // The set below excludes ANY member id — chat OR terminal — from the
+  // flat list so a split-member is only rendered once (as a child of its
+  // group), never doubled as a solo row.
+  const memberIdsInGroups = new Set<string>()
+  for (const g of groups) for (const id of g.itemIds) memberIdsInGroups.add(id)
 
   const chatItems: TabItem[] = sessions
-    .filter(item => !chatIdsInGroups.has(item.id))
+    .filter(item => !memberIdsInGroups.has(item.id))
     .map(item => ({
       kind: 'chat' as const,
       id: item.id,
@@ -265,14 +291,27 @@ export function groupTabItems(
     }))
 
   const groupItems: TabItem[] = groups.map(group => {
-    const children = group.chatIds
-      .map(id => groupChildrenById.get(id))
-      .filter((s): s is AgentSession => Boolean(s))
-    // Actividad del grupo = la última actividad de cualquiera de sus chats.
-    const lastActivity = children.reduce(
-      (max, s) => Math.max(max, sessionLastActivity(s)),
-      0
-    )
+    // Mixed hydration: `chatIds` holds `session_*` and `term_*` ids in
+    // the order the user arranged the panes. Look each id up in both
+    // pools and keep the original order.
+    const children: GroupChild[] = group.itemIds.flatMap((id): GroupChild[] => {
+      const session = groupChildrenById.get(id)
+      if (session) return [{ kind: 'chat' as const, id, session }]
+      const term = terminalsById.get(id)
+      if (term) return [{ kind: 'terminal' as const, id, terminal: term }]
+      return []
+    })
+    // Actividad del grupo = la última actividad de cualquiera de sus
+    // paneles (chat o terminal).
+    const lastActivity = children.reduce((max, child) => {
+      const t =
+        child.kind === 'chat'
+          ? sessionLastActivity(child.session)
+          : new Date(
+              child.terminal.updatedAt || child.terminal.createdAt
+            ).getTime()
+      return Math.max(max, t)
+    }, 0)
     return {
       kind: 'group' as const,
       id: group.id,
@@ -282,14 +321,29 @@ export function groupTabItems(
     }
   })
 
-  const all = [...chatItems, ...groupItems]
+  // FAS-107: terminals as first-class items in the same fluid list —
+  // but only those that are NOT already inside a split (avoid double
+  // render — see `memberIdsInGroups` above).
+  const terminalItems: TabItem[] = terminals
+    .filter(term => !memberIdsInGroups.has(term.id))
+    .map(term => ({
+      kind: 'terminal' as const,
+      id: term.id,
+      terminal: term,
+      lastActivity: new Date(term.updatedAt).getTime()
+    }))
+
+  const all = [...chatItems, ...groupItems, ...terminalItems]
 
   const isPinned = (item: TabItem) =>
     item.kind === 'chat'
       ? item.session.organizeLabel === 'pinned'
-      : item.group.pinned
+      : item.kind === 'group'
+        ? item.group.pinned
+        : item.terminal.organizeLabel === 'pinned'
   const isArchived = (item: TabItem) =>
-    item.kind === 'chat' && item.session.organizeLabel === 'archive'
+    (item.kind === 'chat' && item.session.organizeLabel === 'archive') ||
+    (item.kind === 'terminal' && item.terminal.organizeLabel === 'archive')
   // Los grupos no tienen "archived" — solo chats pueden estar archivados.
 
   // Dentro de cada sección, "más reciente primero" — sirve para que un

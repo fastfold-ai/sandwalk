@@ -1,32 +1,134 @@
-import type { PaneNode } from '@sandwalk/agent-ui-core'
+import type { PaneNode, WorkspaceItemRef } from '@sandwalk/agent-ui-core'
 
 /**
  * Pure operations on the tiling tree (Warp / iTerm2 model). Each
  * function returns a new tree — no in-place mutation — so React can
  * treat state updates as immutable and re-render predictably.
+ *
+ * FAS-107 generalizes leaves to any pane-able item (chat or terminal
+ * today, files/preview later). The chat-only API is preserved as a thin
+ * wrapper over the mixed-type primitives so existing callers keep
+ * working without touching every call site.
  */
 
 export type SplitDirection = 'horizontal' | 'vertical'
 
+/** True when the node represents a single pane (any kind), false when it is a branch. */
+export function isLeafPane(
+  node: PaneNode
+): node is
+  | { type: 'chat'; chatId: string }
+  | { type: 'terminal'; terminalId: string }
+  | { type: 'ref'; ref: WorkspaceItemRef } {
+  return node.type === 'chat' || node.type === 'terminal' || node.type === 'ref'
+}
+
+/**
+ * Extract the typed item reference from a leaf pane, or null when the
+ * node is a branch (or a legacy chat leaf with an empty id, which the
+ * builder uses as a sentinel for "no chat yet").
+ */
+export function leafItemRef(node: PaneNode): WorkspaceItemRef | null {
+  if (node.type === 'chat') {
+    return node.chatId ? { kind: 'chat', id: node.chatId } : null
+  }
+  if (node.type === 'terminal') {
+    return node.terminalId ? { kind: 'terminal', id: node.terminalId } : null
+  }
+  if (node.type === 'ref') return node.ref
+  return null
+}
+
+/** Just the id, without kind. Handy when the caller already knows the kind or doesn't care. */
+export function leafItemId(node: PaneNode): string | null {
+  const ref = leafItemRef(node)
+  return ref?.id ?? null
+}
+
 /**
  * Build the default tree for a group: a single horizontal branch whose
- * children are the chats in the given order, with equal ratios. When
- * there's only one chat, we return a bare `chat` leaf — a branch with a
- * single child is redundant and would collapse immediately.
+ * children are the given items in order, with equal ratios. When there
+ * is only one item, we return a bare leaf.
  */
 export function buildDefaultTree(chatIds: string[]): PaneNode {
   if (chatIds.length === 0) {
     return { type: 'chat', chatId: '' }
   }
   if (chatIds.length === 1) {
-    return { type: 'chat', chatId: chatIds[0] }
+    return idToLeaf(chatIds[0])
   }
   return {
     type: 'branch',
     direction: 'horizontal',
     ratios: equalRatios(chatIds.length),
-    children: chatIds.map(id => ({ type: 'chat', chatId: id } as PaneNode))
+    children: chatIds.map(idToLeaf)
   }
+}
+
+/** Same as `buildDefaultTree` but for mixed-type item refs (FAS-107). */
+export function buildDefaultTreeFromRefs(refs: WorkspaceItemRef[]): PaneNode {
+  if (refs.length === 0) return { type: 'chat', chatId: '' }
+  if (refs.length === 1) return refToLeaf(refs[0])
+  return {
+    type: 'branch',
+    direction: 'horizontal',
+    ratios: equalRatios(refs.length),
+    children: refs.map(refToLeaf)
+  }
+}
+
+/**
+ * Lay `itemIds` out as `rows × cols`: a vertical branch of horizontal rows
+ * (row-major). Extra ids beyond `rows * cols` spill into additional rows;
+ * a short last row keeps equal ratios among its own children.
+ */
+export function buildGridTree(
+  itemIds: string[],
+  rows: number,
+  cols: number
+): PaneNode {
+  const ids = itemIds.filter(Boolean)
+  const perRow = Math.max(1, Math.floor(cols))
+  if (ids.length <= 1 || rows < 1) return buildDefaultTree(ids)
+  const rowNodes: PaneNode[] = []
+  for (let start = 0; start < ids.length; start += perRow) {
+    const slice = ids.slice(start, start + perRow)
+    rowNodes.push(
+      slice.length === 1
+        ? idToLeaf(slice[0])
+        : {
+            type: 'branch',
+            direction: 'horizontal',
+            ratios: equalRatios(slice.length),
+            children: slice.map(idToLeaf)
+          }
+    )
+  }
+  if (rowNodes.length === 1) return rowNodes[0]
+  return {
+    type: 'branch',
+    direction: 'vertical',
+    ratios: equalRatios(rowNodes.length),
+    children: rowNodes
+  }
+}
+
+function refToLeaf(ref: WorkspaceItemRef): PaneNode {
+  if (ref.kind === 'chat') return { type: 'chat', chatId: ref.id }
+  return { type: 'terminal', terminalId: ref.id }
+}
+
+/**
+ * Build a leaf from a plain id, inferring the kind from its prefix.
+ * FAS-107: terminals are `term_*`; everything else is treated as a chat.
+ * Used by `buildDefaultTree` / `splitPane` / `reconcileTree` so the tree
+ * always carries the right leaf type — the renderer no longer has to
+ * discriminate chat vs terminal by looking up the id in a live list.
+ */
+function idToLeaf(id: string): PaneNode {
+  return id.startsWith('term_')
+    ? { type: 'terminal', terminalId: id }
+    : { type: 'chat', chatId: id }
 }
 
 export function equalRatios(n: number): number[] {
@@ -36,16 +138,25 @@ export function equalRatios(n: number): number[] {
 }
 
 /**
- * Collect chat ids in tree traversal order. Handy for computing the
- * chatIds array on the group and for reconciliation.
+ * Collect chat ids in tree traversal order. Terminal leaves are skipped
+ * to keep the return shape compatible with existing chat-only callers.
+ * New callers should prefer `extractItemRefs` for mixed-type trees.
  */
 export function extractChatIds(node: PaneNode): string[] {
-  if (node.type === 'chat') return node.chatId ? [node.chatId] : []
-  return node.children.flatMap(extractChatIds)
+  return extractItemRefs(node)
+    .filter(ref => ref.kind === 'chat')
+    .map(ref => ref.id)
+}
+
+/** Collect every leaf's typed reference in traversal order (FAS-107). */
+export function extractItemRefs(node: PaneNode): WorkspaceItemRef[] {
+  if (node.type === 'branch') return node.children.flatMap(extractItemRefs)
+  const ref = leafItemRef(node)
+  return ref ? [ref] : []
 }
 
 /**
- * Split the pane holding `targetChatId` in the requested direction and
+ * Split the pane holding `targetId` in the requested direction and
  * insert a new pane holding `newChatId` on the requested side. If the
  * parent branch already runs in the requested direction, we insert as a
  * sibling with equal ratios; otherwise we wrap the target in a new
@@ -61,12 +172,32 @@ export function splitPane(
   newChatId: string,
   side: 'before' | 'after' = 'after'
 ): PaneNode {
-  // Special case: the whole tree is a single chat pane.
-  if (tree.type === 'chat') {
-    if (tree.chatId !== targetChatId) return tree
-    const newLeaf: PaneNode = { type: 'chat', chatId: newChatId }
-    const children =
-      side === 'after' ? [tree, newLeaf] : [newLeaf, tree]
+  // FAS-107: infer the kind from the id prefix so a `term_*` insertion
+  // becomes a terminal leaf (not a chat leaf that would then crash the
+  // renderer when looked up as a session).
+  const newRef: WorkspaceItemRef = newChatId.startsWith('term_')
+    ? { kind: 'terminal', id: newChatId }
+    : { kind: 'chat', id: newChatId }
+  return splitPaneWithRef(tree, targetChatId, direction, newRef, side)
+}
+
+/**
+ * Mixed-type variant of `splitPane`. `targetId` matches any leaf (chat
+ * or terminal); `newRef` becomes the newly inserted leaf regardless of
+ * kind. Callers building a Split-with-Terminal action from the picker
+ * hit this path.
+ */
+export function splitPaneWithRef(
+  tree: PaneNode,
+  targetId: string,
+  direction: SplitDirection,
+  newRef: WorkspaceItemRef,
+  side: 'before' | 'after' = 'after'
+): PaneNode {
+  if (isLeafPane(tree)) {
+    if (leafItemId(tree) !== targetId) return tree
+    const newLeaf = refToLeaf(newRef)
+    const children = side === 'after' ? [tree, newLeaf] : [newLeaf, tree]
     return {
       type: 'branch',
       direction,
@@ -74,33 +205,32 @@ export function splitPane(
       children
     }
   }
-  return splitInBranch(tree, targetChatId, direction, newChatId, side)
+  return splitInBranch(tree, targetId, direction, newRef, side)
 }
 
 function splitInBranch(
   branch: PaneNode & { type: 'branch' },
-  targetChatId: string,
+  targetId: string,
   direction: SplitDirection,
-  newChatId: string,
+  newRef: WorkspaceItemRef,
   side: 'before' | 'after'
 ): PaneNode {
-  const index = branch.children.findIndex(child => containsChat(child, targetChatId))
+  const index = branch.children.findIndex(child => containsItem(child, targetId))
   if (index === -1) return branch
   const child = branch.children[index]
   // The target lives deeper — recurse; the branch stays unchanged
   // structurally, only the affected child is replaced.
-  if (child.type === 'branch' && !isLeafOf(child, targetChatId)) {
-    const newChild = splitInBranch(child, targetChatId, direction, newChatId, side)
+  if (child.type === 'branch' && !isLeafOf(child, targetId)) {
+    const newChild = splitInBranch(child, targetId, direction, newRef, side)
     const nextChildren = branch.children.slice()
     nextChildren[index] = newChild
     return { ...branch, children: nextChildren }
   }
-  // The target is a direct chat child (or a wrapper we can flatten).
+  const newLeaf = refToLeaf(newRef)
+  // Same direction as the parent branch → insert as a sibling with
+  // equal ratios so the split feels balanced instead of squishing the
+  // existing panes.
   if (branch.direction === direction) {
-    // Same direction as the parent branch → insert as a sibling with
-    // equal ratios so the split feels balanced instead of squishing the
-    // existing chats.
-    const newLeaf: PaneNode = { type: 'chat', chatId: newChatId }
     const insertAt = side === 'after' ? index + 1 : index
     const nextChildren = branch.children.slice()
     nextChildren.splice(insertAt, 0, newLeaf)
@@ -111,10 +241,8 @@ function splitInBranch(
     }
   }
   // Perpendicular split → wrap the target in a new branch of the
-  // requested direction and place both panes there with equal ratios.
-  const newLeaf: PaneNode = { type: 'chat', chatId: newChatId }
-  const wrapperChildren =
-    side === 'after' ? [child, newLeaf] : [newLeaf, child]
+  // requested direction.
+  const wrapperChildren = side === 'after' ? [child, newLeaf] : [newLeaf, child]
   const wrapper: PaneNode = {
     type: 'branch',
     direction,
@@ -126,24 +254,30 @@ function splitInBranch(
   return { ...branch, children: nextChildren }
 }
 
-function containsChat(node: PaneNode, chatId: string): boolean {
-  if (node.type === 'chat') return node.chatId === chatId
-  return node.children.some(c => containsChat(c, chatId))
+function containsItem(node: PaneNode, itemId: string): boolean {
+  if (node.type === 'branch') {
+    return node.children.some(c => containsItem(c, itemId))
+  }
+  return leafItemId(node) === itemId
 }
 
-function isLeafOf(node: PaneNode, chatId: string): boolean {
-  return node.type === 'chat' && node.chatId === chatId
+function isLeafOf(node: PaneNode, itemId: string): boolean {
+  return isLeafPane(node) && leafItemId(node) === itemId
 }
 
 /**
- * Remove the pane holding `chatId`. When a branch is left with a single
+ * Remove the pane holding `itemId`. When a branch is left with a single
  * child, the child bubbles up and replaces the branch (Warp's collapse
  * behaviour). Returns null when the whole tree becomes empty — the
  * caller decides what to do (dissolve the group, usually).
+ *
+ * Works for any leaf kind. The parameter name `chatId` is kept for
+ * backwards compatibility with existing call sites; semantically it is
+ * an item id.
  */
 export function closePane(tree: PaneNode, chatId: string): PaneNode | null {
-  if (tree.type === 'chat') {
-    return tree.chatId === chatId ? null : tree
+  if (isLeafPane(tree)) {
+    return leafItemId(tree) === chatId ? null : tree
   }
   const nextChildren: PaneNode[] = []
   for (const child of tree.children) {
@@ -152,9 +286,6 @@ export function closePane(tree: PaneNode, chatId: string): PaneNode | null {
   }
   if (nextChildren.length === 0) return null
   if (nextChildren.length === 1) return nextChildren[0]
-  // Preserve existing ratios for surviving children where possible; new
-  // children (there are none in close, but keep the code stable) fall
-  // back to equal ratios.
   const keptRatios = filterKeptRatios(tree, chatId)
   const ratios =
     keptRatios.length === nextChildren.length
@@ -165,11 +296,11 @@ export function closePane(tree: PaneNode, chatId: string): PaneNode | null {
 
 function filterKeptRatios(
   branch: PaneNode & { type: 'branch' },
-  chatId: string
+  itemId: string
 ): number[] {
   const result: number[] = []
   branch.children.forEach((child, index) => {
-    const kept = closePane(child, chatId)
+    const kept = closePane(child, itemId)
     if (kept !== null) result.push(branch.ratios[index] ?? 0)
   })
   return result
@@ -211,40 +342,91 @@ export function setBranchRatios(
  * missing from the tree are appended as new sibling panes at the root;
  * panes whose chatId no longer exists in the group are removed and the
  * layout is collapsed. Returns the (possibly rebuilt) tree.
+ *
+ * Non-chat leaves (terminals) are preserved untouched — reconcileTree
+ * only prunes/adds chat leaves. To reconcile against a mixed-type list
+ * of refs, use `reconcileTreeFromRefs`.
  */
 export function reconcileTree(tree: PaneNode, chatIds: string[]): PaneNode {
   const known = new Set(chatIds)
-  let current: PaneNode | null = pruneUnknown(tree, known)
+  // FAS-107: use the item-based prune so a terminal leaf whose id lives
+  // in `chatIds` is preserved instead of dropped as an "unknown chat".
+  let current: PaneNode | null = pruneUnknownItemIds(tree, known)
   if (current === null) return buildDefaultTree(chatIds)
-  const existing = new Set(extractChatIds(current))
+  const existing = new Set(
+    extractItemRefs(current).map(ref => ref.id)
+  )
   const missing = chatIds.filter(id => !existing.has(id))
-  for (const chatId of missing) {
-    current = appendChatAtRoot(current, chatId)
+  for (const id of missing) {
+    // Infer the leaf kind from the id prefix so a `term_*` id is added
+    // as a terminal leaf, never as a chat pointing at a nonexistent chat.
+    current = appendLeafAtRoot(current, idToLeaf(id))
   }
   return current
 }
 
-function pruneUnknown(tree: PaneNode, known: Set<string>): PaneNode | null {
-  if (tree.type === 'chat') {
-    return known.has(tree.chatId) ? tree : null
+function pruneUnknownItemIds(
+  tree: PaneNode,
+  knownIds: Set<string>
+): PaneNode | null {
+  if (isLeafPane(tree)) {
+    const id = leafItemId(tree)
+    if (!id) return null
+    return knownIds.has(id) ? tree : null
   }
+  return pruneBranch(tree, node => pruneUnknownItemIds(node, knownIds))
+}
+
+/** Mixed-type variant of `reconcileTree` (FAS-107). */
+export function reconcileTreeFromRefs(
+  tree: PaneNode,
+  refs: WorkspaceItemRef[]
+): PaneNode {
+  const known = new Map(refs.map(ref => [ref.id, ref.kind] as const))
+  let current: PaneNode | null = pruneUnknownItems(tree, known)
+  if (current === null) return buildDefaultTreeFromRefs(refs)
+  const existingIds = new Set(extractItemRefs(current).map(r => r.id))
+  const missing = refs.filter(ref => !existingIds.has(ref.id))
+  for (const ref of missing) {
+    current = appendLeafAtRoot(current, refToLeaf(ref))
+  }
+  return current
+}
+
+function pruneUnknownItems(
+  tree: PaneNode,
+  known: Map<string, WorkspaceItemRef['kind']>
+): PaneNode | null {
+  if (isLeafPane(tree)) {
+    const ref = leafItemRef(tree)
+    if (!ref) return null
+    const kind = known.get(ref.id)
+    if (kind && kind === ref.kind) return tree
+    return null
+  }
+  return pruneBranch(tree, node => pruneUnknownItems(node, known))
+}
+
+function pruneBranch(
+  branch: PaneNode & { type: 'branch' },
+  visit: (node: PaneNode) => PaneNode | null
+): PaneNode | null {
   const nextChildren: PaneNode[] = []
   const nextRatios: number[] = []
-  tree.children.forEach((child, i) => {
-    const kept = pruneUnknown(child, known)
+  branch.children.forEach((child, i) => {
+    const kept = visit(child)
     if (kept !== null) {
       nextChildren.push(kept)
-      nextRatios.push(tree.ratios[i] ?? 0)
+      nextRatios.push(branch.ratios[i] ?? 0)
     }
   })
   if (nextChildren.length === 0) return null
   if (nextChildren.length === 1) return nextChildren[0]
-  return { ...tree, children: nextChildren, ratios: renormalize(nextRatios) }
+  return { ...branch, children: nextChildren, ratios: renormalize(nextRatios) }
 }
 
-function appendChatAtRoot(tree: PaneNode, chatId: string): PaneNode {
-  const leaf: PaneNode = { type: 'chat', chatId }
-  if (tree.type === 'chat') {
+function appendLeafAtRoot(tree: PaneNode, leaf: PaneNode): PaneNode {
+  if (isLeafPane(tree)) {
     return {
       type: 'branch',
       direction: 'horizontal',
@@ -260,7 +442,7 @@ function appendChatAtRoot(tree: PaneNode, chatId: string): PaneNode {
       children: nextChildren
     }
   }
-  // Root is a vertical branch — wrap it and add the new chat to the right.
+  // Root is a vertical branch — wrap it and add the new pane to the right.
   return {
     type: 'branch',
     direction: 'horizontal',

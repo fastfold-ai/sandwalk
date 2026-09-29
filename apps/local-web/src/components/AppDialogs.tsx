@@ -79,6 +79,17 @@ type AppDialogsProps = {
   setRenameGroupTarget: Dispatch<SetStateAction<SessionGroup | null>>
   setRenameGroupValue: Dispatch<SetStateAction<string>>
   submitRenameGroup: () => void
+  /** X2 Fix 1: dialog para renombrar terminal (antes `window.prompt`,
+   *  que en Tauri Mac WKWebView aparecía roto o no aparecía). */
+  renameTerminalTarget: import('@sandwalk/agent-ui-core').TerminalSession | null
+  renameTerminalValue: string
+  setRenameTerminalTarget: Dispatch<
+    SetStateAction<
+      import('@sandwalk/agent-ui-core').TerminalSession | null
+    >
+  >
+  setRenameTerminalValue: Dispatch<SetStateAction<string>>
+  submitRenameTerminal: () => Promise<void>
   deleteTarget: AgentSession | null
   setDeleteTarget: Dispatch<SetStateAction<AgentSession | null>>
   confirmDelete: () => Promise<void>
@@ -123,6 +134,11 @@ export function AppDialogs({
   setRenameGroupTarget,
   setRenameGroupValue,
   submitRenameGroup,
+  renameTerminalTarget,
+  renameTerminalValue,
+  setRenameTerminalTarget,
+  setRenameTerminalValue,
+  submitRenameTerminal,
   deleteTarget,
   setDeleteTarget,
   confirmDelete,
@@ -226,6 +242,59 @@ export function AppDialogs({
               size="sm"
               onClick={() => void submitRename()}
               disabled={!renameValue.trim()}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* X2 Fix 1: dialog para renombrar terminal — antes usaba
+          `window.prompt`, roto en Tauri Mac. Mismo patrón que el de chat. */}
+      <Dialog
+        open={Boolean(renameTerminalTarget)}
+        onOpenChange={open => {
+          if (!open) {
+            setRenameTerminalTarget(null)
+            setRenameTerminalValue('')
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename terminal</DialogTitle>
+            <DialogDescription>
+              Choose a clearer name for this terminal.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameTerminalValue}
+            onChange={event => setRenameTerminalValue(event.target.value)}
+            placeholder="Terminal name"
+            autoFocus
+            maxLength={140}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void submitRenameTerminal()
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRenameTerminalTarget(null)
+                setRenameTerminalValue('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void submitRenameTerminal()}
+              disabled={!renameTerminalValue.trim()}
             >
               Save
             </Button>

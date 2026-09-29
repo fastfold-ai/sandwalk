@@ -38,6 +38,25 @@ export function isReservedAgentRouteId(
     id === 'skills' ||
     id === 'integrations' ||
     isHostTerminalSessionId(id) ||
-    isDraftAgentSessionId(id)
+    isDraftAgentSessionId(id) ||
+    // FAS-107 X3 Fase 6a: los terminales tienen su propia ruta
+    // `/terminals/:id`. Un `term_*` que caiga en `/agents/:id` es un
+    // error de navegación — el router debe descartarlo. `navigateToSession`
+    // (App.tsx) redirige preventivamente a la ruta correcta.
+    (typeof id === 'string' && id.startsWith('term_'))
   )
+}
+
+/**
+ * FAS-107 X3 Fase 6a: navigate helper que elige la ruta correcta según
+ * el prefijo del id. Antes cada consumidor duplicaba el switch
+ * (`id.startsWith('term_') ? '/terminals/' : '/agents/'`), y bastaba
+ * con olvidarse uno para que el sistema cayera en la ruta ambigua.
+ *
+ * - `term_*` → `/terminals/:id`
+ * - `chat_*`, `grp_*`, drafts → `/agents/:id`
+ */
+export function sessionRoutePath(id: string): string {
+  if (id.startsWith('term_')) return `/terminals/${id}`
+  return `/agents/${id}`
 }

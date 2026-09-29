@@ -6,6 +6,9 @@ build/
 .env
 .env.local
 
+# Local-only notes / drafts / private docs (never committed).
+.local/
+
 # Python
 __pycache__/
 *.pyc
@@ -44,3 +47,8 @@ DerivedData/
 
 # sandwalk-bench HF cache
 apps/benchmarking/.cache/
+
+# Playwright e2e / bench artifacts
+apps/local-web/e2e/.artifacts/
+apps/local-web/e2e/.report/
+apps/local-web/e2e/results/

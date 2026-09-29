@@ -16,7 +16,8 @@ import { buildConversationTimeline } from '@/components/agents/transcript'
 import { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
 import { usePrefetchSessionMessages } from '@/hooks/useAppRouteContext'
 import { useChatScroll } from '@/hooks/useChatScroll'
-import { useSessionActions } from '@/hooks/useSessionActions'
+import { useSessionActionsCrud } from '@/hooks/useSessionActionsCrud'
+import { useSessionActionsTabs } from '@/hooks/useSessionActionsTabs'
 import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
 import { useSessionChatStream } from '@/hooks/useSessionChatStream'
@@ -53,7 +54,11 @@ export type PerSessionChatStateArgs = {
    */
   sessionIdRef?: MutableRefObject<string | null>
   session: AgentSession | null
-  sessions: AgentSession[]
+  /**
+   * Latest sessions list by ref. Split panes are memoized on these args;
+   * a ref keeps every pane from re-rendering when any other row changes.
+   */
+  sessionsRef: MutableRefObject<AgentSession[]>
   setSessions: Dispatch<SetStateAction<AgentSession[]>>
   setError: Dispatch<SetStateAction<string | null>>
   loadSessions: (options?: {
@@ -80,7 +85,6 @@ export type PerSessionChatStateArgs = {
   loadModelOptions: () => Promise<void>
   openTabsByProject: Record<string, string[]>
   setOpenTabsByProject: Dispatch<SetStateAction<Record<string, string[]>>>
-  lastSessionByScope: Record<string, string>
   setLastSessionByScope: Dispatch<SetStateAction<Record<string, string>>>
   setProjectScopeId: Dispatch<SetStateAction<string | null>>
   setRecentProjectIds: Dispatch<SetStateAction<string[]>>
@@ -90,7 +94,8 @@ export type PerSessionChatStateArgs = {
   ) => void
   openTabIds: string[]
   setOpenTabIds: (value: string[] | ((current: string[]) => string[])) => void
-  tabGroups: import('@sandwalk/agent-ui-core').SessionGroup[]
+  /** Latest split groups by ref (handlers only; see `sessionsRef`). */
+  tabGroupsRef: MutableRefObject<import('@sandwalk/agent-ui-core').SessionGroup[]>
   setCollapsedSidebarSections: Dispatch<
     SetStateAction<Record<string, boolean>>
   >
@@ -125,7 +130,7 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     health: args.health,
     sessionId: args.sessionId,
     sessionIdRef,
-    sessions: args.sessions,
+    sessionsRef: args.sessionsRef,
     chatBySessionIdRef: chat.chatBySessionIdRef,
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
@@ -135,7 +140,10 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     loadSkillsRef: args.loadSkillsRef
   })
 
-  const actions = useSessionActions({
+  // Pane-local actions: crud + tabs only. Sidebar multi-select lives in
+  // `useAppSessionLayer` (App consumes it), so panes skip that hook and its
+  // render-time dependency on the full sessions array.
+  const actionArgs = {
     client: args.client,
     navigate: args.navigate,
     activeProjectId: args.activeProjectId,
@@ -145,19 +153,18 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     stripSessionId: args.sessionId,
     sessionIdRef,
     session: args.session,
-    sessions: args.sessions,
+    sessionsRef: args.sessionsRef,
     setSessions: args.setSessions,
     activeProject: args.activeProject,
     openTabsByProject: args.openTabsByProject,
     setOpenTabsByProject: args.setOpenTabsByProject,
-    lastSessionByScope: args.lastSessionByScope,
     setLastSessionByScope: args.setLastSessionByScope,
     setProjectScopeId: args.setProjectScopeId,
     setRecentProjectIds: args.setRecentProjectIds,
     patchOpenTabs: args.patchOpenTabs,
     openTabIds: args.openTabIds,
     setOpenTabIds: args.setOpenTabIds,
-    tabGroups: args.tabGroups,
+    tabGroupsRef: args.tabGroupsRef,
     patchChat: chat.patchChat,
     setChatBySessionId: chat.setChatBySessionId,
     composerLiveRef: chat.composerLiveRef,
@@ -167,7 +174,10 @@ export function usePerSessionChatState(args: PerSessionChatStateArgs) {
     setCollapsedSidebarSections: args.setCollapsedSidebarSections,
     setFilesPanelCollapsed: args.setFilesPanelCollapsed,
     setTerminalOpen: args.setTerminalOpen
-  })
+  }
+  const crud = useSessionActionsCrud(actionArgs)
+  const tabs = useSessionActionsTabs(actionArgs)
+  const actions = useMemo(() => ({ ...crud, ...tabs }), [crud, tabs])
 
   // Forward-declared so `useSessionChatSend` (declared before `useChatScroll`
   // due to conversationTimeline dep) can still trigger scroll-to-bottom on

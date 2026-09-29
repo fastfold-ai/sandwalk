@@ -30,10 +30,20 @@ DEFAULT_HTTP_TIMEOUT_S = 5.0
 DEFAULT_STDIO_TIMEOUT_S = 8.0
 FAILURE_COOLDOWN_S = 60.0
 SUCCESS_CACHE_TTL_S = 120.0
+# Stale-while-revalidate: past the fresh TTL a run still gets the last known
+# tool list immediately while one background refresh re-lists the server.
+# Tool objects re-open their own session per call, so a stale *schema* list
+# never talks to a dead connection. Entries older than this are dropped.
+STALE_CACHE_MAX_S = 15 * 60.0
 
 _cache_lock = threading.Lock()
 _failure_until: dict[str, float] = {}
-_success_cache: dict[str, tuple[float, list[Any], list[str]]] = {}
+_success_cache: dict[str, tuple[float, list[Any], list[str]]] = {}  # stored_at, tools, names
+# One loader per server at a time. N concurrent runs (a 4x4 grid = 16) used
+# to handshake every MCP server 16 times in parallel; now the first caller
+# loads and the rest wait for its result. Threading primitives on purpose:
+# each agent run drives its own event loop in its own thread.
+_inflight_locks: dict[str, threading.Lock] = {}
 
 
 def _connection_for_server(server: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
@@ -112,23 +122,61 @@ def _mark_failure(key: str) -> None:
 def _mark_success(key: str, tools: list[Any], tool_names: list[str]) -> None:
     with _cache_lock:
         _failure_until.pop(key, None)
-        _success_cache[key] = (
-            time.monotonic() + SUCCESS_CACHE_TTL_S,
-            list(tools),
-            list(tool_names),
-        )
+        # (stored_at, tools, names); freshness is derived from stored_at.
+        _success_cache[key] = (time.monotonic(), list(tools), list(tool_names))
 
 
-def _cached_success(key: str) -> tuple[list[Any], list[str]] | None:
+def _cached_success(
+    key: str, *, allow_stale: bool = False
+) -> tuple[list[Any], list[str], bool] | None:
+    """Return ``(tools, names, is_fresh)`` or None when nothing usable is cached."""
     with _cache_lock:
         hit = _success_cache.get(key)
         if hit is None:
             return None
-        expires, tools, names = hit
-        if time.monotonic() >= expires:
+        stored_at, tools, names = hit
+        age = time.monotonic() - stored_at
+        if age < SUCCESS_CACHE_TTL_S:
+            return list(tools), list(names), True
+        if age >= STALE_CACHE_MAX_S:
             _success_cache.pop(key, None)
             return None
-        return list(tools), list(names)
+        if not allow_stale:
+            return None
+        return list(tools), list(names), False
+
+
+def _inflight_lock(key: str) -> threading.Lock:
+    with _cache_lock:
+        return _inflight_locks.setdefault(key, threading.Lock())
+
+
+def _refresh_in_background(name: str, connection: dict[str, Any], timeout_s: float) -> None:
+    """Re-list one server off the caller's loop; skipped if a load is in flight."""
+    key = _cache_key(name, connection)
+    lock = _inflight_lock(key)
+    if not lock.acquire(blocking=False):
+        return
+
+    def _run() -> None:
+        try:
+            asyncio.run(
+                _load_locked(
+                    name=name,
+                    connection=connection,
+                    timeout_s=timeout_s,
+                    use_cache=True,
+                    key=key,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Background MCP refresh for %s failed: %s", name, exc)
+        finally:
+            lock.release()
+
+    threading.Thread(
+        target=_run, name=f"mcp-refresh-{name}", daemon=True
+    ).start()
 
 
 def _in_failure_cooldown(key: str) -> bool:
@@ -147,6 +195,7 @@ def clear_mcp_tool_caches() -> None:
     with _cache_lock:
         _failure_until.clear()
         _success_cache.clear()
+        _inflight_locks.clear()
 
 
 def ensure_quiet_stdio_mcp_errlog() -> None:
@@ -229,14 +278,58 @@ async def _load_server_entry(
     use_cache: bool,
 ) -> tuple[str, list[Any], list[str]]:
     key = _cache_key(name, connection)
-    if use_cache:
+    if not use_cache:
+        return await _load_locked(
+            name=name,
+            connection=connection,
+            timeout_s=timeout_s,
+            use_cache=False,
+            key=key,
+        )
+
+    cached = _cached_success(key, allow_stale=True)
+    if cached is not None:
+        tools, names, fresh = cached
+        if not fresh:
+            _refresh_in_background(name, connection, timeout_s)
+        return name, tools, names
+    if _in_failure_cooldown(key):
+        logger.debug("Skipping MCP %s (failure cooldown)", name)
+        return name, [], []
+
+    lock = _inflight_lock(key)
+    # Wait (off the event loop) for a concurrent loader of the same server;
+    # bounded so a wedged peer can't hold every other run hostage.
+    acquired = await asyncio.to_thread(lock.acquire, True, timeout_s + 1.0)
+    if not acquired:
+        logger.warning("Timed out waiting for a concurrent MCP load of %s", name)
+        return name, [], []
+    try:
         cached = _cached_success(key)
         if cached is not None:
             return name, cached[0], cached[1]
         if _in_failure_cooldown(key):
-            logger.debug("Skipping MCP %s (failure cooldown)", name)
             return name, [], []
+        return await _load_locked(
+            name=name,
+            connection=connection,
+            timeout_s=timeout_s,
+            use_cache=True,
+            key=key,
+        )
+    finally:
+        lock.release()
 
+
+async def _load_locked(
+    *,
+    name: str,
+    connection: dict[str, Any],
+    timeout_s: float,
+    use_cache: bool,
+    key: str,
+) -> tuple[str, list[Any], list[str]]:
+    """Perform one real server listing and record success/failure."""
     try:
         loaded = await asyncio.wait_for(
             _load_one_server(name, connection),

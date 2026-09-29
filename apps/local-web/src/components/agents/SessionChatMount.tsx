@@ -3,8 +3,10 @@ import type {
   AgentProject,
   AgentSession
 } from '@sandwalk/agent-ui-core'
-import { type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { type Dispatch, memo, type RefObject, type SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
+
+import { perfCount } from '@/lib/perf-probe'
 
 import { SessionChatBody } from '@/components/agents/session-main/session-chat-body'
 import {
@@ -66,11 +68,12 @@ export type SessionChatMountProps = {
   splitMode?: { focused: boolean }
 }
 
-export function SessionChatMount({
+function SessionChatMountInner({
   perSessionArgs,
   shared,
   splitMode
 }: SessionChatMountProps) {
+  perfCount('render.SessionChatMount')
   const perSession = usePerSessionChatState(perSessionArgs)
   const {
     chat,
@@ -116,10 +119,14 @@ export function SessionChatMount({
       chatScrollRef={perSession.scroll.chatScrollRef}
       chatEndRef={perSession.scroll.chatEndRef}
       conversationTimeline={conversationTimeline}
-      expandedToolRunKeys={shared.expandedToolRunKeys}
+      /*
+       * Per-session, not `shared.*`: those are the shell's active chat and
+       * painted pane A's usage badges / expanded tool runs in pane B.
+       */
+      expandedToolRunKeys={chat.expandedToolRunKeys}
       patchChat={shared.patchChat}
-      runIdByMessageId={shared.runIdByMessageId}
-      usageByRunId={shared.usageByRunId}
+      runIdByMessageId={chat.runIdByMessageId}
+      usageByRunId={chat.usageByRunId}
       copiedMessageId={shared.copiedMessageId}
       setCopiedMessageId={shared.setCopiedMessageId}
       activeRunTools={activeRunTools}
@@ -146,3 +153,42 @@ export function SessionChatMount({
     />
   )
 }
+
+function sameRecord(
+  a: Record<string, unknown> | undefined,
+  b: Record<string, unknown> | undefined,
+  label: string
+): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  let same = true
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (!Object.is(a[key], b[key])) {
+      perfCount(`props.SessionChatMount.${label}.${key}`)
+      same = false
+    }
+  }
+  return same
+}
+
+/**
+ * Memoized one level deep: `perSessionArgs` / `shared` are rebuilt every
+ * render by the props builders, but their fields are mostly stable, so
+ * compare fields, not the wrapper objects. Records the churning field for
+ * the perf harness.
+ */
+export const SessionChatMount = memo(SessionChatMountInner, (prev, next) => {
+  const args = sameRecord(
+    prev.perSessionArgs as unknown as Record<string, unknown>,
+    next.perSessionArgs as unknown as Record<string, unknown>,
+    'perSessionArgs'
+  )
+  const shared = sameRecord(
+    prev.shared as unknown as Record<string, unknown>,
+    next.shared as unknown as Record<string, unknown>,
+    'shared'
+  )
+  const split = prev.splitMode?.focused === next.splitMode?.focused
+  if (!split) perfCount('props.SessionChatMount.splitMode')
+  return args && shared && split
+})

@@ -6,7 +6,8 @@ import type {
 
 import { slugifyIntegrationRoute } from '@/components/agents/dashboard-main-view-helpers'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
-import { groupTabItems, type TabItem } from '@/lib/sessions'
+import { type GroupChild, groupTabItems, type TabItem } from '@/lib/sessions'
+import { assertNever } from '@/lib/strip-item'
 
 export function resolveSelectedIntegrationKey(
   decodedIntegrationRouteName: string | null,
@@ -116,17 +117,34 @@ export function buildSessionSidebarModel(input: {
   openTabIds: string[]
   /** Keep the open chat visible in the tab strip while its project assignment catches up. */
   activeSessionId?: string | null
+  /** FAS-107: terminals of the active project (optional). */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
 }) {
   const displayedSessions = input.activeProjectId
     ? input.sessions.filter(item => item.projectId === input.activeProjectId)
     : input.sessions
-  // Grupos que aplican al scope actual: al menos uno de sus chatIds vive en
-  // `displayedSessions`. Los grupos son por-scope-de-proyecto ya en el store
-  // (`useAppTabGroups` usa `projectTabsKey`), esta segunda vuelta filtra por
-  // si acaso quedaron grupos con chats de otros scopes al vuelo.
-  const displayedIds = new Set(displayedSessions.map(item => item.id))
+  // FAS-107: same scope filter as chats — terminals of the active
+  // project only. Cross-project terminals aren't shown outside their
+  // home project (parallel to sessions filtering).
+  const displayedTerminals = input.activeProjectId
+    ? (input.terminals ?? []).filter(
+        t => t.projectId === input.activeProjectId
+      )
+    : input.terminals ?? []
+  // Grupos que aplican al scope actual: al menos uno de sus itemIds vive en
+  // `displayedSessions` o `displayedTerminals`. Los grupos son
+  // por-scope-de-proyecto ya en el store (`useAppTabGroups` usa
+  // `projectTabsKey`), esta segunda vuelta filtra por si acaso quedaron
+  // grupos con items de otros scopes al vuelo.
+  // FAS-107: el Set incluye terminales — antes solo se poblaba con chat
+  // IDs y un group compuesto solo por terminales (sin chats de agente)
+  // fallaba el `.some(...)` → chip invisible en sidebar aunque el mismo
+  // group sí apareciera en el strip.
+  const displayedIds = new Set<string>()
+  for (const item of displayedSessions) displayedIds.add(item.id)
+  for (const term of displayedTerminals) displayedIds.add(term.id)
   const applicableGroups = input.tabGroups.filter(g =>
-    g.chatIds.some(id => displayedIds.has(id))
+    g.itemIds.some(id => displayedIds.has(id))
   )
   // Pass `input.sessions` (unfiltered) so groupTabItems can resolve foreign
   // chats inside cross-project groups. Standalone chats stay scoped via
@@ -134,7 +152,8 @@ export function buildSessionSidebarModel(input: {
   const sections = groupTabItems(
     displayedSessions,
     applicableGroups,
-    input.sessions
+    input.sessions,
+    displayedTerminals
   )
   // `openTabs` mezcla chats y grupos en el orden real de `openTabIds`. Los
   // items que no se pueden resolver (chat en otro scope, grupo aún cargando)
@@ -142,18 +161,39 @@ export function buildSessionSidebarModel(input: {
   // activo aunque el filtro de proyecto lo excluiría.
   const sessionsById = new Map(input.sessions.map(s => [s.id, s]))
   const groupsById = new Map(input.tabGroups.map(g => [g.id, g]))
+  // FAS-107 X4.4-hotfix: reconocer terminales en `openTabs`. Antes solo
+  // se resolvían chats y grupos → cuando la strip tenía SOLO terminales,
+  // `openTabs.length` daba 0 y `computeShowSessionTabs` retornaba false
+  // → aparecía "New Chat" en franja negra arriba mientras el chip del
+  // terminal seguía visible por otra vía. Cruce visual feo.
+  const terminalsById = new Map(
+    (input.terminals ?? []).map(t => [t.id, t])
+  )
   const openTabs: TabItem[] = input.openTabIds
     .map<TabItem | null>(id => {
       const group = groupsById.get(id)
       if (group) {
-        const children = group.chatIds
-          .map(cid => sessionsById.get(cid))
-          .filter((s): s is AgentSession => Boolean(s))
+        const children = group.itemIds.flatMap((cid): GroupChild[] => {
+          const session = sessionsById.get(cid)
+          if (session) return [{ kind: 'chat', id: cid, session }]
+          const terminal = terminalsById.get(cid)
+          if (terminal) return [{ kind: 'terminal', id: cid, terminal }]
+          return []
+        })
         return {
           kind: 'group',
           id: group.id,
           group,
           children,
+          lastActivity: 0
+        }
+      }
+      const terminal = terminalsById.get(id)
+      if (terminal) {
+        return {
+          kind: 'terminal',
+          id: terminal.id,
+          terminal,
           lastActivity: 0
         }
       }
@@ -172,13 +212,24 @@ export function buildSessionSidebarModel(input: {
     .filter(item => {
       if (!input.activeProjectId) return true
       if (item.id === input.activeSessionId) return true
-      if (item.kind === 'chat') {
-        return item.session.projectId === input.activeProjectId
+      // FAS-107 X5.3 · exhaustive switch con `assertNever`. Si en el
+      // futuro agregamos un `kind` a `TabItem` (nota, canvas, mcp),
+      // TypeScript señala este bloque en compile time — no puede haber
+      // "consumidor olvidó tipo X" que compile con éxito.
+      switch (item.kind) {
+        case 'chat':
+          return item.session.projectId === input.activeProjectId
+        case 'terminal':
+          return (item.terminal.projectId ?? null) === input.activeProjectId
+        case 'group':
+          return item.children.some(child =>
+            child.kind === 'chat'
+              ? child.session.projectId === input.activeProjectId
+              : (child.terminal.projectId ?? null) === input.activeProjectId
+          )
+        default:
+          return assertNever(item)
       }
-      // Grupos: aplican si al menos uno de sus chats pertenece al scope.
-      return item.children.some(
-        s => s.projectId === input.activeProjectId
-      )
     })
   return { displayedSessions, sections, openTabs }
 }

@@ -63,6 +63,9 @@ def set_skill_enabled(
     *,
     project_root: Path | None = None,
 ) -> dict:
+    from agent.deepagents_runtime.skills_sources import invalidate_skill_sources_cache
+
+    invalidate_skill_sources_cache()
     skills = _skills.iter_skills(project_root)
     key = _skills._resolve_skill_key(name, skills)
     if key is None:
@@ -179,6 +182,9 @@ def remove_all_skills(*, project_root: Path | None = None) -> dict:
 
 def remove_skill(name: str, *, dest: Path | None = None) -> dict:
     """Remove a globally-installed skill by name."""
+    from agent.deepagents_runtime.skills_sources import invalidate_skill_sources_cache
+
+    invalidate_skill_sources_cache()
     dest = dest or _skills.GLOBAL_SKILLS_DIR
     resolved_name = name
     installed = _skills._scan_dir(dest, "global")

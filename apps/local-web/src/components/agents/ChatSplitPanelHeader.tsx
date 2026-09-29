@@ -14,7 +14,7 @@ import {
   Terminal,
   X
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { ProjectMark } from '@/components/agents/ProjectMark'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
@@ -37,6 +37,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { copyText } from '@/lib/clipboard'
+import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
 import { useSessionTabColors } from './session-tab-colors'
@@ -118,7 +119,7 @@ export type ChatSplitPanelHeaderProps = {
   onSplitDown?: (sessionId: string) => void
 }
 
-export function ChatSplitPanelHeader({
+function ChatSplitPanelHeaderInner({
   session,
   focused,
   onFocusPanel,
@@ -146,6 +147,7 @@ export function ChatSplitPanelHeader({
   onSplitUp,
   onSplitDown
 }: ChatSplitPanelHeaderProps) {
+  perfCount('render.ChatSplitPanelHeader')
   const { tabColors, setTabColor } = useSessionTabColors()
   const [cliOpen, setCliOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -315,7 +317,7 @@ export function ChatSplitPanelHeader({
                     onSelect={() => onRename(session)}
                   >
                     <Pencil className="size-3.5" />
-                    Rename…
+                    Rename chat…
                   </DropdownMenuItem>
                 ) : null}
                 {onMoveToProject && projects.length > 0 ? (
@@ -464,7 +466,18 @@ export function ChatSplitPanelHeader({
  * tiene configurado. Cuando el chat no tiene proyecto asociado, se
  * muestra un fallback discreto con su propia explicación.
  */
-function ProjectMetaHover({ project }: { project: AgentProject | null }) {
+/**
+ * Memoized: one per pane, re-rendered on every App cascade otherwise. The
+ * parent pins its handlers with `useStableHandlers`, so only real changes
+ * (session row, focus, panel flags) get through.
+ */
+export const ChatSplitPanelHeader = memo(ChatSplitPanelHeaderInner)
+
+function ProjectMetaHoverInner({
+  project
+}: {
+  project: AgentProject | null
+}) {
   /*
    * Popover con hover-para-abrir + click-para-pinnear.
    *
@@ -546,7 +559,7 @@ function ProjectMetaHover({ project }: { project: AgentProject | null }) {
             onMouseEnter={scheduleOpen}
             onMouseLeave={scheduleClose}
           >
-            Sin proyecto asociado
+            No project
           </span>
         )}
       </PopoverTrigger>
@@ -569,6 +582,9 @@ function ProjectMetaHover({ project }: { project: AgentProject | null }) {
     </Popover>
   )
 }
+
+/** Memoized: one per pane header; `project` comes from the projects store. */
+export const ProjectMetaHover = memo(ProjectMetaHoverInner)
 
 function ProjectFicha({ project }: { project: AgentProject }) {
   /*
@@ -599,13 +615,13 @@ function ProjectFicha({ project }: { project: AgentProject }) {
       {/* Zona scrolleable */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {project.description ? (
-          <FichaSection title="Descripción">
+          <FichaSection title="Description">
             <CollapsibleText text={project.description} />
           </FichaSection>
         ) : null}
 
         {project.folderPath ? (
-          <FichaSection title="Carpeta local">
+          <FichaSection title="Local folder">
             <p
               className="text-foreground/90 break-all font-mono text-[11.5px] leading-relaxed"
               title={project.folderPath}
@@ -616,7 +632,7 @@ function ProjectFicha({ project }: { project: AgentProject }) {
         ) : null}
 
         {project.agentContext ? (
-          <FichaSection title="Contexto para el agente">
+          <FichaSection title="Agent context">
             <CollapsibleText text={project.agentContext} />
           </FichaSection>
         ) : null}
@@ -627,7 +643,7 @@ function ProjectFicha({ project }: { project: AgentProject }) {
         {formatSessionCount(project.sessionCount)}
         {project.createdAt ? (
           <>
-            {' · creado '}
+            {' · created '}
             {formatCreatedAt(project.createdAt)}
           </>
         ) : null}
@@ -681,12 +697,12 @@ function CollapsibleText({ text }: { text: string }) {
           {expanded ? (
             <>
               <ChevronDown className="size-3 rotate-180" aria-hidden />
-              Ver menos
+              Show less
             </>
           ) : (
             <>
               <ChevronDown className="-rotate-90 size-3" aria-hidden />
-              Ver más
+              Show more
             </>
           )}
         </button>
@@ -703,11 +719,11 @@ function NoProjectFicha() {
       </span>
       <div className="min-w-0 flex-1">
         <h3 className="text-foreground text-[13px] font-semibold">
-          Sin proyecto asociado
+          No project
         </h3>
         <p className="text-muted-foreground mt-1 text-[12px] leading-relaxed">
-          Este chat no está vinculado a ningún proyecto. Podés asociarlo
-          desde el selector de proyecto del composer.
+          This chat is not linked to a project. You can assign one from the
+          project picker in the composer.
         </p>
       </div>
     </div>
@@ -732,7 +748,7 @@ function FichaSection({
 }
 
 function formatSessionCount(count: number): string {
-  if (count === 0) return 'Sin chats'
+  if (count === 0) return 'No chats'
   if (count === 1) return '1 chat'
   return `${count} chats`
 }
@@ -740,7 +756,7 @@ function formatSessionCount(count: number): string {
 function formatCreatedAt(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString('es-ES', {
+  return d.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric'

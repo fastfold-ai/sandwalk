@@ -23,6 +23,7 @@ import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { startPlanBuild } from '@/lib/plan-build'
+import { perfCount } from '@/lib/perf-probe'
 import { type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -133,6 +134,7 @@ export function SessionChatBody({
   error,
   splitMode
 }: SessionChatBodyProps) {
+  perfCount('render.SessionChatBody')
   const isSplit = Boolean(splitMode)
   const splitFocused = splitMode?.focused ?? false
   // Altura medida del composer embedded — el transcript la usa como

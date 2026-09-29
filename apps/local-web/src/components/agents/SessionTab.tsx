@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { AgentSession } from '@sandwalk/agent-ui-core'
-import { Columns2, Pin, X } from 'lucide-react'
+import { Columns2, Pin, SquareTerminal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { UNREAD_DOT_COLOR } from '@/lib/sidebar-unread-filter'
@@ -170,7 +170,7 @@ export type SessionTabProps = {
    * badge numérico con `groupCount`. Todo lo demás (chrome, hover, marquee,
    * X para disolver) se mantiene idéntico al de una pestaña de sesión.
    */
-  variant?: 'session' | 'group'
+  variant?: 'session' | 'group' | 'terminal'
   groupCount?: number
 }
 
@@ -188,6 +188,7 @@ export function SessionTab({
   groupCount
 }: SessionTabProps) {
   const isGroup = variant === 'group'
+  const isTerminal = variant === 'terminal'
   const [hovering, setHovering] = useState(false)
   const {
     attributes,
@@ -260,6 +261,17 @@ export function SessionTab({
     >
       <TabBackground width={tabWidth} />
       <div className="chrome-tab-content">
+        {/* T2: pin PRIMERO — antes de cualquier icon del tipo — para
+            leerse como tag del tab. Aplica a chat, terminal y grupo
+            por igual. Paridad con R3/R5 en la fila del sidebar. Blanco
+            absoluto con fill=currentColor para máxima legibilidad. */}
+        {pinned ? (
+          <Pin
+            className="text-white size-3 shrink-0"
+            fill="currentColor"
+            aria-hidden
+          />
+        ) : null}
         {isGroup ? (
           <>
             <Columns2
@@ -275,15 +287,20 @@ export function SessionTab({
               </span>
             ) : null}
           </>
+        ) : isTerminal ? (
+          // Terminal chip: orange type-icon (SquareTerminal) replaces the
+          // chat status + source icons. Keeps the chip's chrome, marquee,
+          // close button unchanged for a consistent tab-strip anatomy.
+          <SquareTerminal
+            className="size-3.5 shrink-0 text-orange-500"
+            aria-hidden
+          />
         ) : (
           <>
             <SessionStatusIcon status={tab.status} />
             <SessionSourceIcon source={tab.source} label={tab.sourceLabel} />
           </>
         )}
-        {pinned ? (
-          <Pin className="text-muted-foreground size-3 shrink-0" aria-hidden />
-        ) : null}
         {unread ? (
           <span
             className="size-2 shrink-0 rounded-full"

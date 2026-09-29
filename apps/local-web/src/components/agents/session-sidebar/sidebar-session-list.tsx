@@ -1,5 +1,9 @@
 import { LocalAgentClient } from '@sandwalk/agent-local-client'
-import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
+import type {
+  AgentProject,
+  AgentSession,
+  TerminalSession
+} from '@sandwalk/agent-ui-core'
 import {
   Archive,
   ArrowUpRight,
@@ -12,10 +16,12 @@ import {
   Pencil,
   Pin,
   Search,
+  SquareTerminal,
   Trash2
 } from 'lucide-react'
 import {
   type Dispatch,
+  memo,
   type MouseEvent,
   type SetStateAction,
   useEffect,
@@ -29,19 +35,33 @@ import type { NavigateFunction } from 'react-router-dom'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
+import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
-import { relativeTime, type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import { perfCount } from '@/lib/perf-probe'
+import type { SessionActivityMap } from '@/lib/session-activity'
+import {
+  type GroupChild,
+  relativeTime,
+  type TabItemSection
+} from '@/lib/sessions'
 import {
   isSidebarGroupExpanded,
   setSidebarGroupExpanded
@@ -52,7 +72,7 @@ import {
 } from '@/lib/sidebar-unread-filter'
 import { cn } from '@/lib/utils'
 
-function UnreadDot({ className }: { className?: string }) {
+export function UnreadDot({ className }: { className?: string }) {
   return (
     <span
       className={cn('size-2 shrink-0 rounded-full', className)}
@@ -175,6 +195,8 @@ function SidebarMarqueeTitle({ text }: { text: string }) {
   )
 }
 
+import { SidebarTerminalRow } from './sidebar-terminals-section'
+
 type SessionSection = TabItemSection
 
 export type SidebarSessionListProps = {
@@ -183,7 +205,8 @@ export type SidebarSessionListProps = {
   scopeKey?: string | null
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  /** Spinner / approval flags only — see `useSessionActivity`. */
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
@@ -207,7 +230,10 @@ export type SidebarSessionListProps = {
   onSelectTabGroup?: (groupId: string) => void
   onRenameTabGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
+  /** X4.2b: cerrar el chip del grupo del strip desde el menú del sidebar. */
+  onCloseTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   /**
    * Proyecto activo en el shell. Sirve para clasificar los chats hijos
    * de un split como "nativos" (mismo proyecto) o "invitados" (otro).
@@ -229,14 +255,30 @@ export type SidebarSessionListProps = {
    */
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   unreadOnly?: boolean
+  /** @deprecated FAS-107 pre-mix: terminals now interleave into the
+   * regular date buckets (Today / Yesterday / …) via `groupTabItems`. */
+  extraTopSection?: React.ReactNode
+  /** FAS-107 GF6/GF8: terminal rendering hooks used by inline rows. */
+  activeTerminalId?: string | null
+  onCloseTerminal?: (terminalId: string) => void
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }
 
-export function SidebarSessionList({
+function SidebarSessionListInner({
   sections,
   scopeKey = null,
   collapsedSidebarSections,
   sessionId,
-  chatBySessionId,
+  activityBySessionId,
   selectedSessionIds,
   threadMenuOpenId,
   projects,
@@ -255,13 +297,23 @@ export function SidebarSessionList({
   onSelectTabGroup,
   onRenameTabGroup,
   onDissolveTabGroup,
+  onCloseTabGroup,
   onSetTabGroupColor,
+  onSetTabGroupPinned,
   activeProjectId,
   onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat,
-  unreadOnly = false
+  unreadOnly = false,
+  extraTopSection,
+  activeTerminalId,
+  onCloseTerminal,
+  onRemoveTerminalFromSplit,
+  onMoveTerminalToProject,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel
 }: SidebarSessionListProps) {
+  perfCount('render.SidebarSessionList')
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
   const [visibleBySection, setVisibleBySection] = useState<
@@ -342,6 +394,7 @@ export function SidebarSessionList({
         className="space-y-2.5 p-2.5 transition-opacity duration-150 ease-out"
         style={{ opacity: listOpacity }}
       >
+        {extraTopSection}
         {listSections.length === 0 ? (
           <p className="text-muted-foreground px-1.5 py-2 text-[13px]">
             {unreadOnly ? 'No unread chats' : 'No Agents Yet'}
@@ -395,9 +448,9 @@ export function SidebarSessionList({
                           <SidebarGroupItem
                             key={item.id}
                             group={item.group}
-                            chats={item.children}
+                            children={item.children}
                             activeId={sessionId}
-                            chatBySessionId={chatBySessionId}
+                            activityBySessionId={activityBySessionId}
                             tabColors={tabColors}
                             selectedSessionIds={selectedSessionIds}
                             attentionIds={attentionIds}
@@ -405,7 +458,9 @@ export function SidebarSessionList({
                             onSelectGroup={onSelectTabGroup}
                             onRenameGroup={onRenameTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
+                            onCloseGroup={onCloseTabGroup}
                             onSetGroupColor={onSetTabGroupColor}
+                            onSetGroupPinned={onSetTabGroupPinned}
                             activeProjectId={activeProjectId}
                             onGoToChatProject={onGoToChatProject}
                             projects={projects}
@@ -415,6 +470,34 @@ export function SidebarSessionList({
                             updateSession={updateSession}
                             exportTranscript={exportTranscript}
                             setDeleteTarget={setDeleteTarget}
+                            onSelectTerminal={terminalId => {
+                              /*
+                               * FAS-107 P2: parity con el `onSelectChat`
+                               * de abajo. Un terminal miembro de un split
+                               * NO se saca a `/terminals/:id` — eso lo
+                               * agrandaba a pantalla completa y dejaba al
+                               * usuario en un "tab invisible" fuera del
+                               * strip. En su lugar seteamos el terminal
+                               * como el `activeChatId` del grupo (los
+                               * grupos aceptan term_* ids) y navegamos al
+                               * grupo, para que el split renderice con
+                               * ese panel enfocado.
+                               */
+                              setSelectionAnchorId(terminalId)
+                              if (setTabGroupActiveChat) {
+                                flushSync(() => {
+                                  setTabGroupActiveChat(item.group.id, terminalId)
+                                })
+                              }
+                              navigate(`/agents/${item.group.id}`)
+                            }}
+                            onCloseTerminal={onCloseTerminal}
+                            onRemoveTerminalFromSplit={onRemoveTerminalFromSplit}
+                            onRenameTerminal={onRenameTerminal}
+                            onToggleTerminalOrganizeLabel={
+                              onToggleTerminalOrganizeLabel
+                            }
+                            onMoveTerminalToProject={onMoveTerminalToProject}
                             onSelectChat={chatId => {
                               /*
                                * Chat hijo del split: en vez de abrir el
@@ -443,6 +526,41 @@ export function SidebarSessionList({
                           />
                         )
                       }
+                      if (item.kind === 'terminal') {
+                        return (
+                          <SidebarTerminalRow
+                            key={item.id}
+                            terminal={item.terminal}
+                            // FAS-107: the row lights up whether you're
+                            // on the terminal's solo route (URL matches
+                            // `activeTerminalId`) or the terminal is the
+                            // focused pane of a split (URL is
+                            // `/agents/:groupId` and `activeGroupChildId`
+                            // resolves to this terminal). Matches the way
+                            // chat children of a split highlight.
+                            active={
+                              item.id === activeTerminalId ||
+                              item.id === activeGroupChildId
+                            }
+                            projects={projects}
+                            colorValue={tabColors[item.id]}
+                            onOpen={id => {
+                              openSessionTab(id)
+                              navigate(`/terminals/${id}`)
+                            }}
+                            onClose={onCloseTerminal}
+                            onMoveToProject={onMoveTerminalToProject}
+                            onRename={onRenameTerminal}
+                            onTogglePin={id =>
+                              onToggleTerminalOrganizeLabel?.(id, 'pinned')
+                            }
+                            onToggleArchive={id =>
+                              onToggleTerminalOrganizeLabel?.(id, 'archive')
+                            }
+                            onSetColor={(id, color) => setTabColor(id, color)}
+                          />
+                        )
+                      }
                       const chat = item.session
                       const isSelected = selectedSessionIds.has(item.id)
                       const selecting = selectedSessionIds.size > 0
@@ -463,10 +581,33 @@ export function SidebarSessionList({
                             }}
                           >
                             <div className="flex min-w-0 items-center gap-1.5">
+                              {/* R3+R4: pin A LA IZQUIERDA DEL TODO, antes
+                                  del checkbox de selección. Vive fuera del
+                                  button clickable para que quede visualmente
+                                  alineado con el pin del terminal (que en
+                                  su fila también va como primer elemento
+                                  del row). Blanco absoluto con fill para
+                                  máxima legibilidad en la sección Pinned.
+                                  FAS-107: pin en slot uniforme `size-4`
+                                  con `place-items-center` para alineación
+                                  vertical con las filas de terminal y
+                                  group split. */}
+                              {chat.organizeLabel === 'pinned' ? (
+                                <span
+                                  aria-hidden
+                                  className="grid size-4 shrink-0 place-items-center"
+                                >
+                                  <Pin
+                                    aria-label="Pinned"
+                                    className="text-white size-3"
+                                    fill="currentColor"
+                                  />
+                                </span>
+                              ) : null}
                               <button
                                 type="button"
                                 className={cn(
-                                  'grid size-3.5 shrink-0 place-items-center',
+                                  'grid size-4 shrink-0 place-items-center',
                                   (isSelected || selecting) &&
                                     'rounded-[4px] border',
                                   isSelected
@@ -505,9 +646,9 @@ export function SidebarSessionList({
                                   <SessionStatusIcon
                                     status={
                                       chat.status === 'awaiting_approval' ||
-                                      chatBySessionId[item.id]?.pendingApproval
+                                      activityBySessionId[item.id]?.pendingApproval
                                         ? 'awaiting_approval'
-                                        : chatBySessionId[item.id]?.runActive
+                                        : activityBySessionId[item.id]?.runActive
                                           ? 'running'
                                           : chat.status
                                     }
@@ -550,9 +691,6 @@ export function SidebarSessionList({
                                 source={chat.source}
                                 label={chat.sourceLabel}
                               />
-                              {chat.organizeLabel === 'pinned' ? (
-                                <Pin className="text-muted-foreground/70 size-3 shrink-0" />
-                              ) : null}
                               {tabColor ? (
                                 <span
                                   className="size-2 shrink-0 rounded-full border border-black/10"
@@ -707,6 +845,27 @@ export function SidebarSessionList({
 }
 
 /**
+ * Memoized: the parent re-renders on every streamed token (chat store in
+ * a root context); this list only needs to repaint when sessions,
+ * selection, or activity flags change.
+ */
+export const SidebarSessionList = memo(SidebarSessionListInner, (prev, next) => {
+  // Shallow compare, but record which prop broke memoization so the perf
+  // harness (`props.SidebarSessionList.<name>`) shows what still churns.
+  let equal = true
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+    keyof SidebarSessionListProps
+  >
+  for (const key of keys) {
+    if (!Object.is(prev[key], next[key])) {
+      perfCount(`props.SidebarSessionList.${String(key)}`)
+      equal = false
+    }
+  }
+  return equal
+})
+
+/**
  * Item de grupo de split view en el sidebar. Se pinta como una fila con
  * chevron collapsible; los chats hijos aparecen anidados debajo con una
  * indent y una línea vertical sutil (Arc/Notion style). La memoria de
@@ -715,18 +874,26 @@ export function SidebarSessionList({
  */
 function SidebarGroupItem({
   group,
-  chats,
+  children: groupChildren,
   activeId,
   activeChildId,
-  chatBySessionId,
+  activityBySessionId,
   tabColors,
   selectedSessionIds,
   attentionIds,
   onSelectGroup,
   onRenameGroup,
   onDissolveGroup,
+  onCloseGroup,
   onSelectChat,
+  onSelectTerminal,
+  onCloseTerminal,
+  onRemoveTerminalFromSplit,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject,
   onSetGroupColor,
+  onSetGroupPinned,
   activeProjectId,
   onGoToChatProject,
   projects,
@@ -738,18 +905,35 @@ function SidebarGroupItem({
   setDeleteTarget
 }: {
   group: import('@sandwalk/agent-ui-core').SessionGroup
-  chats: AgentSession[]
+  children: GroupChild[]
   activeId: string | null
   activeChildId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   tabColors: Record<string, string>
   selectedSessionIds: Set<string>
   attentionIds: ReadonlySet<string>
   onSelectGroup?: (groupId: string) => void
   onRenameGroup?: (group: import('@sandwalk/agent-ui-core').SessionGroup) => void
   onDissolveGroup?: (groupId: string) => void
+  /** X4.2b: cerrar el chip del grupo del strip (asimetría §3.2). El
+   *  grupo sigue existiendo, solo desaparece del strip. */
+  onCloseGroup?: (groupId: string) => void
   onSelectChat: (chatId: string) => void
+  /** FAS-107: click a terminal child of the split → open its solo route. */
+  onSelectTerminal: (terminalId: string) => void
+  onCloseTerminal?: (terminalId: string) => void
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  onSetGroupPinned?: (groupId: string, pinned: boolean) => void
   activeProjectId: string | null
   onGoToChatProject?: (chat: AgentSession) => void
   projects: AgentProject[]
@@ -783,10 +967,18 @@ function SidebarGroupItem({
   // El name es siempre no-vacío ahora (auto "Group N" al crear, o custom
   // tras rename). El badge con la cuenta de chats vive aparte, al lado.
   const label = group.name || `Group`
-  const chatCount = group.chatIds.length
+  const memberCount = group.itemIds.length
   const groupActive = group.id === activeId
-  const activeInside = chats.some(chat => chat.id === activeId)
-  const groupUnread = chats.some(chat => attentionIds.has(chat.id))
+  // Any child (chat or terminal) with focus lights up the group chip.
+  const activeInside = groupChildren.some(child => child.id === activeId)
+  // FAS-107 · Fase 1a · attention unificado: cualquier hijo (chat o
+  // terminal) con atención pendiente enciende el dot azul del grupo.
+  // Antes se filtraba solo `chat` porque los terminales vivían en un
+  // bus paralelo; hoy comparten el mismo Set.
+  const chatChildren = groupChildren.flatMap(child =>
+    child.kind === 'chat' ? [child.session] : []
+  )
+  const groupUnread = groupChildren.some(child => attentionIds.has(child.id))
 
   return (
     <li>
@@ -804,30 +996,33 @@ function SidebarGroupItem({
           setMenuOpen(true)
         }}
       >
-        <div className="flex min-w-0 items-center gap-1">
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground -ml-1 grid size-4 shrink-0 place-items-center rounded"
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Collapse group' : 'Expand group'}
-            onClick={event => {
-              event.stopPropagation()
-              setExpanded(v => !v)
-            }}
-          >
-            <ChevronDown
-              className={cn(
-                'size-3.5 transition-transform',
-                !expanded && '-rotate-90'
-              )}
-            />
-          </button>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {/* FAS-107: pin en slot uniforme `size-4` con
+              `place-items-center` para alineación vertical con las
+              filas de chat y terminal en la sección Pinned. */}
+          {group.pinned ? (
+            <span
+              aria-hidden
+              className="grid size-4 shrink-0 place-items-center"
+            >
+              <Pin
+                aria-label="Pinned"
+                className="text-white size-3"
+                fill="currentColor"
+              />
+            </span>
+          ) : null}
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
             onClick={() => onSelectGroup?.(group.id)}
           >
-            <Columns2 className="size-3.5 shrink-0" aria-hidden />
+            <span
+              aria-hidden
+              className="grid size-4 shrink-0 place-items-center"
+            >
+              <Columns2 className="size-3.5" />
+            </span>
             {/*
               Badge de conteo solo cuando el split ya está armado.
               Mientras está pending (1 chat + picker abierto), no lo
@@ -837,9 +1032,9 @@ function SidebarGroupItem({
             {!group.isPending ? (
               <span
                 className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-                aria-label={`${chatCount} chats`}
+                aria-label={`${memberCount} panels`}
               >
-                {chatCount}
+                {memberCount}
               </span>
             ) : null}
             {group.color ? (
@@ -858,20 +1053,42 @@ function SidebarGroupItem({
               <UnreadDot />
             </span>
           ) : null}
+        {/* FAS-107: chevron a la derecha, siempre visible. Click izquierdo
+            expande/colapsa el split. El menú de acciones ya no vive detrás
+            de un ellipsis — se abre con click derecho sobre todo el chip
+            (ver `onContextMenu` del contenedor). El chevron sirve además
+            como ancla del `Popover` para posicionar el menú. */}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label={`Options for ${label}`}
-              className={cn(
-                'text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
-                menuOpen ? 'opacity-100' : 'opacity-0 group-hover/gr:opacity-100'
-              )}
-              onClick={event => event.stopPropagation()}
-            >
-              <MoreHorizontal className="size-3.5" />
-            </button>
-          </PopoverTrigger>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverAnchor asChild>
+                  <button
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-label={
+                      expanded ? `Collapse ${label}` : `Expand ${label}`
+                    }
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5"
+                    onClick={event => {
+                      event.stopPropagation()
+                      setExpanded(v => !v)
+                    }}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        'size-3.5 transition-transform',
+                        !expanded && '-rotate-90'
+                      )}
+                    />
+                  </button>
+                </PopoverAnchor>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {expanded ? 'Collapse split' : 'Expand split'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <PopoverContent align="end" className="w-52 p-1">
             {onRenameGroup ? (
               <>
@@ -883,7 +1100,26 @@ function SidebarGroupItem({
                     onRenameGroup(group)
                   }}
                 >
-                  Rename…
+                  Rename split…
+                </button>
+                <div className="border-border/60 my-1 border-t" />
+              </>
+            ) : null}
+            {/* FAS-107 Q8: pinear splits — mismo comportamiento que chats
+                y terminales (van al cluster pinneado del strip y a la
+                sección Pinned del sidebar). */}
+            {onSetGroupPinned ? (
+              <>
+                <button
+                  type="button"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onSetGroupPinned(group.id, !group.pinned)
+                  }}
+                >
+                  <Pin className="size-3.5" />
+                  {group.pinned ? 'Unpin' : 'Pin'}
                 </button>
                 <div className="border-border/60 my-1 border-t" />
               </>
@@ -900,8 +1136,20 @@ function SidebarGroupItem({
                 />
               </div>
             ) : null}
-            {onSetGroupColor && onDissolveGroup ? (
+            {(onSetGroupColor || onDissolveGroup || onCloseGroup) ? (
               <div className="border-border/60 my-1 border-t" />
+            ) : null}
+            {onCloseGroup ? (
+              <button
+                type="button"
+                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px]"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onCloseGroup(group.id)
+                }}
+              >
+                Close tab
+              </button>
             ) : null}
             {onDissolveGroup ? (
               <button
@@ -912,7 +1160,8 @@ function SidebarGroupItem({
                   setDissolveConfirmOpen(true)
                 }}
               >
-                Dissolve
+                <Trash2 className="size-3.5" />
+                Delete Split View
               </button>
             ) : null}
           </PopoverContent>
@@ -921,7 +1170,7 @@ function SidebarGroupItem({
       </div>
       <GroupDissolveDialog
         group={dissolveConfirmOpen ? group : null}
-        chats={chats}
+        chats={chatChildren}
         onCancel={() => setDissolveConfirmOpen(false)}
         onConfirm={() => {
           setDissolveConfirmOpen(false)
@@ -936,7 +1185,52 @@ function SidebarGroupItem({
           // queda casi invisible contra el fondo del sidebar.
           className="border-foreground/20 ml-3 mt-0.5 space-y-px border-l pl-2"
         >
-          {chats.map(chat => {
+          {groupChildren.map(child => {
+            // FAS-107: terminal children of a split render as a compact
+            // row with the orange square-terminal icon. Everything else
+            // (active highlight, indent, sub-row action menu) matches
+            // the chat child so the visual weight stays symmetric.
+            if (child.kind === 'terminal') {
+              const term = child.terminal
+              const active =
+                term.id === activeChildId || term.id === activeId
+              const tabColor = tabColors[term.id]
+              return (
+                <SidebarSplitTerminalChild
+                  key={term.id}
+                  terminal={term}
+                  active={active}
+                  tabColor={tabColor || null}
+                  projects={projects}
+                  activeProjectId={activeProjectId}
+                  onOpen={() => onSelectTerminal(term.id)}
+                  onRename={onRenameTerminal}
+                  onTogglePin={
+                    onToggleTerminalOrganizeLabel
+                      ? id =>
+                          void onToggleTerminalOrganizeLabel(id, 'pinned')
+                      : undefined
+                  }
+                  onToggleArchive={
+                    onToggleTerminalOrganizeLabel
+                      ? id =>
+                          void onToggleTerminalOrganizeLabel(id, 'archive')
+                      : undefined
+                  }
+                  onMoveToProject={onMoveTerminalToProject}
+                  onSetColor={color => setTabColor(term.id, color)}
+                  // X4.4: en el sidebar, viendo un terminal DENTRO de
+                  // un split, la acción "Delete" hoy sacaba el
+                  // terminal del disco (destructivo real). Ahora usa
+                  // el handler no destructivo que solo lo quita del
+                  // split — mismo patrón que los chats en la misma
+                  // posición (SplitChildActionsMenu distingue delete
+                  // real de remove-from-split).
+                  onDelete={onRemoveTerminalFromSplit ?? onCloseTerminal}
+                />
+              )
+            }
+            const chat = child.session
             // El chat "activo" dentro del grupo puede ser el `activeChildId`
             // (si estás en la ruta del grupo con foco en este chat) o el
             // `activeId` global si por alguna razón la ruta apunta al chat
@@ -973,9 +1267,9 @@ function SidebarGroupItem({
                       <SessionStatusIcon
                         status={
                           chat.status === 'awaiting_approval' ||
-                          chatBySessionId[chat.id]?.pendingApproval
+                          activityBySessionId[chat.id]?.pendingApproval
                             ? 'awaiting_approval'
-                            : chatBySessionId[chat.id]?.runActive
+                            : activityBySessionId[chat.id]?.runActive
                               ? 'running'
                               : chat.status
                         }
@@ -1120,7 +1414,7 @@ function SplitChildActionsMenu({
         }}
       >
         <Pencil className="size-3.5" />
-        Rename…
+        Rename chat…
       </button>
       {isNative ? (
         <ProjectPicker
@@ -1220,6 +1514,136 @@ function SplitChildActionsMenu({
         </>
       ) : null}
     </>
+  )
+}
+
+/**
+ * FAS-107: terminal child inside a split-view group in the sidebar.
+ * Mirrors `SplitChildActionsMenu` for chats but with the terminal-specific
+ * palette (Rename, Pin/Unpin, Set color, Move to project, Archive, Delete).
+ * The row layout matches the chat child so a split with mixed panes reads
+ * as a single homogeneous sub-list.
+ */
+function SidebarSplitTerminalChild({
+  terminal,
+  active,
+  tabColor,
+  projects,
+  activeProjectId: _activeProjectId,
+  onOpen,
+  onRename,
+  onTogglePin,
+  onToggleArchive,
+  onMoveToProject,
+  onSetColor,
+  onDelete
+}: {
+  terminal: TerminalSession
+  active: boolean
+  tabColor: string | null
+  projects: AgentProject[]
+  activeProjectId: string | null
+  onOpen: () => void
+  onRename?: (terminalId: string) => void
+  onTogglePin?: (terminalId: string) => void
+  onToggleArchive?: (terminalId: string) => void
+  onMoveToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
+  onSetColor: (color: string | null) => void
+  onDelete?: (terminalId: string) => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isPinned = terminal.organizeLabel === 'pinned'
+  return (
+    <li>
+      <div
+        className={cn(
+          'group/child hover:bg-sidebar-accent/45 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
+          active && 'bg-sidebar-accent/55'
+        )}
+        onContextMenu={event => {
+          event.preventDefault()
+          setMenuOpen(true)
+        }}
+      >
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-1.5 text-left"
+          onClick={onOpen}
+        >
+          <SquareTerminal
+            className="size-3.5 shrink-0 text-orange-500"
+            aria-hidden
+          />
+          {tabColor ? (
+            <span
+              aria-hidden
+              className="size-2 shrink-0 rounded-full border border-black/10"
+              style={{ backgroundColor: tabColor }}
+            />
+          ) : null}
+          <SidebarMarqueeTitle text={terminal.title || 'Terminal'} />
+          {isPinned ? (
+            <Pin
+              aria-label="Pinned"
+              className="text-muted-foreground/60 size-3 shrink-0"
+            />
+          ) : null}
+        </button>
+        <div className="relative h-6 w-8 justify-self-end">
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label="Terminal options"
+                className={cn(
+                  'text-muted-foreground hover:text-foreground hover:bg-muted absolute inset-y-0 right-0 my-auto inline-flex items-center justify-center rounded-md p-0.5 transition-opacity',
+                  menuOpen
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover/child:opacity-100'
+                )}
+                onClick={event => event.stopPropagation()}
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-52 p-1.5">
+              <TerminalActionsMenu
+                terminal={terminal}
+                projects={projects}
+                tabColor={tabColor}
+                onRename={() => {
+                  setMenuOpen(false)
+                  onRename?.(terminal.id)
+                }}
+                onTogglePin={() => {
+                  setMenuOpen(false)
+                  onTogglePin?.(terminal.id)
+                }}
+                onMoveToProject={projectId => {
+                  setMenuOpen(false)
+                  void onMoveToProject?.(terminal.id, projectId)
+                }}
+                onSetTabColor={color => {
+                  setMenuOpen(false)
+                  onSetColor(color)
+                }}
+                onArchive={() => {
+                  setMenuOpen(false)
+                  onToggleArchive?.(terminal.id)
+                }}
+                onDelete={() => {
+                  setMenuOpen(false)
+                  onDelete?.(terminal.id)
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    </li>
   )
 }
 

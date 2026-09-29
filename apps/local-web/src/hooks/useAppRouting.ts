@@ -180,6 +180,23 @@ export function useAppRouting(location: Location) {
       ? routeSessionId
       : null
 
+  // FAS-107: `/terminals/:terminalId` — Q3 answered "B" (separate route
+  // from chats). Populate `terminalId` when the current path matches so
+  // the shell can render TerminalPanel as the main pane instead of a
+  // chat.
+  const routeTerminalId = routes.terminalRoute?.params.terminalId ?? null
+  const terminalId =
+    !isDashboard &&
+    !isSkills &&
+    !isIntegrations &&
+    !isLibrary &&
+    !isSites &&
+    !isProjectHome &&
+    routeTerminalId &&
+    routeTerminalId.startsWith('term_')
+      ? routeTerminalId
+      : null
+
   return {
     ...routes,
     onOnboardingPath,
@@ -231,6 +248,7 @@ export function useAppRouting(location: Location) {
     isDraftAgent,
     isInspect,
     dashboardSkeletonKind,
-    sessionId
+    sessionId,
+    terminalId
   }
 }

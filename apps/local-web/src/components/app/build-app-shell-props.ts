@@ -13,6 +13,7 @@ import type { useSessionActions } from '@/hooks/useSessionActions'
 import type { useSessionChatState } from '@/hooks/useSessionChatState'
 import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
 import type { TabItem, TabItemSection } from '@/lib/sessions'
+import type { SessionActivityMap } from '@/lib/session-activity'
 
 type AppShellBridgeInput = {
   offlineStatus: AppShellProps['offlineStatus']
@@ -29,6 +30,8 @@ type AppShellBridgeInput = {
     session: AppShellProps['session']
   }
   chat: ReturnType<typeof useSessionChatState>
+  /** Spinner / approval flags per session (see `useChatActivity`). */
+  activityBySessionId: SessionActivityMap
   tabs: ReturnType<typeof useAppOpenTabs>
   actions: ReturnType<typeof useSessionActions>
   sandbox: ReturnType<typeof useSessionSandbox>
@@ -54,11 +57,19 @@ type AppShellBridgeInput = {
   showChatSkeleton: boolean
   tabGroupsStore: ReturnType<typeof useAppTabGroups>
   closeTabGroup: (groupId: string) => void
+  /** X1: wrapper del store que además navega si el user estaba viendo
+   *  el split que se disuelve — sin esto la ruta queda muerta. */
+  dissolveTabGroup: (groupId: string) => void
   renameGroupTarget: AppShellProps['renameGroupTarget']
   renameGroupValue: AppShellProps['renameGroupValue']
   setRenameGroupTarget: AppShellProps['setRenameGroupTarget']
   setRenameGroupValue: AppShellProps['setRenameGroupValue']
   submitRenameGroup: AppShellProps['submitRenameGroup']
+  renameTerminalTarget: AppShellProps['renameTerminalTarget']
+  renameTerminalValue: AppShellProps['renameTerminalValue']
+  setRenameTerminalTarget: AppShellProps['setRenameTerminalTarget']
+  setRenameTerminalValue: AppShellProps['setRenameTerminalValue']
+  submitRenameTerminal: AppShellProps['submitRenameTerminal']
   activeGroup: AppShellProps['activeGroup']
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
@@ -105,7 +116,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
      * cuando estás en él) se usa `input.route.sessionId` derivado.
      */
     sessionId: input.effectiveSessionId,
-    chatBySessionId: input.chat.chatBySessionId,
+    activityBySessionId: input.activityBySessionId,
     orderedVisibleSessionIds: input.orderedVisibleSessionIds,
     selectedSessionIds: input.actions.selectedSessionIds,
     threadMenuOpenId: input.ui.threadMenuOpenId,
@@ -285,13 +296,18 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     setRenameGroupTarget: input.setRenameGroupTarget,
     setRenameGroupValue: input.setRenameGroupValue,
     submitRenameGroup: input.submitRenameGroup,
+    renameTerminalTarget: input.renameTerminalTarget,
+    renameTerminalValue: input.renameTerminalValue,
+    setRenameTerminalTarget: input.setRenameTerminalTarget,
+    setRenameTerminalValue: input.setRenameTerminalValue,
+    submitRenameTerminal: input.submitRenameTerminal,
     deleteTarget: input.actions.deleteTarget,
     confirmDelete: input.actions.confirmDelete,
     batchDeletePending: input.actions.batchDeletePending,
     confirmBatchDelete: input.actions.confirmBatchDelete,
     tabGroups: input.tabGroupsStore.allTabGroups,
     createTabGroup: input.tabGroupsStore.createGroup,
-    dissolveTabGroup: input.tabGroupsStore.dissolveGroup,
+    dissolveTabGroup: input.dissolveTabGroup,
     closeTabGroup: input.closeTabGroup,
     addChatToGroup: input.tabGroupsStore.addToGroup,
     removeChatFromGroup: input.tabGroupsStore.removeFromGroup,

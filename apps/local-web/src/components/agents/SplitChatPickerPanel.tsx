@@ -76,7 +76,7 @@ export function SplitChatPickerPanel({
   // picker (rule: a chat can only be in one split at a time).
   const chatIdsInAnyGroup = useMemo(() => {
     const s = new Set<string>()
-    for (const g of allTabGroups) for (const id of g.chatIds) s.add(id)
+    for (const g of allTabGroups) for (const id of g.itemIds) s.add(id)
     return s
   }, [allTabGroups])
 

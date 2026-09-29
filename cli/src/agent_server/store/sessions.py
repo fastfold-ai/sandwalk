@@ -201,4 +201,15 @@ class SessionCreateMixin:
                     session.updated_at.isoformat(),
                 ),
             )
+        # Fan out to the workspace_items index (FAS-107). The tab strip /
+        # sidebar / split picker query that table instead of UNIONing per
+        # kind. Every chat mutation must keep the mirror row in sync.
+        self.upsert_workspace_item(  # type: ignore[attr-defined]
+            item_id=session.id,
+            kind="chat",
+            project_id=session.project_id,
+            organize_label=session.organize_label,
+            title=session.title,
+            updated_at=session.updated_at,
+        )
         return session

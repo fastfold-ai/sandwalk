@@ -424,6 +424,9 @@ def install_skill(
 
     Returns a dict with keys: ok, installed (list of names), summary.
     """
+    from agent.deepagents_runtime.skills_sources import invalidate_skill_sources_cache
+
+    invalidate_skill_sources_cache()
     source = (source or "").strip()
     if not source:
         return {"ok": False, "summary": "No skill source provided."}

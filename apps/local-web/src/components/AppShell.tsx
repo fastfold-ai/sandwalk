@@ -44,7 +44,7 @@ export function AppShell(props: AppShellProps) {
           sections={props.sections}
           collapsedSidebarSections={props.collapsedSidebarSections}
           sessionId={props.sessionId}
-          chatBySessionId={props.chatBySessionId}
+          activityBySessionId={props.activityBySessionId}
           orderedVisibleSessionIds={props.orderedVisibleSessionIds}
           selectedSessionIds={props.selectedSessionIds}
           threadMenuOpenId={props.threadMenuOpenId}
@@ -69,7 +69,9 @@ export function AppShell(props: AppShellProps) {
           onRenameTabGroup={props.onRenameTabGroup}
           onGoToChatProject={props.onGoToChatProject}
           onDissolveTabGroup={props.dissolveTabGroup}
+          onCloseTabGroup={props.closeTabGroup}
           onSetTabGroupColor={props.setTabGroupColor}
+          onSetTabGroupPinned={props.setTabGroupPinned}
           activeGroupChildId={props.activeGroup?.activeChatId ?? null}
           setTabGroupActiveChat={props.setTabGroupActiveChat}
           setCollapsedSidebarSections={props.setCollapsedSidebarSections}
@@ -83,6 +85,13 @@ export function AppShell(props: AppShellProps) {
           updateSession={props.updateSession}
           exportTranscript={props.exportTranscript}
           setDeleteTarget={props.setDeleteTarget}
+          terminals={props.terminals}
+          onCloseTerminal={props.onCloseTerminal}
+          onRemoveTerminalFromSplit={props.onRemoveTerminalFromSplit}
+          activeTerminalId={props.activeTerminalId}
+          onMoveTerminalToProject={props.onMoveTerminalToProject}
+          onRenameTerminal={props.onRenameTerminal}
+          onToggleTerminalOrganizeLabel={props.onToggleTerminalOrganizeLabel}
         />
 
         <ResizableHandle
@@ -97,6 +106,17 @@ export function AppShell(props: AppShellProps) {
           sidebarCollapsed={props.sidebarCollapsed}
           setSidebarCollapsed={props.setSidebarCollapsed}
           showSessionTabs={props.showSessionTabs}
+          terminals={props.terminals ?? []}
+          promptRenameTerminal={props.onRenameTerminal ?? (() => {})}
+          deleteTerminalPermanently={async terminalId => {
+            await props.onCloseTerminal?.(terminalId)
+          }}
+          toggleTerminalOrganizeLabel={async (terminalId, label) => {
+            await props.onToggleTerminalOrganizeLabel?.(terminalId, label)
+          }}
+          moveTerminalToProject={async (terminalId, projectId) => {
+            await props.onMoveTerminalToProject?.(terminalId, projectId)
+          }}
           isHome={props.isHome}
           isLibrary={props.isLibrary}
           isSites={props.isSites}
@@ -263,6 +283,7 @@ export function AppShell(props: AppShellProps) {
           dissolveTabGroup={props.dissolveTabGroup}
           renameTabGroup={props.onRenameTabGroup}
           setTabGroupColor={props.setTabGroupColor}
+          setTabGroupPinned={props.setTabGroupPinned}
           closeTabGroup={props.closeTabGroup}
           selectedChatIds={props.selectedChatIds}
           toggleSelectChat={props.toggleSelectChat}
@@ -314,6 +335,11 @@ export function AppShell(props: AppShellProps) {
         setRenameGroupTarget={props.setRenameGroupTarget}
         setRenameGroupValue={props.setRenameGroupValue}
         submitRenameGroup={props.submitRenameGroup}
+        renameTerminalTarget={props.renameTerminalTarget}
+        renameTerminalValue={props.renameTerminalValue}
+        setRenameTerminalTarget={props.setRenameTerminalTarget}
+        setRenameTerminalValue={props.setRenameTerminalValue}
+        submitRenameTerminal={props.submitRenameTerminal}
         deleteTarget={props.deleteTarget}
         setDeleteTarget={props.setDeleteTarget}
         confirmDelete={props.confirmDelete}

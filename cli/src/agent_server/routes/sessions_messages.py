@@ -63,7 +63,11 @@ def register_message_routes(app: FastAPI, deps: AppDeps) -> None:
         payload: SendMessageRequest,
     ) -> StartRunResponse:
         try:
-            return service.submit_message(session_id=session_id, content=payload.content)
+            # SQLite writes + workspace setup happen off the event loop;
+            # ``submit_message`` schedules the run back onto it.
+            return await asyncio.to_thread(
+                service.submit_message, session_id=session_id, content=payload.content
+            )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Session not found.") from exc
         except SessionBusyError as exc:

@@ -19,7 +19,8 @@ import {
 import type {
   AgentProject,
   AgentSession,
-  SessionGroup
+  SessionGroup,
+  TerminalSession
 } from '@sandwalk/agent-ui-core'
 import {
   Archive,
@@ -28,10 +29,12 @@ import {
   Columns2,
   Download,
   Folder,
+  MessageSquare,
   Pencil,
   Pin,
   Plus,
   Search,
+  SquareTerminal,
   Trash2,
   X
 } from 'lucide-react'
@@ -46,6 +49,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -59,6 +68,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
+import { perfCount } from '@/lib/perf-probe'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -104,11 +114,17 @@ export function SessionTabs({
   onDissolveGroup,
   onRenameGroup,
   onSetGroupColor,
+  onSetGroupPinned,
   onCloseGroup,
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
-  onCreateSplitFromSelection
+  onCreateSplitFromSelection,
+  terminals,
+  onCreateTerminal,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject
 }: {
   tabs: AgentSession[]
   activeId: string | null
@@ -142,12 +158,38 @@ export function SessionTabs({
   onDissolveGroup?: (groupId: string) => void
   onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  /**
+   * FAS-107 X4.2b: pin/unpin del grupo. Antes el store tenía la acción
+   * (`useAppTabGroups.setGroupPinned`) pero ninguna superficie la
+   * exponía — asimetría §3.2 con chats y terminales.
+   */
+  onSetGroupPinned?: (groupId: string, pinned: boolean) => void
   onCloseGroup?: (groupId: string) => void
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
   onCreateSplitFromSelection?: () => void
+  /**
+   * Terminal-as-first-class-item chips (FAS-107). Optional. When
+   * provided, ids in `openTabIds` that match a terminal render as a
+   * SessionTab with `variant="terminal"` (orange SquareTerminal icon).
+   */
+  terminals?: TerminalSession[]
+  onCloseTerminal?: (terminalId: string) => void
+  /** FAS-107 GF5: opens a new terminal from the tab-strip "+" menu. */
+  onCreateTerminal?: () => void
+  /** FAS-107 GF-PARITY-5: parity actions for the terminal chip context menu. */
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
 }) {
+  perfCount('render.SessionTabs')
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   // Confirmation modal for "Delete Split View": the action dissolves
   // the group (chats become standalone conversations again) —
@@ -185,6 +227,12 @@ export function SessionTabs({
         group: SessionGroup
         pinned: boolean
       }
+    | {
+        kind: 'terminal'
+        id: string
+        terminal: TerminalSession
+        pinned: boolean
+      }
 
   const tabsById = useMemo(() => {
     const map = new Map<string, AgentSession>()
@@ -197,6 +245,12 @@ export function SessionTabs({
     for (const g of groups ?? []) map.set(g.id, g)
     return map
   }, [groups])
+
+  const terminalsById = useMemo(() => {
+    const map = new Map<string, TerminalSession>()
+    for (const t of terminals ?? []) map.set(t.id, t)
+    return map
+  }, [terminals])
 
   const orderedItems = useMemo<TabItem[]>(() => {
     // The caller (App shell) always drives the strip through `openTabIds`.
@@ -215,6 +269,16 @@ export function SessionTabs({
             id: group.id,
             group,
             pinned: group.pinned
+          })
+          continue
+        }
+        const terminal = terminalsById.get(id)
+        if (terminal) {
+          items.push({
+            kind: 'terminal',
+            id: terminal.id,
+            terminal,
+            pinned: terminal.organizeLabel === 'pinned'
           })
           continue
         }
@@ -248,7 +312,7 @@ export function SessionTabs({
     const pinned = items.filter(item => item.pinned)
     const rest = items.filter(item => !item.pinned)
     return [...pinned, ...rest]
-  }, [openTabIds, tabs, tabsById, groupsById, groups])
+  }, [openTabIds, tabs, tabsById, groupsById, groups, terminalsById])
 
   const orderedTabs = useMemo(
     () =>
@@ -332,7 +396,9 @@ export function SessionTabs({
       const title =
         item.kind === 'chat'
           ? item.session.title || 'Untitled'
-          : item.group.name || 'Group'
+          : item.kind === 'group'
+            ? item.group.name || 'Group'
+            : item.terminal.title || 'Terminal'
       return title.toLowerCase().includes(needle)
     })
   }, [orderedItems, searchQuery])
@@ -363,6 +429,9 @@ export function SessionTabs({
   const menuGroup = menu
     ? (groups ?? []).find(g => g.id === menu.sessionId) || null
     : null
+  const menuTerminal = menu
+    ? (terminals ?? []).find(t => t.id === menu.sessionId) || null
+    : null
 
   const runAction = (action: () => void) => {
     setMenu(null)
@@ -389,6 +458,9 @@ export function SessionTabs({
   }
 
   const openContextMenu = (id: string, event: React.MouseEvent) => {
+    // FAS-107 GF-PARITY-5: terminals now share the same menu machinery as
+    // chats/groups. `menuTerminal` (below) resolves the id → TerminalSession
+    // so its dedicated menu branch renders.
     setMenu({ sessionId: id, x: event.clientX, y: event.clientY })
   }
 
@@ -459,6 +531,46 @@ export function SessionTabs({
                     />
                   )
                 }
+                if (item.kind === 'terminal') {
+                  const term = item.terminal
+                  const pseudoTab: AgentSession = {
+                    id: term.id,
+                    title: term.title,
+                    status: 'idle',
+                    source: 'local',
+                    sourceLabel: 'Terminal',
+                    organizeLabel: term.organizeLabel ?? null,
+                    createdAt: term.createdAt,
+                    updatedAt: term.updatedAt,
+                    lastMessageAt: null,
+                    projectId: term.projectId,
+                    titleSource: term.titleSource,
+                    workspacePath: term.workspacePath
+                  } as unknown as AgentSession
+                  return (
+                    <SessionTab
+                      key={term.id}
+                      tab={pseudoTab}
+                      active={term.id === activeId}
+                      color={tabColors[term.id]}
+                      unread={false}
+                      draggable={draggable}
+                      onSelect={onSelect}
+                      // X4.4-hotfix: la X del chip del terminal en el
+                      // strip usaba `onCloseTerminal` = destructor real
+                      // (borraba el terminal del disco → desaparecía
+                      // del sidebar también). Los chats en la misma
+                      // posición usan `onClose` = `closeSessionTab`
+                      // (no destructivo, solo quita del strip). Ahora
+                      // el terminal sigue el mismo patrón — la acción
+                      // destructiva vive solo en el "Delete" del sidebar.
+                      onClose={onClose}
+                      onContextMenu={openContextMenu}
+                      selected={selectedChatIds?.has(term.id) ?? false}
+                      variant="terminal"
+                    />
+                  )
+                }
                 const group = item.group
                 const pseudoTab: AgentSession = {
                   id: group.id,
@@ -488,7 +600,7 @@ export function SessionTabs({
                     selected={selectedChatIds?.has(group.id) ?? false}
                     variant="group"
                     groupCount={
-                      group.isPending ? undefined : group.chatIds.length
+                      group.isPending ? undefined : group.itemIds.length
                     }
                   />
                 )
@@ -504,9 +616,16 @@ export function SessionTabs({
       */}
       {onCreateSession ? (
         <div className="sandwalk-tab-new-slot">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
+          {/*
+            FAS-107 GF5: the "+" now opens a dropdown with two entries
+            (Agent chat / Terminal) so users can create either kind from
+            the same affordance. When `onCreateTerminal` isn't wired the
+            button falls back to the classic single-action behavior for
+            backwards compatibility.
+          */}
+          {onCreateTerminal ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className={cn(
@@ -517,23 +636,54 @@ export function SessionTabs({
                     'dark:bg-white/[0.1] dark:text-zinc-100',
                     'dark:hover:bg-white/[0.16] dark:hover:text-white'
                   )}
-                  aria-label="New agent"
-                  onClick={onCreateSession}
+                  aria-label="New"
                 >
                   <Plus className="size-3.5 shrink-0" />
                 </button>
-              </TooltipTrigger>
-              <TooltipContent
-                side="bottom"
-                className="flex items-center gap-2"
-              >
-                <span>New agent</span>
-                <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
-                  ⌘N
-                </kbd>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuItem onSelect={() => onCreateSession()}>
+                  <MessageSquare className="mr-2 size-3.5 text-sky-500" />
+                  <span>New agent chat</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onCreateTerminal()}>
+                  <SquareTerminal className="mr-2 size-3.5 text-orange-500" />
+                  <span>New terminal</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      `sandwalk-tab-overflow-btn inline-flex ${OVERFLOW_BTN_HEIGHT} items-center justify-center gap-1 rounded-lg`,
+                      'px-2.5',
+                      'bg-black/[0.06] text-foreground/85',
+                      'hover:bg-black/[0.1] hover:text-foreground',
+                      'dark:bg-white/[0.1] dark:text-zinc-100',
+                      'dark:hover:bg-white/[0.16] dark:hover:text-white'
+                    )}
+                    aria-label="New agent"
+                    onClick={onCreateSession}
+                  >
+                    <Plus className="size-3.5 shrink-0" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  className="flex items-center gap-2"
+                >
+                  <span>New agent</span>
+                  <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
+                    ⌘N
+                  </kbd>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       ) : null}
 
@@ -627,19 +777,33 @@ export function SessionTabs({
                   filteredSearchItems.map(item => {
                     const active = item.id === activeId
                     const isGroup = item.kind === 'group'
-                    const tab = isGroup ? null : item.session
-                    const group = isGroup ? item.group : null
-                    const title = isGroup
-                      ? group!.name || 'Group'
-                      : tab!.title || 'Untitled'
-                    const stamp = isGroup
-                      ? ''
-                      : relativeTime(
-                          tab!.lastMessageAt ||
-                            tab!.updatedAt ||
-                            tab!.createdAt
-                        )
-                    const color = isGroup ? group!.color : tabColors[item.id]
+                    const isTerminal = item.kind === 'terminal'
+                    const title =
+                      item.kind === 'chat'
+                        ? item.session.title || 'Untitled'
+                        : item.kind === 'group'
+                          ? item.group.name || 'Group'
+                          : item.terminal.title || 'Terminal'
+                    const stamp =
+                      item.kind === 'chat'
+                        ? relativeTime(
+                            item.session.lastMessageAt ||
+                              item.session.updatedAt ||
+                              item.session.createdAt
+                          )
+                        : item.kind === 'terminal'
+                          ? relativeTime(
+                              item.terminal.updatedAt || item.terminal.createdAt
+                            )
+                          : ''
+                    const color =
+                      item.kind === 'group' ? item.group.color : tabColors[item.id]
+                    const pinnedBadge =
+                      item.kind === 'chat'
+                        ? item.session.organizeLabel === 'pinned'
+                        : item.kind === 'terminal'
+                          ? item.terminal.organizeLabel === 'pinned'
+                          : item.group.pinned
                     return (
                       <div
                         key={item.id}
@@ -652,7 +816,7 @@ export function SessionTabs({
                         )}
                         onClick={event => {
                           if (
-                            !isGroup &&
+                            item.kind === 'chat' &&
                             onToggleSelectChat &&
                             (event.shiftKey || event.metaKey)
                           ) {
@@ -672,14 +836,18 @@ export function SessionTabs({
                           openContextMenu(item.id, event)
                         }}
                         data-selected={
-                          selectedChatIds?.has(item.id) ? 'true' : undefined
+                          item.kind === 'chat' && selectedChatIds?.has(item.id)
+                            ? 'true'
+                            : undefined
                         }
                       >
                         <span className="bg-muted/80 flex size-7 shrink-0 items-center justify-center rounded-md">
                           {isGroup ? (
                             <Columns2 className="size-3.5" />
+                          ) : isTerminal ? (
+                            <SquareTerminal className="size-3.5 text-orange-500" />
                           ) : (
-                            <SessionStatusIcon status={tab!.status} />
+                            <SessionStatusIcon status={item.session.status} />
                           )}
                         </span>
                         <span className="min-w-0 flex-1">
@@ -691,12 +859,12 @@ export function SessionTabs({
                                 aria-hidden
                               />
                             ) : null}
-                            {isGroup && !group!.isPending ? (
+                            {item.kind === 'group' && !item.group.isPending ? (
                               <span
                                 className="bg-muted text-foreground/70 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums"
-                                aria-label={`${group!.chatIds.length} chats`}
+                                aria-label={`${item.group.itemIds.length} chats`}
                               >
-                                {group!.chatIds.length}
+                                {item.group.itemIds.length}
                               </span>
                             ) : null}
                             <span className="text-foreground min-w-0 flex-1 truncate text-sm font-medium">
@@ -706,7 +874,7 @@ export function SessionTabs({
                               className="relative block h-4 shrink-0"
                               style={{ width: 28 }}
                             >
-                              {!isGroup ? (
+                              {stamp ? (
                                 <span className="text-muted-foreground absolute inset-0 inline-flex items-center justify-center text-[11px] tabular-nums transition-opacity group-hover/item:opacity-0">
                                   {stamp}
                                 </span>
@@ -717,9 +885,15 @@ export function SessionTabs({
                                 aria-label={`Close ${title}`}
                                 onClick={event => {
                                   event.stopPropagation()
-                                  if (isGroup) {
+                                  if (item.kind === 'group') {
                                     onCloseGroup?.(item.id)
                                   } else {
+                                    // X4.4-hotfix: chats Y terminales
+                                    // usan el mismo `onClose` (no
+                                    // destructivo, solo quita del
+                                    // strip). Antes los terminales
+                                    // caían en `onCloseTerminal` que
+                                    // los borraba del disco.
                                     onClose(item.id)
                                   }
                                 }}
@@ -728,7 +902,7 @@ export function SessionTabs({
                               </button>
                             </span>
                           </span>
-                          {!isGroup && tab!.organizeLabel === 'pinned' ? (
+                          {pinnedBadge ? (
                             <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
                               <Pin
                                 className="size-3 shrink-0"
@@ -756,7 +930,7 @@ export function SessionTabs({
         >
           <TabContextItem
             icon={<Pencil className="size-3.5" />}
-            label="Rename…"
+            label="Rename chat…"
             onClick={() => runAction(() => onRename(menuSession))}
           />
           <TabContextItem
@@ -803,7 +977,7 @@ export function SessionTabs({
           <TabContextSeparator />
           <TabContextItem
             icon={<Download className="size-3.5" />}
-            label="Export session"
+            label="Export transcript"
             onClick={() => runAction(() => onExport(menuSession))}
           />
           <TabContextItem
@@ -859,12 +1033,21 @@ export function SessionTabs({
             <>
               <TabContextItem
                 icon={<Pencil className="size-3.5" />}
-                label="Rename…"
+                label="Rename split…"
                 onClick={() => runAction(() => onRenameGroup(menuGroup))}
               />
-              <TabContextSeparator />
             </>
           ) : null}
+          {onSetGroupPinned ? (
+            <TabContextItem
+              icon={<Pin className="size-3.5" />}
+              label={menuGroup.pinned ? 'Unpin' : 'Pin'}
+              onClick={() =>
+                runAction(() => onSetGroupPinned(menuGroup.id, !menuGroup.pinned))
+              }
+            />
+          ) : null}
+          {onRenameGroup || onSetGroupPinned ? <TabContextSeparator /> : null}
           {onSetGroupColor ? (
             <>
               <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
@@ -913,11 +1096,125 @@ export function SessionTabs({
           ) : null}
         </TabContextMenuShell>
       ) : null}
+
+      {menu && menuTerminal ? (
+        <TabContextMenuShell
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        >
+          {onRenameTerminal ? (
+            <TabContextItem
+              icon={<Pencil className="size-3.5" />}
+              label="Rename terminal…"
+              onClick={() =>
+                runAction(() => onRenameTerminal(menuTerminal.id))
+              }
+            />
+          ) : null}
+          {onToggleTerminalOrganizeLabel ? (
+            <TabContextItem
+              icon={<Pin className="size-3.5" />}
+              label={
+                menuTerminal.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'
+              }
+              onClick={() =>
+                runAction(() =>
+                  void onToggleTerminalOrganizeLabel(menuTerminal.id, 'pinned')
+                )
+              }
+            />
+          ) : null}
+          {onMoveTerminalToProject && projects ? (
+            <ProjectPicker
+              projects={projects}
+              value={menuTerminal.projectId}
+              noneLabel="No project"
+              trigger={
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3"
+                >
+                  <Folder />
+                  Move to project…
+                </button>
+              }
+              onChange={projectId => {
+                void onMoveTerminalToProject(menuTerminal.id, projectId)
+                setMenu(null)
+              }}
+            />
+          ) : null}
+          <TabContextSeparator />
+          <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+            Color
+          </div>
+          <TabInlineColorRow
+            value={tabColors[menuTerminal.id] || null}
+            onSelect={color => {
+              setTabColor(menuTerminal.id, color)
+              setMenu(null)
+            }}
+            onClear={() => {
+              setTabColor(menuTerminal.id, null)
+              setMenu(null)
+            }}
+          />
+          {onToggleTerminalOrganizeLabel ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Archive className="size-3.5" />}
+                label={
+                  menuTerminal.organizeLabel === 'archive'
+                    ? 'Unarchive'
+                    : 'Archive'
+                }
+                onClick={() =>
+                  runAction(() =>
+                    void onToggleTerminalOrganizeLabel(
+                      menuTerminal.id,
+                      'archive'
+                    )
+                  )
+                }
+              />
+            </>
+          ) : null}
+          {onSplitWith ? (
+            <>
+              <TabContextSeparator />
+              <TabContextItem
+                icon={<Columns2 className="size-3.5" />}
+                label="Create split view"
+                onClick={() => runAction(() => onSplitWith(menuTerminal.id))}
+              />
+            </>
+          ) : null}
+          <TabContextSeparator />
+          <TabContextItem
+            icon={<X className="size-3.5" />}
+            label="Close tab"
+            // X4.4-hotfix: paridad con la X del chip. Close tab quita
+            // el terminal del strip, NO lo borra del disco. El delete
+            // real vive en el sidebar como "Delete".
+            onClick={() => runAction(() => onClose(menuTerminal.id))}
+          />
+          <TabContextItem
+            icon={<CircleX className="size-3.5" />}
+            label="Close other tabs"
+            disabled={orderedItems.length <= 1}
+            onClick={() => runAction(() => onCloseOthers(menuTerminal.id))}
+          />
+        </TabContextMenuShell>
+      ) : null}
+
       <GroupDissolveDialog
         group={dissolveConfirm}
         chats={
           dissolveConfirm
-            ? tabs.filter(t => dissolveConfirm.chatIds.includes(t.id))
+            ? tabs.filter(t => dissolveConfirm.itemIds.includes(t.id))
             : []
         }
         onCancel={() => setDissolveConfirm(null)}

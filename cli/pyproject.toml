@@ -271,7 +271,13 @@ omit = [
     "*/cli/*.py",
     "*/cli/setup/*.py",
     # PTY/process supervisor — requires live TTYs; covered by manual/integration use.
-    "*/agent_server/pty_manager/*.py",
+    # The pure pieces (OSC parser, snapshot store, shell integration script)
+    # are unit-tested and stay measured.
+    "*/agent_server/pty_manager/__init__.py",
+    "*/agent_server/pty_manager/io_mixin.py",
+    "*/agent_server/pty_manager/lifecycle_mixin.py",
+    "*/agent_server/pty_manager/spawn.py",
+    "*/agent_server/pty_manager/types.py",
     # FastAPI/WebSocket route surface and process entrypoint — HTTP contract tests cover behavior.
     "*/agent_server/app.py",
     "*/agent_server/main.py",

@@ -3,6 +3,11 @@ import { skillChipToken } from '@/components/agents/composer-parts'
 import { DashboardMainViews } from '@/components/agents/DashboardMainViews'
 import { SitesView } from '@/components/agents/SitesView'
 import {
+  TerminalHostsProvider,
+  TerminalLayerProvider,
+  TerminalLayerRoot
+} from '@/components/agents/terminal-layer'
+import {
   AppShellMainDragStrip,
   AppShellTitleBar
 } from '@/components/app/app-shell-main-chrome'
@@ -19,10 +24,12 @@ import {
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { perfCount } from '@/lib/perf-probe'
 
 export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
 
 export function AppShellMain(props: AppShellMainProps) {
+  perfCount('render.AppShellMain')
   // Draft New Agent already has SessionMainHeader (files/terminal chrome).
   // Don't stack a redundant "New Chat" title row when no tabs are open.
   const showSimpleTitleBar =
@@ -56,7 +63,16 @@ export function AppShellMain(props: AppShellMainProps) {
       minSize={40}
       className="min-w-0"
     >
+      <TerminalLayerProvider>
       <div className="sandwalk-shell-main relative flex h-full min-w-0 flex-col bg-background">
+        {/* FAS-107 W1: layer donde viven todos los xterm first-class
+            (via createPortal). Ver terminal-layer/README para el patrón
+            completo. */}
+        <TerminalLayerRoot />
+        <TerminalHostsProvider
+          client={props.client}
+          terminals={props.terminals}
+        />
         {/*
          * Layout-neutral drag hit target. Only mount when there's no
          * visible drag strip already covering the top: when the collapsed
@@ -182,15 +198,21 @@ export function AppShellMain(props: AppShellMainProps) {
             dissolveTabGroup={props.dissolveTabGroup}
             renameTabGroup={props.renameTabGroup}
             setTabGroupColor={props.setTabGroupColor}
+            setTabGroupPinned={props.setTabGroupPinned}
             closeTabGroup={props.closeTabGroup}
             selectedChatIds={props.selectedChatIds}
             toggleSelectChat={props.toggleSelectChat}
             clearSelectChats={props.clearSelectChats}
             createSplitFromSelection={props.createSplitFromSelection}
+            promptRenameTerminal={props.promptRenameTerminal}
+            deleteTerminalPermanently={props.deleteTerminalPermanently}
+            toggleTerminalOrganizeLabel={props.toggleTerminalOrganizeLabel}
+            moveTerminalToProject={props.moveTerminalToProject}
           />
         )}
         </div>
       </div>
+      </TerminalLayerProvider>
     </ResizablePanel>
   )
 }

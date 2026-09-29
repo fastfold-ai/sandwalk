@@ -11,15 +11,41 @@ install still surfaces as a single, clear preflight error.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
 from pathlib import Path
 
+from agent.runner.build_slots import run_cpu_bound
 from agent.runner_helpers import _looks_like_unverified_execution_claim
 from agent.types import ExecutionResult, Plan, Step
 
 logger = logging.getLogger("runner")
+
+
+def _empty_output_summary(empty_turns: object) -> str:
+    """User-facing text for a run whose model turns produced no prose.
+
+    Includes the provider stop reason when the event processor captured one
+    (``refusal``, ``max_tokens``, …) so an empty reply is diagnosable from the
+    transcript instead of looking like the agent silently gave up.
+    """
+    base = "(Agent produced no text output)"
+    turns = [t for t in (empty_turns or []) if isinstance(t, dict)]
+    if not turns:
+        return base
+    last = turns[-1]
+    reason = last.get("stop_reason")
+    blocks = [str(b) for b in (last.get("content_blocks") or []) if b]
+    details: list[str] = []
+    if reason:
+        details.append(f"stop_reason={reason}")
+    if blocks:
+        details.append("content=" + ",".join(blocks))
+    if not details:
+        return base
+    return f"{base[:-1]} — model returned {'; '.join(details)})"
 
 
 class DeepAgentsBuildMixin:
@@ -67,7 +93,11 @@ class DeepAgentsBuildMixin:
             or ""
         ).strip()
         capy_mode = bool(ctx.get("capy_mode"))
-        tools, sandbox, code_trace_buffer, display_name_map = create_ct_langchain_tools(
+        # ~1.3s of CPU (297 tool wrappers + schemas). Off the event loop so
+        # concurrent runs do not stall the API and every other run's stream.
+        # ``to_thread`` copies contextvars, so ``tool_session_var`` still applies.
+        tools, sandbox, code_trace_buffer, display_name_map = await run_cpu_bound(
+            create_ct_langchain_tools,
             self.session,
             exclude_categories=exclude_cats,
             exclude_tools=exclude_tool_names,
@@ -330,10 +360,10 @@ class DeepAgentsBuildMixin:
         # (name+description at startup). Respect specialist allowlists and the
         # Skills UI enable/disable toggles — never pass raw on-disk roots.
         allowed_skill_names = ctx.get("allowed_skill_names")
-        skills_sources = resolve_skill_source_dirs(
-            None
-            if allowed_skill_names is None
-            else list(allowed_skill_names or [])
+        # Disk scan of every SKILL.md (~1s) — keep it off the event loop.
+        skills_sources = await asyncio.to_thread(
+            resolve_skill_source_dirs,
+            None if allowed_skill_names is None else list(allowed_skill_names or []),
         )
         # Never root filesystem tools at "/" — relative paths like
         # ./artifacts/... would resolve to /artifacts/... and fail.
@@ -368,8 +398,6 @@ class DeepAgentsBuildMixin:
             background_sync=effective_backend == "modal",
         )
         if sandbox_handle.kind == "modal" and not sandbox_handle.seeded:
-            import asyncio
-
             seeded_ok = await asyncio.to_thread(
                 wait_until_seeded,
                 sandbox_handle,
@@ -441,7 +469,10 @@ class DeepAgentsBuildMixin:
                 )
             )
         create_kwargs["middleware"] = tuple(middleware)
-        agent = create_deep_agent(**create_kwargs)
+        # Graph compile inspects every tool signature for the main agent and
+        # each subagent (~1s CPU); run it in a worker thread, throttled so a
+        # grid of concurrent runs doesn't time-slice the GIL into N× builds.
+        agent = await run_cpu_bound(create_deep_agent, **create_kwargs)
         return agent, sandbox_handle
 
     def _build_deepagents_exec_result(
@@ -461,7 +492,9 @@ class DeepAgentsBuildMixin:
         token_usage = dict(result.get("token_usage") or {})
         model_call_count = int(result.get("model_call_count", 0))
 
-        summary = "\n".join(full_text).strip() or "(Agent produced no text output)"
+        summary = "\n".join(full_text).strip() or _empty_output_summary(
+            result.get("empty_model_turns")
+        )
         guardrail_unverified_execution = False
         if _looks_like_unverified_execution_claim(summary, tool_calls):
             guardrail_unverified_execution = True

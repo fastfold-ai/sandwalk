@@ -350,6 +350,9 @@ def upgrade_skills(
     Returns a dict: added (new names), updated (refreshed names), failed (list of
     (source, reason)), and a human-readable summary.
     """
+    from agent.deepagents_runtime.skills_sources import invalidate_skill_sources_cache
+
+    invalidate_skill_sources_cache()
 
     def _notify(msg: str) -> None:
         if progress is not None:

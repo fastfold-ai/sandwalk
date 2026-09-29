@@ -15,6 +15,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useRef, useState } from 'react'
 
 import { applyChatDateBoosts } from '@/lib/chat-date-boost'
+import { sameArrayBy } from '@/lib/stable-equal'
 import {
   type ComposerModelOption,
   toComposerModelOptions
@@ -79,6 +80,11 @@ export function useAppBootstrapLoaders({
   setChatBySessionId
 }: UseAppBootstrapLoadersArgs) {
   const [sessions, setSessions] = useState<AgentSession[]>([])
+  // FAS-107 Fase 4: flag para distinguir "aún cargando" vs "cargó vacío".
+  // Sin este flag, los cleanups de openTabIds usaban `sessions.length === 0`
+  // como guard, que en un proyecto legítimamente vacío bloqueaba el barrido
+  // y dejaba chips huérfanos vivos.
+  const [sessionsInitialLoadDone, setSessionsInitialLoadDone] = useState(false)
   const [projects, setProjects] = useState<AgentProject[]>([])
   const [sessionPreviews, setSessionPreviews] = useState<
     Record<string, string>
@@ -193,6 +199,10 @@ export function useAppBootstrapLoaders({
       setChatBySessionId(current =>
         mergeRunActiveFromSessions(current, nextSessions)
       )
+      // FAS-107 Fase 4: primera carga completa. A partir de ahora los
+      // cleanups pueden distinguir "sessions vacío porque cargó vacío"
+      // de "sessions vacío porque aún no cargó".
+      setSessionsInitialLoadDone(true)
       // Previews load lazily from Home via loadSessionPreviews.
     },
     [client, setChatBySessionId]
@@ -355,7 +365,11 @@ export function useAppBootstrapLoaders({
       seen.add(skillKey)
       return true
     })
-    setSkills(unique)
+    // Same rows → keep the previous reference so memoized consumers
+    // (transcript rows, composer) do not re-render after every run.
+    setSkills(prev =>
+      sameArrayBy(prev, unique, skill => JSON.stringify(skill)) ? prev : unique
+    )
   }, [client])
 
   loadSkillsRef.current = loadSkills
@@ -465,6 +479,7 @@ export function useAppBootstrapLoaders({
   return {
     sessions,
     setSessions,
+    sessionsInitialLoadDone,
     projects,
     sessionPreviews,
     loadSessionPreviews,

@@ -5,7 +5,8 @@ import {
   writeLastSessionByScope,
   writeRecentProjectIds
 } from '@/lib/app-storage'
-import { DRAFT_AGENT_SESSION_ID } from '@/lib/draft-agent'
+import { DRAFT_AGENT_SESSION_ID, sessionRoutePath } from '@/lib/draft-agent'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
 
@@ -16,15 +17,14 @@ type UseSessionActionsTabsArgs = Pick<
   | 'tabsScopeKey'
   | 'sessionId'
   | 'stripSessionId'
-  | 'sessions'
-  | 'lastSessionByScope'
+  | 'sessionsRef'
   | 'setLastSessionByScope'
   | 'setProjectScopeId'
   | 'setRecentProjectIds'
   | 'openTabIds'
   | 'setOpenTabIds'
   | 'patchOpenTabs'
-  | 'tabGroups'
+  | 'tabGroupsRef'
 >
 
 export function useSessionActionsTabs({
@@ -33,14 +33,14 @@ export function useSessionActionsTabs({
   tabsScopeKey,
   sessionId,
   stripSessionId,
-  sessions,
+  sessionsRef,
   setLastSessionByScope,
   setProjectScopeId,
   setRecentProjectIds,
   openTabIds,
   setOpenTabIds,
   patchOpenTabs,
-  tabGroups
+  tabGroupsRef
 }: UseSessionActionsTabsArgs) {
   const closeSessionTab = (id: string) => {
     const scopeProjectId = activeProjectId
@@ -49,7 +49,18 @@ export function useSessionActionsTabs({
       // por-scope (el filtrado real por proyecto de un grupo se hace más
       // arriba en el `buildSessionSidebarModel`).
       if (tabId.startsWith('grp_')) return true
-      const item = sessions.find(session => session.id === tabId)
+      // FAS-107 X4.4-hotfix: los `term_*` viven en el store Zustand,
+      // no en `sessions`. Sin este chequeo, cerrar cualquier tab dentro
+      // de un proyecto barría TODOS los terminales del strip.
+      if (tabId.startsWith('term_')) {
+        const term = useTerminalsStore
+          .getState()
+          .terminals.find(t => t.id === tabId)
+        if (!term) return false
+        if (!scopeProjectId) return true
+        return (term.projectId ?? null) === scopeProjectId
+      }
+      const item = sessionsRef.current.find(session => session.id === tabId)
       if (!item) return false
       if (!scopeProjectId) return true
       return item.projectId === scopeProjectId
@@ -114,7 +125,13 @@ export function useSessionActionsTabs({
       return
     }
 
-    navigate(`/agents/${neighbor}`)
+    // X4.4-hotfix: usar `sessionRoutePath` para elegir `/terminals/:id`
+    // vs `/agents/:id` según el prefijo del neighbor. Antes se navegaba
+    // siempre a `/agents/${neighbor}` — cuando el neighbor era un
+    // terminal, la ruta era inválida (X3 Fase 6a bloquea `term_*` en
+    // `/agents/`) → el active nunca cambiaba al vecino y el terminal
+    // parecía "no cerrarse" del strip.
+    navigate(sessionRoutePath(neighbor))
   }
 
   const closeOtherSessionTabs = (keepId: string) => {
@@ -123,10 +140,10 @@ export function useSessionActionsTabs({
     // sweeping them away with the rest.
     const activeTabId = stripSessionId ?? sessionId
     const pinnedGroupIds = new Set(
-      tabGroups.filter(g => g.pinned).map(g => g.id)
+      tabGroupsRef.current.filter(g => g.pinned).map(g => g.id)
     )
     const pinnedChatIds = new Set(
-      sessions
+      sessionsRef.current
         .filter(s => s.organizeLabel === 'pinned')
         .map(s => s.id)
     )
@@ -138,7 +155,7 @@ export function useSessionActionsTabs({
           pinnedChatIds.has(id)
       )
     )
-    if (activeTabId !== keepId) navigate(`/agents/${keepId}`)
+    if (activeTabId !== keepId) navigate(sessionRoutePath(keepId))
   }
 
   const reorderSessionTabs = (orderedIds: string[]) => {

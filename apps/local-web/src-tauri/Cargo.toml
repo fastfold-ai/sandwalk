@@ -13,6 +13,18 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# FAS-107 · Fase 1j · `devtools` de Tauri (Cmd+Option+I dentro de la
+# webview) DEBE ir solo en dev builds. En release firmado, expone
+# tokens, state, paths y superficie de ataque via APIs Tauri. Se
+# activaba con `default = ["devtools"]` por descuido — quedó desde
+# el debug del deep link banners.
+#
+# Uso: `tauri:dev` en `package.json` pasa `--features devtools` para
+# activar en dev. `tauri build` (release) NO lo pasa, por lo tanto
+# queda desactivado en el DMG firmado.
+devtools = ["tauri/devtools"]
+
 [dependencies]
 # macos-private-api: transparent window + liquid glass (NSGlassEffectView / vibrancy)
 tauri = { version = "2", features = ["macos-private-api", "image-png"] }
@@ -37,5 +49,11 @@ tauri-plugin-process = "2"
 objc2 = { version = "0.6", default-features = false, features = ["std"] }
 block2 = "0.6"
 objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData", "NSGeometry", "NSString", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSError", "NSGeometry", "NSString", "NSUUID", "block2", "objc2-core-foundation"] }
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSCell", "NSControl", "NSDockTile", "NSGraphics", "NSImage", "NSImageView", "NSResponder", "NSView", "block2"] }
+# FAS-107 · Fase 1g · deep link click en banner nativo macOS.
+# El plugin oficial `tauri-plugin-notification` no expone `onAction` en
+# desktop (solo mobile), así que registramos un
+# `UNUserNotificationCenterDelegate` propio para capturar el click y
+# navegar al chat/terminal emisor por su `tag` en `userInfo`.
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNUserNotificationCenter", "UNNotificationContent", "UNNotificationRequest", "UNNotificationResponse", "UNNotification", "UNNotificationTrigger"] }

@@ -29,6 +29,7 @@ import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import type { CreateDraftSession } from '@/lib/draft-agent'
+import type { SessionActivityMap } from '@/lib/session-activity'
 import { type SessionChatState, type TabItem, type TabItemSection } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
@@ -55,7 +56,7 @@ export type AppShellProps = {
   sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
@@ -256,6 +257,15 @@ export type AppShellProps = {
   setRenameGroupTarget: Dispatch<SetStateAction<SessionGroup | null>>
   setRenameGroupValue: Dispatch<SetStateAction<string>>
   submitRenameGroup: () => void
+  renameTerminalTarget:
+    | import('@sandwalk/agent-ui-core').TerminalSession
+    | null
+  renameTerminalValue: string
+  setRenameTerminalTarget: Dispatch<
+    SetStateAction<import('@sandwalk/agent-ui-core').TerminalSession | null>
+  >
+  setRenameTerminalValue: Dispatch<SetStateAction<string>>
+  submitRenameTerminal: () => Promise<void>
   deleteTarget: AgentSession | null
   confirmDelete: () => Promise<void>
   batchDeletePending: boolean
@@ -271,6 +281,7 @@ export type AppShellProps = {
   addChatToGroup: (groupId: string, chatId: string) => void
   removeChatFromGroup: (groupId: string, chatId: string) => number
   setTabGroupColor: (groupId: string, color: string | null) => void
+  /** X4.2b: pin/unpin del grupo (asimetría §3.2). */
   setTabGroupPinned: (groupId: string, pinned: boolean) => void
   setTabGroupActiveChat: (groupId: string, chatId: string) => void
   setTabGroupLayoutForMonitor: (
@@ -299,4 +310,22 @@ export type AppShellProps = {
   onSelectTabGroup: (groupId: string) => void
   onRenameTabGroup: (group: SessionGroup) => void
   onGoToChatProject: (chat: AgentSession) => void
+  /** FAS-107 GF6: terminals of the active project (shared source of truth). */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  onCloseTerminal?: (terminalId: string) => void
+  /** X4.4: sacar terminal del split (no destructivo) desde el sidebar. */
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
+  activeTerminalId?: string | null
+  /** FAS-107 GF8: move a terminal between projects (or no project). */
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
+  /** FAS-107 paridad: rename via native prompt (mvp). */
+  onRenameTerminal?: (terminalId: string) => void
+  /** Toggle pin/archive on a terminal (organize_label). */
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }

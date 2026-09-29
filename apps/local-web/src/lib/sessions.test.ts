@@ -150,7 +150,7 @@ describe('groupTabItems', () => {
           name: 'Split',
           color: null,
           pinned: false,
-          chatIds: ['c1', 'g1'],
+          itemIds: ['c1', 'g1'],
           activeChatId: 'c1'
         }
       ],
@@ -198,7 +198,7 @@ describe('groupTabItems', () => {
           name: 'Pinned split',
           color: null,
           pinned: true,
-          chatIds: ['c1'],
+          itemIds: ['c1'],
           activeChatId: 'c1'
         }
       ]

@@ -1,8 +1,7 @@
-import type { SessionGroup } from '@sandwalk/agent-ui-core'
+import type { SessionGroup, TerminalSession } from '@sandwalk/agent-ui-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { OfflineBanner } from '@/components/app/OfflineBanner'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
@@ -13,6 +12,7 @@ import {
 } from '@/components/app/app-display'
 import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
+import { OfflineBanner } from '@/components/app/OfflineBanner'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
@@ -25,21 +25,40 @@ import { useAppSessionEffects } from '@/hooks/useAppSessionEffects'
 import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppTabGroups } from '@/hooks/useAppTabGroups'
+import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { useAppUiState } from '@/hooks/useAppUiState'
+import { buildGridTree } from '@/hooks/useChatTiling'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useEventsMux } from '@/hooks/useEventsMux'
 import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
+import { useLatestRef } from '@/hooks/useLatestRef'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { useOfflineStatus } from '@/hooks/useOfflineStatus'
 import { notifyMissedCompletions } from '@/lib/browser-notifications'
-import { applyCapyOpenSplit } from '@/lib/capy-ui'
+import { applyCapyOpenSplit, parseGridLayout } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
-import { isDraftAgentSessionId } from '@/lib/draft-agent'
-import { recoverUnreadFromSessions } from '@/lib/session-attention'
+import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
+import { setFocusedItemId } from '@/lib/focused-item'
+import { setItemOpener } from '@/lib/item-opener'
+import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
+import { perfCount } from '@/lib/perf-probe'
+import { resolveItemLocation } from '@/lib/resolve-item-location'
+import { useChatActivity } from '@/lib/session-activity'
+import {
+  pruneSessionAttention,
+  recoverUnreadFromSessions
+} from '@/lib/session-attention'
 import { visibleSessionIds } from '@/lib/sessions'
+import { resolveStripActiveId } from '@/lib/strip-active'
+import { clearTerminalActivity } from '@/lib/terminal-attention'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 export default function App() {
+  perfCount('render.App')
+  // Shell-level chat signal: flips only when a run starts/stops or asks for
+  // approval — per-token updates stay inside each pane's own subscription.
+  const activityBySessionId = useChatActivity()
   const location = useLocation()
   const navigate = useNavigate()
   useMacDesktopOverlay()
@@ -73,6 +92,140 @@ export default function App() {
     isDashboardModels: route.isDashboardModels
   })
 
+  // FAS-107 GF1/GF6: terminals for the active project, shared source of
+  // truth for both the sidebar list and the tab strip (so a fresh
+  // create appears everywhere without per-consumer fetching).
+  const terminalsLive = useAppTerminals(
+    bootstrap.client,
+    ui.projectScopeId ?? null
+  )
+  const handleDeleteTerminalGlobal = useCallback(
+    async (terminalId: string) => {
+      if (!bootstrap.client) return
+      try {
+        terminalsLive.removeOptimistic(terminalId)
+        await bootstrap.client.deleteTerminal(terminalId)
+        clearTerminalActivity(terminalId)
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('deleteTerminal (global) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
+  const handleMoveTerminalToProject = useCallback(
+    async (terminalId: string, projectId: string | null) => {
+      if (!bootstrap.client) return
+      try {
+        await bootstrap.client.updateTerminal(terminalId, { projectId })
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('updateTerminal (move) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
+  const handleRenameTerminal = useCallback(
+    async (terminalId: string, nextTitle: string) => {
+      if (!bootstrap.client) return
+      const cleaned = nextTitle.trim()
+      if (!cleaned) return
+      // FAS-107 X4.2: patch optimista al store singleton para
+      // actualización instantánea del UI. Antes esperábamos el
+      // round-trip del backend + un refresh (~400ms de lag visible).
+      // El refresh queda como reconciliación de fondo.
+      useTerminalsStore.getState().patch(terminalId, { title: cleaned })
+      try {
+        await bootstrap.client.updateTerminal(terminalId, { title: cleaned })
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('updateTerminal (rename) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
+  // X2 Fix 1: dialog Radix para renombrar terminal (antes window.prompt,
+  // roto en Tauri Mac). Estado + submit + dispatcher que abre el dialog.
+  const [renameTerminalTarget, setRenameTerminalTarget] =
+    useState<TerminalSession | null>(null)
+  const [renameTerminalValue, setRenameTerminalValue] = useState('')
+
+  const submitRenameTerminal = useCallback(async () => {
+    const target = renameTerminalTarget
+    if (!target) return
+    const cleaned = renameTerminalValue.trim()
+    if (!cleaned) return
+    setRenameTerminalTarget(null)
+    setRenameTerminalValue('')
+    await handleRenameTerminal(target.id, cleaned)
+  }, [renameTerminalTarget, renameTerminalValue, handleRenameTerminal])
+
+  const promptRenameTerminal = useCallback(
+    (terminalId: string) => {
+      const current = terminalsLive.terminals.find(t => t.id === terminalId)
+      if (!current) return
+      setRenameTerminalTarget(current)
+      setRenameTerminalValue(current.title ?? '')
+    },
+    [terminalsLive.terminals]
+  )
+
+  const handleToggleTerminalOrganizeLabel = useCallback(
+    async (terminalId: string, label: 'pinned' | 'archive') => {
+      if (!bootstrap.client) return
+      const current = terminalsLive.terminals.find(t => t.id === terminalId)
+      // Empty string = clear (the store maps `"" -> None` to null out the
+      // column). Explicit label = set. Toggles between the label and null.
+      const nextLabel: string = current?.organizeLabel === label ? '' : label
+      try {
+        await bootstrap.client.updateTerminal(terminalId, {
+          organizeLabel: nextLabel
+        })
+        terminalsLive.refresh()
+      } catch (err) {
+        console.error('updateTerminal (organize) failed', err)
+      }
+    },
+    [bootstrap.client, terminalsLive]
+  )
+
+  // FAS-107 GF10: `⌘⇧T` opens a new terminal in the active project and
+  // navigates to it. Handled at the shell so it works from any page.
+  // Declared AFTER `bootstrap` so `bootstrap.client` isn't in TDZ.
+  const bootstrapClientForShortcut = bootstrap.client
+  const bootstrapActiveProjectIdForShortcut = ui.projectScopeId
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey
+      if (!meta || !e.shiftKey) return
+      if (e.key.toLowerCase() !== 't') return
+      e.preventDefault()
+      const client = bootstrapClientForShortcut
+      if (!client) return
+      void client
+        .createTerminal({
+          projectId: bootstrapActiveProjectIdForShortcut ?? null
+        })
+        .then(term => {
+          // FAS-107 P6: register the new terminal in the strip BEFORE
+          // navigating, so a chip appears (parity with the "+ New
+          // terminal" dropdown flow).
+          openSessionTabRef.current?.(term.id)
+          navigate(`/terminals/${term.id}`)
+        })
+        .catch(err => console.error('⌘⇧T createTerminal failed', err))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [
+    bootstrapClientForShortcut,
+    bootstrapActiveProjectIdForShortcut,
+    navigate
+  ])
+
   const onDesktopRoute = useCallback(
     (path: string) => {
       // Menubar New Agent / recent chats create sessions outside this window —
@@ -94,6 +247,15 @@ export default function App() {
     ui.openTabsByProject,
     ui.setOpenTabsByProject
   )
+  // FAS-107 P6: expose `openSessionTab` to the ⌘⇧T effect declared above
+  // (which sits before `tabs` for TDZ reasons). The ref lets the effect
+  // register the new terminal id in the strip right after creation so a
+  // chip appears — parity with the "+" dropdown flow in
+  // AgentSessionMainPanel.
+  const openSessionTabRef = useRef(tabs.openSessionTab)
+  useEffect(() => {
+    openSessionTabRef.current = tabs.openSessionTab
+  }, [tabs.openSessionTab])
   const tabGroupsStore = useAppTabGroups(
     ui.projectScopeId,
     bootstrap.sessions,
@@ -117,10 +279,19 @@ export default function App() {
   const effectiveSessionId = activeGroup
     ? activeGroup.activeChatId
     : route.sessionId
-  // What the strip renders as active — always the URL id, so closing a
-  // group chip compares `id === stripSessionId` correctly instead of
-  // matching against the resolved child chat id.
-  const stripSessionId = route.sessionId
+  // What the strip renders as active — el id del chip resaltado en el
+  // strip (chat, terminal o grupo).
+  //
+  // FAS-107 X5.1: consolidado en `resolveStripActiveId`. Antes esto era
+  // `route.sessionId ?? route.terminalId ?? null` inline en varios
+  // sitios y era fácil olvidarse de un tipo (hotfix `8f38fa9` corrigió
+  // uno de esos olvidos). Ahora la lógica vive en un solo lugar; si en
+  // el futuro agregamos un tipo nuevo (`note`, `canvas`, `mcp`), se
+  // toca `lib/strip-active.ts` y punto.
+  const stripSessionId = resolveStripActiveId(
+    { sessionId: route.sessionId, terminalId: route.terminalId },
+    null
+  )
 
   // Stable membership check for session effects. Was an inline arrow
   // that changed identity every render, which re-fired
@@ -128,7 +299,7 @@ export default function App() {
   // sometimes re-added a tab in the same batch it was being closed.
   const chatIsInsideAnyGroupMemo = useCallback(
     (chatId: string) =>
-      tabGroupsStore.allTabGroups.some(g => g.chatIds.includes(chatId)),
+      tabGroupsStore.allTabGroups.some(g => g.itemIds.includes(chatId)),
     [tabGroupsStore.allTabGroups]
   )
 
@@ -191,6 +362,7 @@ export default function App() {
     sessionId: effectiveSessionId,
     stripSessionId,
     enableTranscriptStream: !activeGroup,
+    subscribeActiveChat: !activeGroup,
     sessionIdRef: ui.sessionIdRef,
     session: context.session,
     activeProjectId: context.activeProjectId,
@@ -251,6 +423,40 @@ export default function App() {
    * `last_message_at`; se limpia solo cuando el chat recibe actividad real
    * que iguala o supera el boost. Ver `lib/chat-date-boost.ts`.
    */
+  /**
+   * FAS-107 X4.4-hotfix (bug D): entrar a un grupo suelta el pin
+   * individual del item. Rationale: al pinear un chat/terminal, el user
+   * pinea ese ítem específico. Al meterlo a un grupo pasa a ser hijo de
+   * otra entidad, y el pin del grupo (si se activa) es lo que ordena.
+   * Mantener el pin viejo genera confusión (aparece pineado dentro del
+   * grupo Y como suelto al disolver).
+   */
+  const unpinItemIfPinned = useCallback(
+    async (id: string) => {
+      if (!bootstrap.client) return
+      try {
+        if (id.startsWith('term_')) {
+          const term = terminalsLive.terminals.find(t => t.id === id)
+          if (term?.organizeLabel !== 'pinned') return
+          await bootstrap.client.updateTerminal(id, { organizeLabel: '' })
+          useTerminalsStore.getState().patch(id, { organizeLabel: null })
+        } else {
+          const chat = bootstrap.sessions.find(s => s.id === id)
+          if (chat?.organizeLabel !== 'pinned') return
+          await bootstrap.client.updateSession(id, { organizeLabel: null })
+          bootstrap.setSessions(current =>
+            current.map(s =>
+              s.id === id ? { ...s, organizeLabel: null } : s
+            )
+          )
+        }
+      } catch (err) {
+        console.error('unpinItemIfPinned failed', err)
+      }
+    },
+    [bootstrap, terminalsLive.terminals]
+  )
+
   const createSplitGroup = useCallback(
     (chatIds: string[]): string | null => {
       const groupId = tabGroupsStore.createGroup(chatIds)
@@ -262,9 +468,11 @@ export default function App() {
           chatIds.includes(s.id) ? { ...s, lastMessageAt: now } : s
         )
       )
+      // X4.4-hotfix bug D: despinar ítems al confirmar el split.
+      for (const id of chatIds) void unpinItemIfPinned(id)
       return groupId
     },
-    [tabGroupsStore, bootstrap]
+    [tabGroupsStore, bootstrap, unpinItemIfPinned]
   )
 
   useEffect(() => {
@@ -276,6 +484,15 @@ export default function App() {
     if (missed.length > 0) notifyMissedCompletions(missed.length)
   }, [bootstrap.health, bootstrap.sessions, effectiveSessionId])
 
+  // Unread ids are persisted; forget the ones whose chat no longer exists so
+  // the Bell / Dock badge can actually go dark (FAS-120). Only when the list
+  // is unscoped — a project scope hides other projects' chats.
+  const sessionsScopeForPrune = ui.projectScopeId
+  useEffect(() => {
+    if (!bootstrap.health || sessionsScopeForPrune || bootstrap.sessions.length === 0) return
+    pruneSessionAttention(bootstrap.sessions.map(s => s.id))
+  }, [bootstrap.health, bootstrap.sessions, sessionsScopeForPrune])
+
   useGlobalSessionEvents({
     client: bootstrap.client,
     health: bootstrap.health,
@@ -286,8 +503,20 @@ export default function App() {
       const ids = Array.isArray(payload.sessionIds)
         ? payload.sessionIds.filter((id): id is string => typeof id === 'string')
         : []
+      // Optional `layout: { rows, cols }` (POST /v1/ui/commands, dev-grid
+      // script, e2e harness) — otherwise the default single row.
+      const layout = parseGridLayout(payload.layout)
       void bootstrap.loadSessions({ force: true }).then(() => {
-        applyCapyOpenSplit(ids, createSplitGroup, path => navigate(path))
+        const groupId = applyCapyOpenSplit(ids, createSplitGroup, path =>
+          navigate(path)
+        )
+        if (groupId && layout) {
+          tabGroupsStore.setGroupLayoutForMonitor(
+            groupId,
+            getMonitorFingerprint(),
+            buildGridTree(ids, layout.rows, layout.cols)
+          )
+        }
       })
     }
   })
@@ -295,7 +524,7 @@ export default function App() {
     client: bootstrap.client,
     health: bootstrap.health,
     pinnedSessionIds: [
-      ...(activeGroup?.chatIds ?? []),
+      ...(activeGroup?.itemIds ?? []),
       ...(capySessionId ? [capySessionId] : [])
     ]
   })
@@ -334,7 +563,7 @@ export default function App() {
       if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group || !group.isPending) return
-      const sourceId = group.chatIds[0]
+      const sourceId = group.itemIds[0]
       if (sourceId === partnerId) return
       // Boost the partner's date as if the split had been created with
       // both chats from the start — this way the incoming chat also
@@ -347,8 +576,13 @@ export default function App() {
         )
       )
       tabGroupsStore.promotePendingGroup(groupId, partnerId)
+      // X4.4-hotfix bug D: al confirmar el split, despinar ambos ítems.
+      // El sourceId estaba dentro del pending group (efímero, sin
+      // despinar) y ahora se confirma junto con el partner.
+      void unpinItemIfPinned(sourceId)
+      void unpinItemIfPinned(partnerId)
     },
-    [route.sessionId, tabGroupsStore, bootstrap]
+    [route.sessionId, tabGroupsStore, bootstrap, unpinItemIfPinned]
   )
 
   const handleCancelPendingSplit = useCallback(() => {
@@ -356,9 +590,9 @@ export default function App() {
     if (!groupId || !groupId.startsWith('grp_')) return
     const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
     if (!group || !group.isPending) return
-    const sourceId = group.chatIds[0]
+    const sourceId = group.itemIds[0]
     tabGroupsStore.dissolveGroup(groupId)
-    if (sourceId) navigate(`/agents/${sourceId}`)
+    if (sourceId) navigate(sessionRoutePath(sourceId))
   }, [route.sessionId, tabGroupsStore, navigate])
 
   /*
@@ -375,17 +609,90 @@ export default function App() {
    * (no tiene sentido un split con 1 sólo chat) y navegamos al que
    * queda.
    */
+  /*
+   * FAS-107 X4.4: sacar un terminal del split desde el sidebar SIN
+   * borrarlo del disco. Antes el sidebar mostraba "Delete" que llamaba
+   * `handleDeleteTerminalGlobal` (destructivo real), asimetría vs los
+   * chats que sí distinguían "Remove from split" del delete real.
+   *
+   * Busca en qué grupo vive el terminal (a diferencia de
+   * `handleRemoveChatFromSplit`, que depende de `route.sessionId` porque
+   * se dispara desde dentro del split activo — este handler puede
+   * dispararse desde el sidebar viendo cualquier grupo).
+   */
+  const handleRemoveTerminalFromSplit = useCallback(
+    (terminalId: string) => {
+      const group = tabGroupsStore.allTabGroups.find(g =>
+        g.itemIds.includes(terminalId)
+      )
+      if (!group) return
+      const survivor = group.itemIds.find(id => id !== terminalId) ?? null
+      const nextSize = tabGroupsStore.removeFromGroup(group.id, terminalId)
+      if (nextSize >= 0 && nextSize < 2) {
+        tabGroupsStore.dissolveGroup(group.id)
+        if (survivor) {
+          openSessionTabRef.current?.(survivor)
+          // Solo navegar si el user estaba viendo ese grupo específicamente.
+          if (route.sessionId === group.id) {
+            navigate(sessionRoutePath(survivor))
+          }
+        }
+      }
+      // El terminal survivor (o el terminal que se quita si el grupo
+      // tenía >2) ya queda en openTabIds via `removeFromGroup`. NO se
+      // llama `deleteTerminal` — el terminal sigue vivo.
+      openSessionTabRef.current?.(terminalId)
+    },
+    [route.sessionId, tabGroupsStore, navigate]
+  )
+
   const handleRemoveChatFromSplit = useCallback(
     (chatId: string) => {
       const groupId = route.sessionId
       if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group) return
-      const survivor = group.chatIds.find(id => id !== chatId) ?? null
+      const survivor = group.itemIds.find(id => id !== chatId) ?? null
       const nextSize = tabGroupsStore.removeFromGroup(groupId, chatId)
       if (nextSize >= 0 && nextSize < 2) {
         tabGroupsStore.dissolveGroup(groupId)
-        if (survivor) navigate(`/agents/${survivor}`)
+        if (survivor) {
+          // FAS-107 X3 Fase 2: garantizar que el survivor esté en
+          // openTabIds antes de navegar. `dissolveGroup` re-inserta
+          // solo los "nativos" del scope (chats con projectId matching),
+          // y los terminales quedan afuera porque su mapa de projectId
+          // vive en otro store. Llamarlo acá cubre ambos tipos.
+          openSessionTabRef.current?.(survivor)
+          navigate(sessionRoutePath(survivor))
+        }
+      }
+    },
+    [route.sessionId, tabGroupsStore, navigate]
+  )
+
+  /*
+   * X1: "Delete Split View" desde el menú del chip del strip o del sidebar.
+   * Antes esto llamaba `tabGroupsStore.dissolveGroup` directo — el grupo
+   * desaparecía pero la ruta seguía en `/agents/grp_xxx`, quedando en
+   * pantalla vacía porque el id ya no existía.
+   *
+   * Ahora: tomamos el `activeChatId` del grupo (lo que el user tenía en
+   * foco dentro del split) ANTES de disolver, corremos el dissolve, y si
+   * la ruta actual apuntaba a ese mismo grupo, navegamos al ítem activo
+   * como tab suelto — a `/agents/:id` si es chat, a `/terminals/:id` si
+   * empieza con `term_`. El user sigue viendo la misma cosa, solo que
+   * ya no adentro del split.
+   */
+  const handleDissolveTabGroup = useCallback(
+    (groupId: string) => {
+      const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
+      const activeChild = group?.activeChatId ?? group?.itemIds[0] ?? null
+      const wasViewingThisGroup = route.sessionId === groupId
+      tabGroupsStore.dissolveGroup(groupId)
+      if (wasViewingThisGroup && activeChild) {
+        // FAS-107 X3 Fase 2: mismo motivo que en handleRemoveChatFromSplit.
+        openSessionTabRef.current?.(activeChild)
+        navigate(sessionRoutePath(activeChild))
       }
     },
     [route.sessionId, tabGroupsStore, navigate]
@@ -397,7 +704,7 @@ export default function App() {
       if (!groupId || !groupId.startsWith('grp_')) return
       const group = tabGroupsStore.allTabGroups.find(g => g.id === groupId)
       if (!group || group.isPending) return
-      if (group.chatIds.includes(chatId)) return
+      if (group.itemIds.includes(chatId)) return
       const now = new Date().toISOString()
       setChatDateBoosts([chatId], now)
       bootstrap.setSessions(current =>
@@ -407,8 +714,11 @@ export default function App() {
       )
       tabGroupsStore.addToGroup(groupId, chatId)
       tabGroupsStore.setGroupActiveChat(groupId, chatId)
+      // X4.4-hotfix bug D: al agregar un item a un split existente,
+      // despinar el ítem (mismo criterio que crear split).
+      void unpinItemIfPinned(chatId)
     },
-    [route.sessionId, tabGroupsStore, bootstrap]
+    [route.sessionId, tabGroupsStore, bootstrap, unpinItemIfPinned]
   )
 
   /*
@@ -447,6 +757,10 @@ export default function App() {
   // its own chatId + session. Computed once so secondary mounts within
   // a group can boot their pipeline with the same shared handles the
   // active mount uses.
+  // Panes read the sessions list by ref (see usePerSessionChatState) so
+  // a row update in one chat doesn't re-render every other pane.
+  const sessionsRef = useLatestRef(bootstrap.sessions)
+  const tabGroupsRef = useLatestRef(tabGroupsStore.allTabGroups)
   const perSessionBaseArgs = useMemo(
     () => ({
       client: bootstrap.client,
@@ -455,7 +769,7 @@ export default function App() {
       activeProjectId: context.activeProjectId,
       activeProject: context.activeProject,
       tabsScopeKey: tabs.tabsScopeKey,
-      sessions: bootstrap.sessions,
+      sessionsRef,
       setSessions: bootstrap.setSessions,
       setError: bootstrap.setError,
       loadSessions: bootstrap.loadSessions,
@@ -472,14 +786,13 @@ export default function App() {
       loadModelOptions: bootstrap.loadModelOptions,
       openTabsByProject: ui.openTabsByProject,
       setOpenTabsByProject: ui.setOpenTabsByProject,
-      lastSessionByScope: ui.lastSessionByScope,
       setLastSessionByScope: ui.setLastSessionByScope,
       setProjectScopeId: ui.setProjectScopeId,
       setRecentProjectIds: ui.setRecentProjectIds,
       patchOpenTabs: tabs.patchOpenTabs,
       openTabIds: tabs.openTabIds,
       setOpenTabIds: tabs.setOpenTabIds,
-      tabGroups: tabGroupsStore.allTabGroups,
+      tabGroupsRef,
       setCollapsedSidebarSections: ui.setCollapsedSidebarSections,
       setWorkspaceVersion: ui.setWorkspaceVersion,
       workspaceFiles: ui.workspaceFiles,
@@ -496,7 +809,7 @@ export default function App() {
       context.activeProjectId,
       context.activeProject,
       tabs.tabsScopeKey,
-      bootstrap.sessions,
+      sessionsRef,
       bootstrap.setSessions,
       bootstrap.setError,
       bootstrap.loadSessions,
@@ -513,14 +826,13 @@ export default function App() {
       bootstrap.loadModelOptions,
       ui.openTabsByProject,
       ui.setOpenTabsByProject,
-      ui.lastSessionByScope,
       ui.setLastSessionByScope,
       ui.setProjectScopeId,
       ui.setRecentProjectIds,
       tabs.patchOpenTabs,
       tabs.openTabIds,
       tabs.setOpenTabIds,
-      tabGroupsStore.allTabGroups,
+      tabGroupsRef,
       ui.setCollapsedSidebarSections,
       ui.setWorkspaceVersion,
       ui.workspaceFiles,
@@ -535,6 +847,33 @@ export default function App() {
   // Route wins. Draft materialization uses a separate ref inside session CRUD
   // so /agents/new never "sticks" to a previous real session id.
   ui.sessionIdRef.current = effectiveSessionId
+  // FAS-107 · Fix pre-fase1: expone el ítem con foco visible a módulos
+  // sin acceso al store (p. ej. `TerminalPortalHost` — vive en un layer
+  // portal aparte y no puede consultar tab groups). Cuando el usuario
+  // está en un split, `effectiveSessionId` YA es el `activeChatId` del
+  // group; si no, es la ruta directa.
+  setFocusedItemId(effectiveSessionId ?? null)
+  // FAS-107 · Fase 1f: bridge global para "abrir un ítem por id" desde
+  // el handler de click de notif nativas macOS (y cualquier otro
+  // módulo fuera del árbol React). El resolver decide si es standalone
+  // (navegar directo) o hijo de split (navegar al group + setear
+  // activeChatId del pane, así el chat/terminal queda visible dentro
+  // del split de una).
+  useEffect(() => {
+    setItemOpener((itemId: string) => {
+      const location = resolveItemLocation(itemId, allTabGroupsRef.current)
+      if (location.kind === 'split-child') {
+        tabGroupsStore.setGroupActiveChat(
+          location.groupId,
+          location.activeChatId
+        )
+      }
+      navigate(location.routePath)
+    })
+    return () => {
+      setItemOpener(null)
+    }
+  }, [navigate, tabGroupsStore.setGroupActiveChat])
 
   const { showChatSkeleton } = useAppShellEffects({
     locationPathname: location.pathname,
@@ -612,7 +951,9 @@ export default function App() {
     setComposer: layer.chat.setComposer,
     setComposerFiles: layer.chat.setComposerFiles,
     chatIsInsideAnyGroup: chatIsInsideAnyGroupMemo,
-    tabGroups: tabGroupsStore.allTabGroups
+    tabGroups: tabGroupsStore.allTabGroups,
+    terminals: terminalsLive.terminals,
+    sessionsInitialLoadDone: bootstrap.sessionsInitialLoadDone
   })
 
   // Bench sessions are omitted from the global list (sidebar noise). When a
@@ -637,7 +978,7 @@ export default function App() {
   const chatsInsideGroupIds = useMemo(() => {
     const set = new Set<string>()
     for (const g of tabGroupsStore.allTabGroups) {
-      for (const id of g.chatIds) set.add(id)
+      for (const id of g.itemIds) set.add(id)
     }
     return set
   }, [tabGroupsStore.allTabGroups])
@@ -685,18 +1026,38 @@ export default function App() {
    * activo — sin redirect.
    */
 
-  const { sections, openTabs } = buildSessionSidebarModel({
-    sessions: bootstrap.sessions,
-    // Pass ALL groups (across every scope) so the model can resolve a
-    // `grp_xxx` even when the active project doesn't match the scope
-    // the group was created in. `buildSessionSidebarModel` filters
-    // internally by scope, but it can still recognize a cross-scope
-    // group in `openTabIds`.
-    tabGroups: tabGroupsStore.allTabGroups,
-    activeProjectId: context.activeProjectId,
-    openTabIds: cleanedOpenTabIds,
-    activeSessionId: route.sessionId
-  })
+  // Memoized: App re-renders on every streamed token (chat store lives in
+  // a root context), and this walks every session. Stable identities here
+  // also let the sidebar list and tab strip skip re-rendering per token.
+  const sidebarModelSessions = bootstrap.sessions
+  const sidebarModelGroups = tabGroupsStore.allTabGroups
+  const sidebarModelProjectId = context.activeProjectId
+  const sidebarModelActiveId = route.sessionId
+  const sidebarModelTerminals = terminalsLive.terminals
+  const { sections, openTabs } = useMemo(
+    () =>
+      buildSessionSidebarModel({
+        sessions: sidebarModelSessions,
+        // Pass ALL groups (across every scope) so the model can resolve a
+        // `grp_xxx` even when the active project doesn't match the scope
+        // the group was created in. `buildSessionSidebarModel` filters
+        // internally by scope, but it can still recognize a cross-scope
+        // group in `openTabIds`.
+        tabGroups: sidebarModelGroups,
+        activeProjectId: sidebarModelProjectId,
+        openTabIds: cleanedOpenTabIds,
+        activeSessionId: sidebarModelActiveId,
+        terminals: sidebarModelTerminals
+      }),
+    [
+      sidebarModelSessions,
+      sidebarModelGroups,
+      sidebarModelProjectId,
+      cleanedOpenTabIds,
+      sidebarModelActiveId,
+      sidebarModelTerminals
+    ]
+  )
   const orderedVisibleSessionIds = useMemo(
     () => visibleSessionIds(sections, ui.collapsedSidebarSections),
     [sections, ui.collapsedSidebarSections]
@@ -807,6 +1168,13 @@ export default function App() {
   return (
     <>
       <AppShellConnected
+        terminals={terminalsLive.terminals}
+        onCloseTerminal={handleDeleteTerminalGlobal}
+        onRemoveTerminalFromSplit={handleRemoveTerminalFromSplit}
+        activeTerminalId={route.terminalId ?? null}
+        onMoveTerminalToProject={handleMoveTerminalToProject}
+        onRenameTerminal={promptRenameTerminal}
+        onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
         {...buildAppShellProps({
           offlineStatus,
           ui,
@@ -814,6 +1182,7 @@ export default function App() {
           bootstrap,
           context,
           chat: layer.chat,
+          activityBySessionId,
           tabs,
           actions: layer.actions,
           sandbox: layer.sandbox,
@@ -847,11 +1216,17 @@ export default function App() {
           onAddChatToSplit: handleAddChatToSplit,
           onRemoveChatFromSplit: handleRemoveChatFromSplit,
           closeTabGroup: handleCloseTabGroup,
+          dissolveTabGroup: handleDissolveTabGroup,
           renameGroupTarget,
           renameGroupValue,
           setRenameGroupTarget,
           setRenameGroupValue,
           submitRenameGroup,
+          renameTerminalTarget,
+          renameTerminalValue,
+          setRenameTerminalTarget,
+          setRenameTerminalValue,
+          submitRenameTerminal,
           selectedChatIds,
           toggleSelectChat,
           clearSelectChats,

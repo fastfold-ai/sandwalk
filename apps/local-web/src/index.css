@@ -1408,6 +1408,23 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
 }
 
 /*
+ * FAS-107 W4: padding interno del terminal (Portal-based rendering).
+ * El `.xterm-screen` es el div donde xterm.js pinta las filas — sin
+ * padding queda pegado al borde y se ve apretado. Aplicamos vía el
+ * selector `[data-terminal-portal-host]` (marker que ponemos en el
+ * div host del portal) para no afectar los TerminalPanel legacy
+ * (workspace side-panel, integrations, onboarding) que tienen su
+ * propio padding externo.
+ *
+ * FitAddon mide `clientWidth` del contenedor del terminal para calcular
+ * cols/rows — como el padding recorta el área útil, el fit ajusta
+ * naturalmente y no hace falta compensar.
+ */
+[data-terminal-portal-host] .xterm-screen {
+  padding: 8px 12px;
+}
+
+/*
  * Session chrome tabs — two colors only:
  *   1) gray  = strip + inactive tabs (--muted)
  *   2) chat  = active tab (--background) merges into the pane below

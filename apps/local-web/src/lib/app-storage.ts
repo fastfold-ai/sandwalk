@@ -184,12 +184,24 @@ export function readTabGroups(): SessionGroup[] {
       if (Array.isArray(parsed)) {
         return parsed
           .filter(
-            (item): item is SessionGroup =>
+            (item): item is SessionGroup & { chatIds?: string[] } =>
               !!item &&
               typeof item === 'object' &&
               typeof (item as SessionGroup).id === 'string' &&
-              Array.isArray((item as SessionGroup).chatIds)
+              // Aceptar `itemIds` (nuevo, X5.2) o `chatIds` (legacy).
+              (Array.isArray((item as SessionGroup).itemIds) ||
+                Array.isArray(
+                  (item as { chatIds?: unknown }).chatIds
+                ))
           )
+          // FAS-107 X5.2 · migración: promover `chatIds` legacy a `itemIds`
+          // al leer del localStorage. Datos guardados antes del rename
+          // siguen funcionando.
+          .map(g => {
+            if (Array.isArray(g.itemIds)) return g
+            const legacy = (g as unknown as { chatIds: string[] }).chatIds
+            return { ...g, itemIds: legacy }
+          })
           // Los pending groups son estado UI efímero (mientras el usuario
           // arma el split desde el picker). No los persistimos entre
           // sesiones — al recargar se descartan y el chat de origen
@@ -217,12 +229,22 @@ export function readTabGroups(): SessionGroup[] {
         if (
           !item ||
           typeof item !== 'object' ||
-          typeof (item as SessionGroup).id !== 'string' ||
-          !Array.isArray((item as SessionGroup).chatIds)
+          typeof (item as SessionGroup).id !== 'string'
         ) {
           continue
         }
-        const g = item as SessionGroup
+        const withItemIds = item as SessionGroup
+        const withLegacy = item as { chatIds?: unknown }
+        // X5.2: aceptar `itemIds` (nuevo) o `chatIds` (legacy).
+        const hasItemIds = Array.isArray(withItemIds.itemIds)
+        const hasChatIds = Array.isArray(withLegacy.chatIds)
+        if (!hasItemIds && !hasChatIds) continue
+        const g: SessionGroup = hasItemIds
+          ? withItemIds
+          : {
+              ...(item as SessionGroup),
+              itemIds: withLegacy.chatIds as string[]
+            }
         if (seen.has(g.id)) continue
         seen.add(g.id)
         flat.push(g)
@@ -263,6 +285,8 @@ function looksLikePaneNode(value: unknown): boolean {
   const v = value as {
     type?: string
     chatId?: string
+    terminalId?: string
+    ref?: { id?: unknown; kind?: unknown }
     direction?: string
     ratios?: unknown
     children?: unknown[]
@@ -274,6 +298,20 @@ function looksLikePaneNode(value: unknown): boolean {
     // Duplicated string on purpose to avoid a UI → storage import.
     if (v.chatId === '__picker__') return false
     return true
+  }
+  // FAS-107: el árbol acepta hojas `terminal` y `ref` desde que se agregó
+  // soporte para terminales en el split. Sin este check el validador
+  // rechazaba cualquier árbol con un terminal y `sanitizeLayout`
+  // devolvía `undefined`, tirando toda la topología persistida.
+  if (v.type === 'terminal') {
+    return typeof v.terminalId === 'string' && v.terminalId.length > 0
+  }
+  if (v.type === 'ref') {
+    return (
+      !!v.ref &&
+      typeof v.ref.id === 'string' &&
+      (v.ref.kind === 'chat' || v.ref.kind === 'terminal')
+    )
   }
   if (v.type !== 'branch') return false
   if (v.direction !== 'horizontal' && v.direction !== 'vertical') return false
@@ -290,7 +328,13 @@ function looksLikePaneNode(value: unknown): boolean {
 
 export function writeTabGroups(groups: SessionGroup[]) {
   try {
-    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(groups))
+    // FAS-107 Fase 4: los pending groups son estado UI efímero (mientras
+    // el picker está abierto). Nunca los persistimos — si el user cierra
+    // la app antes de confirmar el partner, el pending muere y el chat
+    // de origen vuelve a ser tab suelto natural. Complementa el filtro
+    // defensivo en `readTabGroups`.
+    const persistable = groups.filter(g => !g.isPending)
+    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(persistable))
   } catch {
     // ignore storage failures
   }

@@ -18,7 +18,8 @@ import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useSidebarPixelWidth } from '@/hooks/useSidebarPixelWidth'
 import type { CreateDraftSession } from '@/lib/draft-agent'
-import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import type { SessionActivityMap } from '@/lib/session-activity'
+import type { TabItemSection } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 export type AppShellSidebarProps = {
@@ -39,7 +40,7 @@ export type AppShellSidebarProps = {
   sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
@@ -69,7 +70,9 @@ export type AppShellSidebarProps = {
   onSelectTabGroup?: (groupId: string) => void
   onRenameTabGroup?: (group: SessionGroup) => void
   onDissolveTabGroup?: (groupId: string) => void
+  onCloseTabGroup?: (groupId: string) => void
   onSetTabGroupColor?: (groupId: string, color: string | null) => void
+  onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   onGoToChatProject?: (chat: AgentSession) => void
   activeGroupChildId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
@@ -103,6 +106,21 @@ export type AppShellSidebarProps = {
       | null
       | ((current: AgentSession | null) => AgentSession | null)
   ) => void
+  /** FAS-107 GF6: terminals of the active project. */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  onCloseTerminal?: (terminalId: string) => void
+  /** X4.4: sacar terminal del split (no destructivo) desde el sidebar. */
+  onRemoveTerminalFromSplit?: (terminalId: string) => void
+  activeTerminalId?: string | null
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
 }
 
 export function AppShellSidebar({
@@ -121,7 +139,7 @@ export function AppShellSidebar({
   sections,
   collapsedSidebarSections,
   sessionId,
-  chatBySessionId,
+  activityBySessionId,
   orderedVisibleSessionIds,
   selectedSessionIds,
   threadMenuOpenId,
@@ -144,7 +162,9 @@ export function AppShellSidebar({
   onSelectTabGroup,
   onRenameTabGroup,
   onDissolveTabGroup,
+  onCloseTabGroup,
   onSetTabGroupColor,
+  onSetTabGroupPinned,
   onGoToChatProject,
   activeGroupChildId,
   setTabGroupActiveChat,
@@ -158,7 +178,14 @@ export function AppShellSidebar({
   openRenameDialog,
   updateSession,
   exportTranscript,
-  setDeleteTarget
+  setDeleteTarget,
+  terminals,
+  onCloseTerminal,
+  onRemoveTerminalFromSplit,
+  activeTerminalId,
+  onMoveTerminalToProject,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel
 }: AppShellSidebarProps) {
   const { onSidebarResize } = useSidebarPixelWidth(
     sidebarPanelRef,
@@ -213,7 +240,7 @@ export function AppShellSidebar({
             sections={sections}
             collapsedSidebarSections={collapsedSidebarSections}
             sessionId={sessionId}
-            chatBySessionId={chatBySessionId}
+            activityBySessionId={activityBySessionId}
             orderedVisibleSessionIds={orderedVisibleSessionIds}
             selectedSessionIds={selectedSessionIds}
             threadMenuOpenId={threadMenuOpenId}
@@ -243,7 +270,9 @@ export function AppShellSidebar({
             onSelectTabGroup={onSelectTabGroup}
             onRenameTabGroup={onRenameTabGroup}
             onDissolveTabGroup={onDissolveTabGroup}
+            onCloseTabGroup={onCloseTabGroup}
             onSetTabGroupColor={onSetTabGroupColor}
+            onSetTabGroupPinned={onSetTabGroupPinned}
             onGoToChatProject={onGoToChatProject}
             activeGroupChildId={activeGroupChildId}
             setTabGroupActiveChat={setTabGroupActiveChat}
@@ -260,6 +289,13 @@ export function AppShellSidebar({
             setDeleteTarget={setDeleteTarget}
             onLogout={logoutSession}
             onRefreshUser={refreshCloudUserName}
+            terminals={terminals}
+            onCloseTerminal={onCloseTerminal}
+            onRemoveTerminalFromSplit={onRemoveTerminalFromSplit}
+            activeTerminalId={activeTerminalId ?? null}
+            onMoveTerminalToProject={onMoveTerminalToProject}
+            onRenameTerminal={onRenameTerminal}
+            onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}
           />
         )}
       </aside>

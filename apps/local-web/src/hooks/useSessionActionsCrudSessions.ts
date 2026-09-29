@@ -13,6 +13,7 @@ import {
   type DraftSessionSeed,
   isDraftAgentSessionId
 } from '@/lib/draft-agent'
+import { clearSessionAttention } from '@/lib/session-attention'
 import { downloadMarkdown, emptySessionChatState } from '@/lib/sessions'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
@@ -25,7 +26,6 @@ type SessionCrudArgs = Pick<
   | 'tabsScopeKey'
   | 'sessionId'
   | 'sessionIdRef'
-  | 'sessions'
   | 'setSessions'
   | 'setOpenTabsByProject'
   | 'setLastSessionByScope'
@@ -65,7 +65,6 @@ export function useSessionActionsCrudSessions({
   tabsScopeKey,
   sessionId,
   sessionIdRef,
-  sessions,
   setSessions,
   setOpenTabsByProject,
   setLastSessionByScope,
@@ -362,32 +361,37 @@ export function useSessionActionsCrudSessions({
 
   const deleteSession = async (target: AgentSession) => {
     await client.deleteSession(target.id)
+    clearSessionAttention(target.id)
     let neighbor: string | null = null
     let scopeEmpty = false
-    const scopeProjectId = activeProjectId
+    // FAS-107 X4.4-hotfix: SOLO quitar el target.id de cada scope.
+    // Antes había un filtro por proyecto que asumía que TODOS los ids
+    // en `openTabsByProject[scope]` eran chats — y descartaba cualquier
+    // id que `sessions.find(...)` no reconociera. Eso barría todos los
+    // `grp_*` (grupos) y `term_*` (terminales) del strip cuando borrabas
+    // un chat estando dentro de un proyecto.
+    //
+    // El barrido por proyecto ya lo hace `useAppSessionEffects` de forma
+    // correcta usando las 3 listas (sessions + terminals + tabGroups).
     setOpenTabsByProject(current => {
       let changed = false
       const next: Record<string, string[]> = {}
       for (const [key, ids] of Object.entries(current)) {
-        if (!ids.includes(target.id) && key !== tabsScopeKey) {
+        if (!ids.includes(target.id)) {
           next[key] = ids
+          if (key === tabsScopeKey) {
+            neighbor = ids.find(id => id !== target.id) || null
+            scopeEmpty = ids.length === 0
+          }
           continue
         }
-        const withoutTarget = ids.filter(id => id !== target.id)
-        const filtered =
-          key === tabsScopeKey && scopeProjectId
-            ? withoutTarget.filter(id => {
-                const item = sessions.find(session => session.id === id)
-                return Boolean(item && item.projectId === scopeProjectId)
-              })
-            : withoutTarget
-        if (filtered.length !== ids.length) changed = true
+        const filtered = ids.filter(id => id !== target.id)
+        changed = true
         if (key === tabsScopeKey) {
           neighbor = filtered[0] || null
           scopeEmpty = filtered.length === 0
         }
         if (filtered.length > 0) next[key] = filtered
-        else if (ids.length > 0) changed = true
       }
       if (!changed) return current
       writeOpenTabsByProject(next)
@@ -413,8 +417,8 @@ export function useSessionActionsCrudSessions({
       navigate(
         neighbor
           ? `/agents/${neighbor}`
-          : scopeProjectId
-            ? `/projects/${scopeProjectId}`
+          : activeProjectId
+            ? `/projects/${activeProjectId}`
             : '/'
       )
     }

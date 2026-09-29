@@ -79,11 +79,28 @@ export type SessionMainHeaderProps = {
   onPrepareDraftWorkspace?: () => void | Promise<void>
   /** Opens a fresh draft session (same handler as the sidebar "New agent"). */
   createSession?: (projectId?: string | null) => void | Promise<void>
+  /** FAS-107 GF5: create + open a new terminal via the tab-strip "+". */
+  onCreateTerminal?: () => void
+  /** FAS-107 GF1/GF6: terminals so chips render with type-terminal variant. */
+  terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
+  /** FAS-107: close/kill a terminal from its chip. */
+  onCloseTerminal?: (terminalId: string) => void
+  /** FAS-107 GF-PARITY-5: rename/pin/archive/move a terminal from chip menu. */
+  onRenameTerminal?: (terminalId: string) => void
+  onToggleTerminalOrganizeLabel?: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => void | Promise<void>
+  onMoveTerminalToProject?: (
+    terminalId: string,
+    projectId: string | null
+  ) => void | Promise<void>
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
   onDissolveGroup?: (groupId: string) => void
   onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
+  onSetGroupPinned?: (groupId: string, pinned: boolean) => void
   onCloseGroup?: (groupId: string) => void
   /**
    * Cuando la ruta activa apunta a un grupo, el shell oculta su fila de
@@ -94,11 +111,18 @@ export type SessionMainHeaderProps = {
   inSplitGroup?: boolean
   /**
    * Id del grupo activo (si el user está en un split). El activeId
-   * visual del strip usa `activeGroupId ?? sessionId` — sin este prop,
-   * `sessionId` (chatId real) no matchearía ningún tab porque el chat
-   * vive oculto dentro del grupo.
+   * visual del strip usa `activeGroupId ?? sessionId ?? activeTerminalId`
+   * — sin `activeGroupId` un chat que vive oculto dentro de un split
+   * nunca resolvería como activo, y sin `activeTerminalId` un terminal
+   * suelto en `/terminals/:id` deja su chip apagado.
    */
   activeGroupId?: string | null
+  /**
+   * FAS-107: id del terminal activo cuando la ruta es `/terminals/:id`.
+   * Se usa como último fallback del `activeId` del strip para que el
+   * chip del terminal se ilumine igual que un chat activo.
+   */
+  activeTerminalId?: string | null
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
   onClearSelection?: () => void
@@ -137,18 +161,26 @@ export function SessionMainHeader({
   setPanelView,
   onPrepareDraftWorkspace,
   createSession,
+  onCreateTerminal,
+  terminals,
+  onCloseTerminal,
+  onRenameTerminal,
+  onToggleTerminalOrganizeLabel,
+  onMoveTerminalToProject,
   groups,
   onSplitWith,
   onDissolveGroup,
   onRenameGroup,
   onSetGroupColor,
+  onSetGroupPinned,
   onCloseGroup,
   selectedChatIds,
   onToggleSelectChat,
   onClearSelection,
   onCreateSplitFromSelection,
   inSplitGroup,
-  activeGroupId
+  activeGroupId,
+  activeTerminalId
 }: SessionMainHeaderProps) {
   const overlay = useMacDesktopOverlay()
   // Collapse: reveal after panel closes. Expand: keep briefly so icons don't gap.
@@ -278,7 +310,7 @@ export function SessionMainHeader({
         <SessionTabs
           tabs={openTabs}
           openTabIds={openTabIds}
-          activeId={activeGroupId ?? sessionId}
+          activeId={activeGroupId ?? sessionId ?? activeTerminalId ?? null}
           onSelect={id => {
             void navigateToSession({
               id,
@@ -291,12 +323,37 @@ export function SessionMainHeader({
           onCloseOthers={closeOtherSessionTabs}
           onReorder={reorderSessionTabs}
           onRename={openRenameDialog}
-          onTogglePin={item =>
+          onTogglePin={item => {
+            const willPin = item.organizeLabel !== 'pinned'
             void updateSession(item, {
-              organizeLabel:
-                item.organizeLabel === 'pinned' ? null : 'pinned'
+              organizeLabel: willPin ? 'pinned' : null
             })
-          }
+            // Al pinear un tab, moverlo al FINAL del cluster de pinneds
+            // en el orden del strip. Sin esto, aparecía a la izquierda
+            // del cluster de pinneds cuando el `openTabIds` ya lo tenía
+            // antes que otros pinneds. Chrome/VSCode ponen el nuevo pin
+            // al final del cluster de pinneds.
+            if (willPin && openTabIds && openTabs && reorderSessionTabs) {
+              const otherPinnedIds = new Set(
+                openTabs
+                  .filter(
+                    tab => tab.organizeLabel === 'pinned' && tab.id !== item.id
+                  )
+                  .map(tab => tab.id)
+              )
+              const otherPinnedInStrip = openTabIds.filter(id =>
+                otherPinnedIds.has(id)
+              )
+              const notPinnedInStrip = openTabIds.filter(
+                id => !otherPinnedIds.has(id) && id !== item.id
+              )
+              reorderSessionTabs([
+                ...otherPinnedInStrip,
+                item.id,
+                ...notPinnedInStrip
+              ])
+            }
+          }}
           onExport={item => void exportTranscript(item)}
           onInspect={item => navigate(`/agents/${item.id}?inspect=1`)}
           onArchive={item =>
@@ -313,11 +370,18 @@ export function SessionMainHeader({
           onCreateSession={
             createSession ? () => void createSession(activeProjectId) : undefined
           }
+          onCreateTerminal={onCreateTerminal}
+          terminals={terminals}
+          onCloseTerminal={onCloseTerminal}
+          onRenameTerminal={onRenameTerminal}
+          onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}
+          onMoveTerminalToProject={onMoveTerminalToProject}
           groups={groups}
           onSplitWith={onSplitWith}
           onDissolveGroup={onDissolveGroup}
           onRenameGroup={onRenameGroup}
           onSetGroupColor={onSetGroupColor}
+          onSetGroupPinned={onSetGroupPinned}
           onCloseGroup={onCloseGroup}
           selectedChatIds={selectedChatIds}
           onToggleSelectChat={onToggleSelectChat}

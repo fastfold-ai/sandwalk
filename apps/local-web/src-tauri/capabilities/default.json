@@ -16,6 +16,8 @@
     "core:webview:allow-create-webview-window",
     "liquid-glass:default",
     "notification:default",
+    "notification:allow-register-listener",
+    "notification:allow-register-action-types",
     "dialog:default",
     "updater:default",
     "process:default"

@@ -50,7 +50,6 @@ export function useTerminalPanelTabs({
     livesRef,
     connectLive,
     disposeLive,
-    disposeAll,
     mountActive,
     sendCommandToLive
   } = useTerminalLive({ client, sessionId, renameIdRef })
@@ -194,6 +193,16 @@ export function useTerminalPanelTabs({
   }, [submitRename, tabs])
 
   useEffect(() => {
+    // FAS-107 X5.3 · guard: `listPtySessions` solo aplica a sesiones
+    // reales (chats o terminales). Los grupos (`grp_*`) son
+    // contenedores del strip, no sesiones del backend — pedirle su pty
+    // devuelve 404 y ensucia la consola. Es el patrón raíz de X4.4
+    // (consumidor no reconoce tipo). El fix real vendrá cuando este
+    // hook consuma un `StripItem` tipado; por ahora prefix-guard.
+    if (sessionId.startsWith('grp_')) {
+      setBooting(false)
+      return
+    }
     let cancelled = false
     setBooting(true)
     setStatus(null)
@@ -220,10 +229,16 @@ export function useTerminalPanelTabs({
     })()
 
     return () => {
+      // V1: NO llamar `disposeAll()` acá. Antes esto destruía los
+      // xterm instances cada vez que React desmontaba el componente
+      // (cambio de tab, cambio de split, cualquier remount), perdiendo
+      // el buffer completo del scrollback. Ahora los xterm viven en
+      // un map module-level y sobreviven al unmount — sólo se dispose
+      // cuando el usuario cierra el terminal explícitamente via
+      // `closeTab`. Patrón canónico: VSCode, Codespaces, Warp.
       cancelled = true
-      disposeAll()
     }
-  }, [autoCreateOnEmpty, client, connectLive, createTab, disposeAll, sessionId])
+  }, [autoCreateOnEmpty, client, connectLive, createTab, sessionId])
 
   return {
     tabs,

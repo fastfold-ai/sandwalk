@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { useSessionChatSlice } from '@/hooks/chat-store'
 import { useChatStore } from '@/hooks/chat-store-context'
+import { normalizeSessionChatState } from '@/lib/chat-actions'
 
 /**
  * Hook por-sesión que expone el `chatBySessionId` global (vía el
@@ -17,10 +19,12 @@ import { useChatStore } from '@/hooks/chat-store-context'
 
 export function useSessionChatState(sessionId: string | null) {
   const store = useChatStore()
-  const { chatBySessionId, setChatBySessionId, chatBySessionIdRef, patchChat } =
-    store
+  const { setChatBySessionId, chatBySessionIdRef, patchChat } = store
 
-  const chat = store.selectChat(sessionId)
+  // Reactive read of THIS session only — other panes' tokens do not
+  // re-render this mount.
+  const slice = useSessionChatSlice(sessionId)
+  const chat = useMemo(() => normalizeSessionChatState(slice), [slice])
   const {
     messages,
     tools,
@@ -103,7 +107,6 @@ export function useSessionChatState(sessionId: string | null) {
   )
 
   return {
-    chatBySessionId,
     setChatBySessionId,
     chatBySessionIdRef,
     patchChat,

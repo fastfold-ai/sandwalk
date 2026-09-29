@@ -14,6 +14,8 @@ export type AppRouteMatches = {
   onboardingRoute: PathMatch<'slug'> | null
   legacyIntegrationRoute: PathMatch<'integrationKey'> | null
   sessionRoute: PathMatch<'sessionId'> | null
+  /** FAS-107: terminal-as-first-class-item route `/terminals/:terminalId`. */
+  terminalRoute: PathMatch<'terminalId'> | null
   projectRoute: PathMatch<'projectId'> | null
   siteRoute: PathMatch<'siteId'> | null
   specialistNewRoute: PathMatch<string> | null
@@ -50,6 +52,7 @@ export function matchAppRoutes(pathname: string): AppRouteMatches {
       pathname
     ),
     sessionRoute: matchPath('/agents/:sessionId', pathname),
+    terminalRoute: matchPath('/terminals/:terminalId', pathname),
     projectRoute: matchPath('/projects/:projectId', pathname),
     siteRoute: matchPath('/sites/:siteId', pathname),
     specialistNewRoute: matchPath('/dashboard/specialists/new', pathname),

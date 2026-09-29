@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+# Anthropic's SDK default is a 10-minute request timeout. Under provider
+# overload (seen with 16 concurrent grid runs) a request can be accepted and
+# then stall with no bytes; the run then sits "running" with nothing on
+# screen for 10 minutes. Match the OpenAI path's 300 s stall budget.
+ANTHROPIC_REQUEST_TIMEOUT_S = 300.0
+
 
 def build_anthropic_chat_model(config, *, temperature: float):
     from langchain.chat_models import init_chat_model
@@ -21,7 +27,10 @@ def build_anthropic_chat_model(config, *, temperature: float):
     apply_anthropic_empty_thinking_patch()
 
     model = config.get("llm.model") or "claude-sonnet-4-5-20250929"
-    kwargs: dict[str, Any] = {"max_retries": 5}
+    kwargs: dict[str, Any] = {
+        "max_retries": 5,
+        "timeout": ANTHROPIC_REQUEST_TIMEOUT_S,
+    }
     if not anthropic_model_omits_temperature(model):
         kwargs["temperature"] = temperature
     api_key = config.llm_api_key("anthropic")

@@ -47,6 +47,8 @@ INSTALL=1 ./apps/packaging/package-macos-dmg.sh
 
 Output: `apps/packaging/dist/Sandwalk-<version>-macos-arm64.dmg`
 
+Apple Developer ID + local/CI signing: [`apps/packaging/APPLE-SIGNING.md`](../packaging/APPLE-SIGNING.md).
+
 Users drag **Sandwalk.app** into Applications. Opening Sandwalk auto-starts the nested
 helper if the control plane is not already up.
 

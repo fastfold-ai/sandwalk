@@ -3,6 +3,7 @@ import type {
   AgentSession,
   AgentSkillDetail,
   IntegrationSummary,
+  TerminalSession,
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, SetStateAction } from 'react'
@@ -16,6 +17,7 @@ import {
   writeProjectScopeId
 } from '@/lib/app-storage'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { sameArrayBy } from '@/lib/stable-equal'
 import { clearSessionAttention } from '@/lib/session-attention'
 
 type UseAppSessionEffectsArgs = {
@@ -52,6 +54,20 @@ type UseAppSessionEffectsArgs = {
    * si al menos uno de sus chats pertenece al proyecto activo.
    */
   tabGroups?: import('@sandwalk/agent-ui-core').SessionGroup[]
+  /**
+   * FAS-107 P1: todos los terminales conocidos. El cleanup de
+   * `openTabsByProject` los usa como tercera fuente de verdad (además de
+   * `sessions` y `tabGroups`) — sin esto, un `term_*` id en el strip se
+   * caía al primer render porque no matcheaba ninguna sesión existente.
+   */
+  terminals?: TerminalSession[]
+  /**
+   * FAS-107 Fase 4: `true` cuando `loadSessions` completó al menos una
+   * vez (con éxito o vacío). Los cleanups de `openTabIds` lo consultan
+   * para NO abortar en un proyecto legítimamente vacío. Antes usaban
+   * `sessions.length === 0` como guard, y eso dejaba huérfanos vivos.
+   */
+  sessionsInitialLoadDone?: boolean
 }
 
 export function useAppSessionEffects({
@@ -79,7 +95,9 @@ export function useAppSessionEffects({
   setComposer,
   setComposerFiles,
   chatIsInsideAnyGroup,
-  tabGroups = []
+  tabGroups = [],
+  terminals = [],
+  sessionsInitialLoadDone = false
 }: UseAppSessionEffectsArgs) {
   useEffect(() => {
     setIntegrationValues({})
@@ -118,9 +136,11 @@ export function useAppSessionEffects({
   }, [sessionId])
 
   useEffect(() => {
-    // Wait until sessions are loaded — otherwise every persisted tab looks
-    // "unknown" and gets wiped on reload.
-    if (!activeProjectId || sessions.length === 0) return
+    // FAS-107 Fase 4: esperamos a que la primera carga de sessions haya
+    // terminado. Antes usábamos `sessions.length === 0` que era ambiguo
+    // (aún cargando vs cargó vacío) y en un proyecto legítimamente vacío
+    // bloqueaba el cleanup y dejaba chips huérfanos vivos.
+    if (!activeProjectId || !sessionsInitialLoadDone) return
     setOpenTabsByProject(current => {
       const ids = current[activeProjectId]
       if (!ids || ids.length === 0) return current
@@ -133,10 +153,28 @@ export function useAppSessionEffects({
         if (id.startsWith('grp_')) {
           const group = tabGroups.find(g => g.id === id)
           if (!group) return false
-          return group.chatIds.some(chatId => {
+          // X4.4-hotfix: los terminales dentro del grupo también deben
+          // contar a la hora de decidir si el grupo pertenece al scope.
+          // Antes solo miraba `sessions.find(chatId)` y descartaba
+          // grupos con solo terminales o con terminales del proyecto
+          // activo — el chip del grupo desaparecía del strip.
+          return group.itemIds.some(chatId => {
+            if (chatId.startsWith('term_')) {
+              const term = terminals.find(t => t.id === chatId)
+              return Boolean(
+                term && (term.projectId ?? null) === activeProjectId
+              )
+            }
             const chat = sessions.find(s => s.id === chatId)
             return Boolean(chat && chat.projectId === activeProjectId)
           })
+        }
+        // FAS-107 P1: terminales viven en su propio store (`terminals`),
+        // no en `sessions`. Sin este chequeo un `term_*` id caería al
+        // primer render porque `sessions.find(...)` devolvería undefined.
+        if (id.startsWith('term_')) {
+          const term = terminals.find(t => t.id === id)
+          return Boolean(term && (term.projectId ?? null) === activeProjectId)
         }
         const item = sessions.find(session => session.id === id)
         return Boolean(item && item.projectId === activeProjectId)
@@ -148,7 +186,7 @@ export function useAppSessionEffects({
       writeOpenTabsByProject(next)
       return next
     })
-  }, [activeProjectId, sessions, tabGroups])
+  }, [activeProjectId, sessions, tabGroups, terminals])
 
   useEffect(() => {
     if (!sessionId || isDraftAgentSessionId(sessionId)) return
@@ -165,18 +203,26 @@ export function useAppSessionEffects({
   }, [projectScopeId])
 
   useEffect(() => {
-    if (sessions.length === 0) return
+    // FAS-107 Fase 4: mismo guard que arriba. Antes `sessions.length === 0`
+    // era el gate y en un proyecto vacío nunca corría el cleanup global.
+    if (!sessionsInitialLoadDone) return
     const existing = new Set(sessions.map(item => item.id))
     const validGroupIds = new Set(tabGroups.map(g => g.id))
+    // FAS-107 P1: terminales son first-class; sus ids también son válidos
+    // en `openTabsByProject`.
+    const validTerminalIds = new Set(terminals.map(t => t.id))
     setOpenTabsByProject(current => {
       let changed = false
       const next: Record<string, string[]> = {}
       for (const [key, ids] of Object.entries(current)) {
-        // Un id se conserva si es un chat válido O un grp_ conocido.
-        // Antes este cleanup borraba TODOS los `grp_xxx` (no están en
-        // `sessions`) y los grupos desaparecían al primer render.
+        // Un id se conserva si es un chat válido O un grp_ conocido O un
+        // terminal. Antes este cleanup borraba TODOS los `grp_xxx` y los
+        // `term_*` (ninguno vive en `sessions`).
         const filtered = ids.filter(
-          id => existing.has(id) || validGroupIds.has(id)
+          id =>
+            existing.has(id) ||
+            validGroupIds.has(id) ||
+            validTerminalIds.has(id)
         )
         if (filtered.length !== ids.length) changed = true
         if (filtered.length > 0) next[key] = filtered
@@ -200,7 +246,7 @@ export function useAppSessionEffects({
       writeLastSessionByScope(next)
       return next
     })
-  }, [sessions, tabGroups])
+  }, [sessions, tabGroups, terminals])
 
   useEffect(() => {
     const listId =
@@ -211,14 +257,28 @@ export function useAppSessionEffects({
       setWorkspaceFiles([])
       return
     }
+    // S1: si el id activo es un terminal, no hay filesystem que listar
+    // (terminales viven en su propio endpoint). El request devolvería 404
+    // y ensuciaría la consola.
+    // X4.4-hotfix: los grupos (`grp_*`) tampoco tienen filesystem propio.
+    // Son contenedores de tabs, no sesiones reales del backend.
+    if (listId.startsWith('term_') || listId.startsWith('grp_')) {
+      setWorkspaceFiles(prev => (prev.length === 0 ? prev : []))
+      return
+    }
     let cancelled = false
     void client
       .listFiles(listId)
       .then(files => {
-        if (!cancelled) setWorkspaceFiles(files)
+        if (cancelled) return
+        setWorkspaceFiles(prev =>
+          sameArrayBy(prev, files, f => `${f.path}|${f.type}|${f.size}|${f.mtime}`)
+            ? prev
+            : files
+        )
       })
       .catch(() => {
-        if (!cancelled) setWorkspaceFiles([])
+        if (!cancelled) setWorkspaceFiles(prev => (prev.length === 0 ? prev : []))
       })
     return () => {
       cancelled = true

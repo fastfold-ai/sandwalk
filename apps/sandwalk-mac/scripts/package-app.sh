@@ -36,6 +36,37 @@ cp "${ROOT}/Resources/Info.plist" "${APP_OUT}/Contents/Info.plist"
 BUNDLE_SRC="$(dirname "${BIN}")/Sandwalk_SandwalkCore.bundle"
 if [[ -d "${BUNDLE_SRC}" ]]; then
   cp -R "${BUNDLE_SRC}" "${APP_OUT}/Contents/MacOS/"
+  # SwiftPM emite el `.bundle` como directory sin `Contents/Info.plist`
+  # — codesign lo rechaza al firmar el helper padre con "bundle format
+  # unrecognized". Inyectamos un Info.plist mínimo para que codesign lo
+  # acepte como resource bundle válido.
+  NESTED="${APP_OUT}/Contents/MacOS/Sandwalk_SandwalkCore.bundle"
+  mkdir -p "${NESTED}/Contents"
+  cat > "${NESTED}/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>ai.fastfold.sandwalk.core.resources</string>
+  <key>CFBundleName</key>
+  <string>SandwalkCore</string>
+  <key>CFBundlePackageType</key>
+  <string>BNDL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+</dict>
+</plist>
+PLIST
+  # Mover los recursos a Contents/Resources/ (patrón bundle canonical).
+  mkdir -p "${NESTED}/Contents/Resources"
+  for f in "${NESTED}"/*; do
+    name="$(basename "${f}")"
+    [[ "${name}" == "Contents" ]] && continue
+    mv "${f}" "${NESTED}/Contents/Resources/"
+  done
 fi
 
 echo "==> Generating AppIcon.icns..."
@@ -59,8 +90,21 @@ rm -rf "${ICONSET}"
 
 printf 'APPL????' > "${APP_OUT}/Contents/PkgInfo"
 
-echo "==> Ad-hoc sign..."
-codesign --force --deep --sign - "${APP_OUT}" 2>/dev/null || true
+IDENTITY="${CODESIGN_IDENTITY:-${APPLE_SIGNING_IDENTITY:--}}"
+ENTITLEMENTS="${ROOT}/Resources/entitlements.plist"
+echo "==> Codesign helper (identity: ${IDENTITY})..."
+# `--deep` (deprecated pero necesario) firma recursivamente el sub-bundle
+# `Sandwalk_SandwalkCore.bundle` que SwiftPM emite como directory sin
+# `Contents/Info.plist`. Sin `--deep`, codesign lo rechaza con
+# "bundle format unrecognized, invalid, or unsuitable".
+SIGN_ARGS=(--force --deep --sign "${IDENTITY}")
+if [[ "${IDENTITY}" != "-" ]]; then
+  SIGN_ARGS+=(--options runtime --timestamp)
+  if [[ -f "${ENTITLEMENTS}" ]]; then
+    SIGN_ARGS+=(--entitlements "${ENTITLEMENTS}")
+  fi
+fi
+codesign "${SIGN_ARGS[@]}" "${APP_OUT}"
 xattr -dr com.apple.quarantine "${APP_OUT}" 2>/dev/null || true
 
 if [[ "${SKIP_INSTALL}" == "1" ]]; then

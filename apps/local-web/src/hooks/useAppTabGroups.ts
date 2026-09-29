@@ -11,6 +11,7 @@ import {
 } from 'react'
 
 import { writeTabGroups } from '@/lib/app-storage'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 /**
  * Store hook para split-view groups. A partir de la migración
@@ -69,12 +70,16 @@ function nextAutoGroupName(existingGroups: SessionGroup[]): string {
 function groupBelongsToScope(
   group: SessionGroup,
   activeProjectId: string | null,
-  chatProjectById: Map<string, string | null>
+  chatProjectById: Map<string, string | null>,
+  terminalProjectById: Map<string, string | null>
 ): boolean {
   if (activeProjectId === null) return true
-  return group.chatIds.some(
-    chatId => chatProjectById.get(chatId) === activeProjectId
-  )
+  return group.itemIds.some(chatId => {
+    if (chatId.startsWith('term_')) {
+      return terminalProjectById.get(chatId) === activeProjectId
+    }
+    return chatProjectById.get(chatId) === activeProjectId
+  })
 }
 
 export function useAppTabGroups(
@@ -90,13 +95,30 @@ export function useAppTabGroups(
     return map
   }, [sessions])
 
+  // FAS-107 X4.4-hotfix: sub al store singleton de terminales para
+  // resolver `projectId` cuando un grupo contiene `term_*`. Antes se
+  // resolvía solo con `sessions` → un grupo con solo terminales o con
+  // un terminal + chats de otros proyectos daba resultados incorrectos
+  // en `groupBelongsToScope` y en `dissolveGroup`.
+  const terminals = useTerminalsStore(state => state.terminals)
+  const terminalProjectById = useMemo(() => {
+    const map = new Map<string, string | null>()
+    for (const t of terminals) map.set(t.id, t.projectId ?? null)
+    return map
+  }, [terminals])
+
   // Grupos visibles en el proyecto activo (por regla multi-proyecto).
   const tabGroups = useMemo(
     () =>
       allTabGroups.filter(g =>
-        groupBelongsToScope(g, activeProjectId, chatProjectById)
+        groupBelongsToScope(
+          g,
+          activeProjectId,
+          chatProjectById,
+          terminalProjectById
+        )
       ),
-    [allTabGroups, activeProjectId, chatProjectById]
+    [allTabGroups, activeProjectId, chatProjectById, terminalProjectById]
   )
 
   const patchGroups = useCallback(
@@ -127,7 +149,7 @@ export function useAppTabGroups(
         name,
         color: overrides?.color ?? null,
         pinned: overrides?.pinned ?? false,
-        chatIds,
+        itemIds: chatIds,
         activeChatId: overrides?.activeChatId ?? chatIds[0],
         isPending: overrides?.isPending
       }
@@ -178,18 +200,18 @@ export function useAppTabGroups(
       patchGroups(current => {
         // Sacar partnerChatId de cualquier otro grupo donde viva.
         const scrubbed = current.map(g =>
-          g.id !== groupId && g.chatIds.includes(partnerChatId)
-            ? { ...g, chatIds: g.chatIds.filter(id => id !== partnerChatId) }
+          g.id !== groupId && g.itemIds.includes(partnerChatId)
+            ? { ...g, itemIds: g.itemIds.filter(id => id !== partnerChatId) }
             : g
         )
         return scrubbed.map(g => {
           if (g.id !== groupId) return g
-          const nextChatIds = g.chatIds.includes(partnerChatId)
-            ? g.chatIds
-            : [...g.chatIds, partnerChatId]
+          const nextItemIds = g.itemIds.includes(partnerChatId)
+            ? g.itemIds
+            : [...g.itemIds, partnerChatId]
           return {
             ...g,
-            chatIds: nextChatIds,
+            itemIds: nextItemIds,
             isPending: false
           }
         })
@@ -212,13 +234,29 @@ export function useAppTabGroups(
       const group = allTabGroups.find(g => g.id === groupId)
       if (!group) return
       patchGroups(current => current.filter(g => g.id !== groupId))
-      const nativesInThisScope = group.chatIds.filter(chatId => {
+      // FAS-107 X4.4-hotfix: `chatProjectById` solo mapea `sessions`
+      // (chats). Los `term_*` en `group.itemIds` no aparecen ahí →
+      // antes se filtraban fuera de `nativesInThisScope` → al dissolve,
+      // el terminal survivor NO se reinsertaba en `openTabIds` →
+      // desaparecía del strip aunque siguiera vivo en el sidebar.
+      // Ahora resolvemos el projectId de los terminales del store
+      // singleton Zustand.
+      const terminals = useTerminalsStore.getState().terminals
+      const nativesInThisScope = group.itemIds.filter(chatId => {
         if (activeProjectId === null) return true
+        if (chatId.startsWith('term_')) {
+          const term = terminals.find(t => t.id === chatId)
+          return term ? (term.projectId ?? null) === activeProjectId : false
+        }
         return chatProjectById.get(chatId) === activeProjectId
       })
       setOpenTabIds(current => {
         const idx = current.indexOf(groupId)
-        if (idx < 0) return [...current, ...nativesInThisScope]
+        // X4.4-hotfix: si el grupo NO estaba en el strip (dissolve
+        // desde el sidebar), NO abrimos sus hijos como tabs sueltos.
+        // Antes se agregaban al final "magicamente" — sorpresa fea.
+        // Sólo re-abrimos cuando el chip del grupo estaba visible.
+        if (idx < 0) return current
         return [
           ...current.slice(0, idx),
           ...nativesInThisScope,
@@ -243,13 +281,13 @@ export function useAppTabGroups(
         const scrubbed = current.map(g =>
           g.id === groupId
             ? g
-            : g.chatIds.includes(chatId)
-              ? { ...g, chatIds: g.chatIds.filter(c => c !== chatId) }
+            : g.itemIds.includes(chatId)
+              ? { ...g, itemIds: g.itemIds.filter(c => c !== chatId) }
               : g
         )
         return scrubbed.map(g =>
-          g.id === groupId && !g.chatIds.includes(chatId)
-            ? { ...g, chatIds: [...g.chatIds, chatId] }
+          g.id === groupId && !g.itemIds.includes(chatId)
+            ? { ...g, itemIds: [...g.itemIds, chatId] }
             : g
         )
       })
@@ -261,8 +299,8 @@ export function useAppTabGroups(
   const removeFromGroup = useCallback(
     (groupId: string, chatId: string): number => {
       const group = allTabGroups.find(g => g.id === groupId)
-      if (!group || !group.chatIds.includes(chatId)) return -1
-      const nextIds = group.chatIds.filter(id => id !== chatId)
+      if (!group || !group.itemIds.includes(chatId)) return -1
+      const nextIds = group.itemIds.filter(id => id !== chatId)
       const nextActive =
         group.activeChatId === chatId
           ? nextIds[0] ?? group.activeChatId
@@ -270,7 +308,7 @@ export function useAppTabGroups(
       patchGroups(current =>
         current.map(g =>
           g.id === groupId
-            ? { ...g, chatIds: nextIds, activeChatId: nextActive }
+            ? { ...g, itemIds: nextIds, activeChatId: nextActive }
             : g
         )
       )
@@ -319,7 +357,7 @@ export function useAppTabGroups(
     (groupId: string, chatId: string) => {
       patchGroups(current =>
         current.map(g =>
-          g.id === groupId && g.chatIds.includes(chatId)
+          g.id === groupId && g.itemIds.includes(chatId)
             ? { ...g, activeChatId: chatId }
             : g
         )
@@ -333,7 +371,7 @@ export function useAppTabGroups(
       patchGroups(current =>
         current.map(g => {
           if (g.id !== groupId) return g
-          const currentSet = new Set(g.chatIds)
+          const currentSet = new Set(g.itemIds)
           const nextSet = new Set(orderedChatIds)
           if (
             currentSet.size !== nextSet.size ||
@@ -341,7 +379,7 @@ export function useAppTabGroups(
           ) {
             return g
           }
-          return { ...g, chatIds: orderedChatIds }
+          return { ...g, itemIds: orderedChatIds }
         })
       )
     },
@@ -401,18 +439,18 @@ export function useAppTabGroups(
         let mutated = false
         const next: SessionGroup[] = []
         for (const g of current) {
-          if (!g.chatIds.includes(chatId)) {
+          if (!g.itemIds.includes(chatId)) {
             next.push(g)
             continue
           }
-          const nextChatIds = g.chatIds.filter(id => id !== chatId)
+          const nextChatIds = g.itemIds.filter(id => id !== chatId)
           if (nextChatIds.length < 2) {
             mutated = true
             continue
           }
           next.push({
             ...g,
-            chatIds: nextChatIds,
+            itemIds: nextChatIds,
             activeChatId:
               g.activeChatId === chatId ? nextChatIds[0] : g.activeChatId
           })
@@ -450,7 +488,7 @@ export function findGroupForChat(
   groups: SessionGroup[],
   chatId: string
 ): SessionGroup | null {
-  return groups.find(g => g.chatIds.includes(chatId)) || null
+  return groups.find(g => g.itemIds.includes(chatId)) || null
 }
 
 /** Convenience: resolve a strip id (chat or group) to its display active chat. */

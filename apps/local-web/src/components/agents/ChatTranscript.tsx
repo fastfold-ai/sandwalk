@@ -12,11 +12,15 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { ArrowDown } from 'lucide-react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AgentStatusText } from '@/components/agents/AgentStatusText'
 import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
-import { buildChatTimelineItems } from '@/components/agents/chat-transcript-timeline'
+import {
+  buildChatTimelineItems,
+  reuseTimelineItems
+} from '@/components/agents/chat-transcript-timeline'
+import { useStableCallback } from '@/hooks/useStableCallback'
 import { ChatTranscriptTimelineItem } from '@/components/agents/chat-transcript-timeline-item'
 import { HitlDecisionCard } from '@/components/agents/hitl/HitlDecisionCard'
 import { LiveToolStack } from '@/components/agents/live-tool-stack'
@@ -26,6 +30,7 @@ import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { perfCount } from '@/lib/perf-probe'
 
 // Stable empty-array singletons for the ?= defaults below. A fresh `[]`
 // per render changes identity, which cascades into MarkdownContent's
@@ -106,10 +111,23 @@ export function ChatTranscript({
   workspaceFiles = EMPTY_WORKSPACE_FILES,
   mentionChats = EMPTY_MENTION_CHATS
 }: ChatTranscriptProps) {
-  const timelineItems = useMemo(
-    () => buildChatTimelineItems(conversationTimeline),
-    [conversationTimeline]
-  )
+  perfCount('render.ChatTranscript')
+  // Keep item object identity across rebuilds so memoized rows skip work;
+  // pin the row callbacks for the same reason (parents recreate them).
+  const previousItemsRef = useRef<ReturnType<typeof buildChatTimelineItems>>([])
+  const timelineItems = useMemo(() => {
+    const next = reuseTimelineItems(
+      previousItemsRef.current,
+      buildChatTimelineItems(conversationTimeline)
+    )
+    previousItemsRef.current = next
+    return next
+  }, [conversationTimeline])
+  const stableToggleToolRunExpanded = useStableCallback(onToggleToolRunExpanded)
+  const stableOpenFile = useStableCallback(onOpenFile)
+  const stableBuildPlan = useStableCallback(onBuildPlan)
+  const stableInterrupt = useStableCallback(onInterrupt)
+  const lastMessageId = messages.at(-1)?.id
   // Deferred: the markdown re-parse of the growing stream renders at low
   // priority so typing/scrolling stays responsive during fast token bursts.
   const deferredDelta = useDeferredValue(liveDelta)
@@ -182,6 +200,7 @@ export function ChatTranscript({
       <ScrollArea
         ref={chatScrollRef}
         className="chat-scrollbar min-h-0 flex-1"
+        data-transcript=""
       >
         <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
           <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">
@@ -192,18 +211,18 @@ export function ChatTranscript({
                 sessionId={sessionId}
                 client={client}
                 expandedToolRunKeys={expandedToolRunKeys}
-                onToggleToolRunExpanded={onToggleToolRunExpanded}
+                onToggleToolRunExpanded={stableToggleToolRunExpanded}
                 runActive={runActive}
                 tools={tools}
                 runIdByMessageId={runIdByMessageId}
                 usageByRunId={usageByRunId}
-                messages={messages}
+                lastMessageId={lastMessageId}
                 copiedMessageId={copiedMessageId}
                 setCopiedMessageId={setCopiedMessageId}
                 session={session}
-                onOpenFile={onOpenFile}
-                onBuildPlan={onBuildPlan}
-                onInterrupt={onInterrupt}
+                onOpenFile={stableOpenFile}
+                onBuildPlan={stableBuildPlan}
+                onInterrupt={stableInterrupt}
                 hiddenPlanPaths={hiddenPlanPaths}
                 skills={skills}
                 mcpServers={mcpServers}

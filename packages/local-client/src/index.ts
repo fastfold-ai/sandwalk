@@ -85,7 +85,9 @@ import type {
   PromptBudgetResponse,
   WorkspaceFile,
   WorkspaceFileContent,
-  PtySessionInfo
+  PtySessionInfo,
+  TerminalSession,
+  WorkspaceItem
 } from '@sandwalk/agent-ui-core'
 
 export type LocalAgentClientOptions = {
@@ -927,6 +929,94 @@ export class LocalAgentClient
     const result = await this.request<{ data: AgentSession[] }>(
       `/sessions?${params.toString()}`,
       { signal }
+    )
+    return result.data
+  }
+
+  // ─── Terminal-as-first-class-item (FAS-107) ───────────────────────────
+
+  async listTerminals(options?: {
+    projectId?: string | null
+    signal?: AbortSignal
+  }): Promise<TerminalSession[]> {
+    const params = new URLSearchParams()
+    if (options?.projectId) params.set('projectId', options.projectId)
+    const query = params.toString()
+    const result = await this.request<{ data: TerminalSession[] }>(
+      `/terminals${query ? `?${query}` : ''}`,
+      { signal: options?.signal }
+    )
+    return result.data
+  }
+
+  async getTerminal(
+    id: string,
+    signal?: AbortSignal
+  ): Promise<TerminalSession> {
+    return this.request<TerminalSession>(`/terminals/${id}`, { signal })
+  }
+
+  async createTerminal(input: {
+    title?: string | null
+    projectId?: string | null
+    workspacePath?: string | null
+    shell?: string | null
+    originChatId?: string | null
+    slotKey?: string | null
+    cols?: number
+    rows?: number
+  }): Promise<TerminalSession> {
+    return this.request<TerminalSession>('/terminals', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: input.title ?? null,
+        projectId: input.projectId ?? null,
+        workspacePath: input.workspacePath ?? null,
+        shell: input.shell ?? null,
+        originChatId: input.originChatId ?? null,
+        slotKey: input.slotKey ?? null,
+        cols: input.cols ?? 80,
+        rows: input.rows ?? 24
+      }),
+      headers: { 'content-type': 'application/json' }
+    })
+  }
+
+  async updateTerminal(
+    id: string,
+    patch: {
+      title?: string | null
+      projectId?: string | null
+      organizeLabel?: string | null
+    }
+  ): Promise<TerminalSession> {
+    return this.request<TerminalSession>(`/terminals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+      headers: { 'content-type': 'application/json' }
+    })
+  }
+
+  async deleteTerminal(id: string): Promise<void> {
+    await this.request<void>(`/terminals/${id}`, { method: 'DELETE' })
+  }
+
+  async listWorkspaceItems(options?: {
+    projectId?: string | null
+    kinds?: Array<'chat' | 'terminal'>
+    limit?: number
+    signal?: AbortSignal
+  }): Promise<WorkspaceItem[]> {
+    const params = new URLSearchParams()
+    if (options?.projectId) params.set('projectId', options.projectId)
+    if (options?.kinds && options.kinds.length > 0) {
+      params.set('kind', options.kinds.join(','))
+    }
+    if (options?.limit) params.set('limit', String(options.limit))
+    const query = params.toString()
+    const result = await this.request<{ data: WorkspaceItem[] }>(
+      `/workspace-items${query ? `?${query}` : ''}`,
+      { signal: options?.signal }
     )
     return result.data
   }
@@ -3533,5 +3623,50 @@ export class LocalAgentClient
     )
     if (this.apiKey) url.searchParams.set('token', this.apiKey)
     return url.toString()
+  }
+
+  /**
+   * FAS-107 X4 Capa 2 · devuelve el "cuaderno visual" del terminal
+   * como bytes crudos (Uint8Array). El backend absorbió cada byte que
+   * el PTY escupió; ahora lo replay al xterm nuevo. El frontend hace
+   * `xterm.resize(currentCols, currentRows)` y después `xterm.write(bytes)`
+   * — xterm procesa cada byte con las dims actuales y aplica su reflow
+   * interno correctamente, evitando el layout roto que producía el
+   * approach anterior con `SerializeAddon`.
+   *
+   * Devuelve `null` si no hay snapshot (primer uso del terminal).
+   */
+  async getSessionSnapshot(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<Uint8Array | null> {
+    const response = await this.request<{ data: string | null }>(
+      `/sessions/${encodeURIComponent(sessionId)}/snapshot`,
+      { method: 'GET', signal }
+    )
+    if (!response.data) return null
+    // decode base64 → Uint8Array
+    const binary = atob(response.data)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return bytes
+  }
+
+  /**
+   * FAS-107 X4 Capa 2 · fuerza al backend a persistir el `output_log`
+   * actual del PTY vivo al disco. Llamado por el frontend al recibir
+   * el evento Tauri `sandwalk:force-save-snapshots` (Cmd+Q). Es
+   * best-effort — si no hay PTY vivo, no-op.
+   */
+  async flushSessionSnapshot(
+    sessionId: string,
+    signal?: AbortSignal
+  ): Promise<void> {
+    await this.request(
+      `/sessions/${encodeURIComponent(sessionId)}/snapshot/flush`,
+      { method: 'POST', signal }
+    )
   }
 }

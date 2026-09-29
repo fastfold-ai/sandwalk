@@ -17,13 +17,18 @@ import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { registerTranscriptSseHandler } from '@/lib/events-mux-registry'
 import { markSessionAttention } from '@/lib/session-attention'
 import type { SessionChatState } from '@/lib/sessions'
+import { shallowEqualObjects } from '@/lib/stable-equal'
 
 type UseSessionChatStreamArgs = {
   client: LocalAgentClient
   health: BackendHealth | null
   sessionId: string | null
   sessionIdRef: MutableRefObject<string | null>
-  sessions: AgentSession[]
+  /**
+   * Latest sessions list, by ref: only read when a session is (re)hydrated,
+   * so split panes don't re-render every time any row changes.
+   */
+  sessionsRef: MutableRefObject<AgentSession[]>
   chatBySessionIdRef: MutableRefObject<Record<string, SessionChatState>>
   patchChat: (
     id: string,
@@ -62,7 +67,7 @@ export function useSessionChatStream({
   health,
   sessionId,
   sessionIdRef,
-  sessions,
+  sessionsRef,
   chatBySessionIdRef,
   patchChat,
   setSessions,
@@ -141,7 +146,7 @@ export function useSessionChatStream({
     // Menubar "New Agent" navigates here before loadSessions includes the row —
     // treat a missing meta the same as a fresh idle session so we don't sit on
     // a blank main pane waiting for the list poll.
-    const meta = sessions.find(item => item.id === sessionId)
+    const meta = sessionsRef.current.find(item => item.id === sessionId)
     const looksEmpty =
       !meta || (!meta.lastMessageAt && meta.status === 'idle')
     if (looksEmpty) {
@@ -192,8 +197,9 @@ export function useSessionChatStream({
         }
       })
     return () => controller.abort()
-    // Intentionally omit `sessions` — only re-hydrate when the active session changes.
-  }, [client, health, patchChat, sessionId])
+    // `sessionsRef` is read, not depended on — only re-hydrate when the
+    // active session changes.
+  }, [client, health, patchChat, sessionId, sessionsRef])
 
   // Cursor per session so intentional stream restarts (and EventSource
   // reconnects that lose Last-Event-ID) don't replay the entire history —
@@ -301,7 +307,7 @@ export function useSessionChatStream({
                 )
               )
             } else if (event.type === 'session.updated') {
-              void loadSessionsRef.current?.()
+              refreshSessionRow(id)
               // Compact (and similar) rewrites history — refresh the transcript.
               void client.listMessages(id).then(history => {
                 patchChat(id, prev => ({
@@ -357,8 +363,40 @@ export function useSessionChatStream({
                   messagesLoaded: true
                 }))
               })
-              void loadSessionsRef.current?.()
+              refreshSessionRow(id)
             }
+  }
+
+  /**
+   * Re-read one session row instead of the whole list. With N panes
+   * streaming, every `session.updated` / run end used to refetch all ~4k
+   * sessions per pane; the global events stream already patches status in
+   * place, this just picks up server-side fields (auto title, timestamps).
+   * Falls back to the full reload only if the row cannot be fetched.
+   */
+  function refreshSessionRow(id: string) {
+    void client
+      .listSessionsByIds([id])
+      .then(rows => {
+        const fresh = rows.find(row => row.id === id)
+        if (!fresh) return
+        setSessions(current => {
+          let found = false
+          let changed = false
+          const next = current.map(item => {
+            if (item.id !== id) return item
+            found = true
+            const merged = { ...item, ...fresh }
+            if (shallowEqualObjects(item, merged)) return item
+            changed = true
+            return merged
+          })
+          return found && changed ? next : current
+        })
+      })
+      .catch(() => {
+        void loadSessionsRef.current?.()
+      })
   }
 
   useEffect(() => {

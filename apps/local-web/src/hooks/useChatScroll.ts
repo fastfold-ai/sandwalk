@@ -100,15 +100,31 @@ export function useChatScroll({
     const id = activeSessionRef.current
     const viewport = getChatViewport(chatScrollRef.current)
     if (!id || !viewport) return false
+    /*
+     * U1: preservar la elección del usuario mientras el loop del
+     * useLayoutEffect abajo estabiliza el layout. Si el usuario ya
+     * scrolleó arriba manualmente (rememberActive puso
+     * stickToBottomRef.current=false), NO sobreescribir con el valor de
+     * memoria — el loop puede correr por hasta 750ms y cada tick lo
+     * mandaba al bottom aunque hubiera scrolleado hace un frame.
+     * Solo aplicar la memoria si el usuario NO ha tomado una decisión
+     * manual desde que se abrió el chat.
+     */
     const mem = memoryRef.current[id]
-    const stick = mem?.stickToBottom ?? true
+    const userAlreadyScrolled = stickToBottomRef.current === false
+    const stick = userAlreadyScrolled ? false : (mem?.stickToBottom ?? true)
     stickToBottomRef.current = stick
     if (stick) {
       viewport.scrollTop = viewport.scrollHeight
       chatEndRef.current?.scrollIntoView({ block: 'end', behavior: 'auto' })
       setShowScrollToBottom(false)
     } else {
-      viewport.scrollTop = mem?.scrollTop ?? 0
+      // Sólo aplicar el scrollTop guardado en el mount inicial. Si el
+      // usuario ya se movió, respetar su posición actual (no la de
+      // memoria, que puede estar stale).
+      if (!userAlreadyScrolled) {
+        viewport.scrollTop = mem?.scrollTop ?? 0
+      }
       setShowScrollToBottom(
         distanceFromBottom(viewport) > NEAR_BOTTOM_PX
       )

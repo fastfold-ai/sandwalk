@@ -112,6 +112,37 @@ export function clearAllSessionAttention() {
   emit()
 }
 
+/**
+ * Drop attention ids that no longer exist. The set is persisted, so a chat
+ * deleted while unread (or a terminal removed from another window) otherwise
+ * keeps the Bell / Dock badge lit forever. Only chat ids are pruned against
+ * `knownSessionIds` — terminals (`term_*`) are pruned against
+ * `knownTerminalIds` only when the caller has the complete list.
+ */
+export function pruneSessionAttention(
+  knownSessionIds: Iterable<string>,
+  knownTerminalIds?: Iterable<string> | null
+): string[] {
+  const sessions = new Set(knownSessionIds)
+  const terminals = knownTerminalIds ? new Set(knownTerminalIds) : null
+  const removed: string[] = []
+  for (const id of attentionIds) {
+    if (id.startsWith('grp_')) {
+      removed.push(id)
+      continue
+    }
+    if (id.startsWith('term_')) {
+      if (terminals && !terminals.has(id)) removed.push(id)
+      continue
+    }
+    if (!sessions.has(id)) removed.push(id)
+  }
+  if (removed.length === 0) return removed
+  for (const id of removed) attentionIds.delete(id)
+  emit()
+  return removed
+}
+
 export function hasSessionAttention(sessionId: string): boolean {
   return attentionIds.has(sessionId)
 }

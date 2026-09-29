@@ -62,7 +62,16 @@ export function TerminalViewport({
               activeId === tab.id ? 'block' : 'hidden'
             )}
             ref={node => {
-              hostsRef.current[tab.id] = node
+              // V1: solo actualizar cuando hay nodo real. Si React llama
+              // el ref con null (unmount temporal), NO borramos la
+              // entrada — el próximo mount la sobrescribe con el div
+              // nuevo. Sin este guard, GLOBAL_HOSTS[ptyId] quedaba en
+              // null entre unmount/remount y `mountActive` fallaba
+              // silencioso, o peor: podía apuntar a un host equivocado
+              // durante el re-parenteo.
+              if (node) {
+                hostsRef.current[tab.id] = node
+              }
             }}
           />
         ))

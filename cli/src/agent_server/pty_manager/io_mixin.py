@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import signal
+import time
 from typing import Any
 
+from agent_server.pty_manager.osc_parser import PtyEvent
 from agent_server.pty_manager.shell_env import set_winsize
-from agent_server.pty_manager.types import BUFFER_LIMIT, PtySession
+from agent_server.pty_manager.types import BUFFER_LIMIT, OUTPUT_LOG_LIMIT, PtySession
 
 
 class PtyIOMixin:
@@ -92,6 +95,19 @@ class PtyIOMixin:
                             except Exception:
                                 pass
                     return
+                # FAS-107 X4 Capa 2 · toda salida del PTY se graba al
+                # `output_log` (ring buffer) — independiente de si hay
+                # subscribers activos. Es el "cuaderno visual" que
+                # sobrevive el Cmd+Q + reopen.
+                session.output_log.extend(data)
+                if len(session.output_log) > OUTPUT_LOG_LIMIT:
+                    session.output_log = session.output_log[-OUTPUT_LOG_LIMIT:]
+                # FAS-107 · Fase 1b · parsear OSC 133/9/777 sobre los mismos
+                # bytes que van al terminal. El parser es no-consuming — el
+                # stream de bytes sigue igual, solo se emiten frames de
+                # texto JSON paralelos al WebSocket con eventos
+                # estructurados ("command.finished", "notify", etc.).
+                events = session.osc_parser.feed(data)
                 if session.subscribers:
                     stale: list[Any] = []
                     for ws in list(session.subscribers):
@@ -105,6 +121,8 @@ class PtyIOMixin:
                     session.buffer.extend(data)
                     if len(session.buffer) > BUFFER_LIMIT:
                         session.buffer = session.buffer[-BUFFER_LIMIT:]
+                if events:
+                    await self._dispatch_pty_events(session, events)
         finally:
             session = self._sessions.get(pty_id)
             if session is not None:
@@ -112,6 +130,48 @@ class PtyIOMixin:
                     loop.remove_reader(session.master_fd)
                 except Exception:
                     pass
+
+    async def _dispatch_pty_events(
+        self, session: PtySession, events: list[PtyEvent]
+    ) -> None:
+        """Convert parser events into JSON WS frames and fan them out.
+
+        Uses `send_text` so the frontend can distinguish bytes (`send_bytes`,
+        goes to xterm.write) from events (text, goes to the event handler).
+        Frame shape: `{"type": "pty.event", "terminalId": ..., "event": {...}}`.
+        """
+        for event in events:
+            payload: dict[str, Any] = {"kind": event.kind}
+            if event.kind == "command.started":
+                session.command_started_at = time.monotonic()
+            elif event.kind == "command.finished":
+                payload["exitCode"] = event.exit_code
+                if session.command_started_at is not None:
+                    duration_ms = int(
+                        (time.monotonic() - session.command_started_at) * 1000
+                    )
+                    payload["durationMs"] = duration_ms
+                session.command_started_at = None
+            elif event.kind == "notify":
+                if event.title is not None:
+                    payload["title"] = event.title
+                if event.body is not None:
+                    payload["body"] = event.body
+            frame = json.dumps(
+                {
+                    "type": "pty.event",
+                    "terminalId": session.info.session_id,
+                    "event": payload,
+                }
+            )
+            stale: list[Any] = []
+            for ws in list(session.subscribers):
+                try:
+                    await ws.send_text(frame)
+                except Exception:
+                    stale.append(ws)
+            for ws in stale:
+                session.subscribers.discard(ws)
 
     async def _teardown(self, pty_id: str, session: PtySession) -> None:
         if session.reader_task and not session.reader_task.done():

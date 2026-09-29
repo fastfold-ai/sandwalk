@@ -101,6 +101,15 @@ class SessionUpdateMixin:
                     session_id,
                 ),
             )
+        # Fan out to the workspace_items index (FAS-107).
+        self.upsert_workspace_item(  # type: ignore[attr-defined]
+            item_id=session_id,
+            kind="chat",
+            project_id=next_project_id,
+            organize_label=next_label,
+            title=next_title,
+            updated_at=now,
+        )
         return self.get_session(session_id)
 
     def set_workspace_path(self, session_id: str, workspace_path: str) -> AgentSession | None:
@@ -114,7 +123,11 @@ class SessionUpdateMixin:
     def delete_session(self, session_id: str) -> bool:
         with self._write_lock, self._connect() as connection:
             cursor = connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+        if deleted:
+            # Remove the workspace_items mirror row (FAS-107).
+            self.delete_workspace_item(session_id)  # type: ignore[attr-defined]
+        return deleted
 
     def set_session_status(self, session_id: str, status: SessionStatus) -> AgentSession | None:
         now = utc_now()

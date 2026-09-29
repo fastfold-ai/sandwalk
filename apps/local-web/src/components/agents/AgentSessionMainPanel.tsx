@@ -5,6 +5,7 @@ import type {
   AgentSession,
   SessionGroup
 } from '@sandwalk/agent-ui-core'
+import { MessageSquare, SquareTerminal } from 'lucide-react'
 import {
   type ComponentProps,
   type Dispatch,
@@ -17,13 +18,15 @@ import {
   useState
 } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
-import { type NavigateFunction,useLocation } from 'react-router-dom'
+import { matchPath, type NavigateFunction,useLocation } from 'react-router-dom'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { ChatTilingContainer } from '@/components/agents/ChatTilingContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
+import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
 import { TerminalPanel } from '@/components/agents/TerminalPanel'
+import { TerminalSplitPanelHeader } from '@/components/agents/TerminalSplitPanelHeader'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
@@ -33,6 +36,10 @@ import {
   ResizablePanelGroup
 } from '@/components/ui/resizable'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useAppTerminals } from '@/hooks/useAppTerminals'
+import { useStableHandlers } from '@/hooks/useStableHandlers'
+import { clearTerminalActivity } from '@/lib/terminal-attention'
+import { perfCount } from '@/lib/perf-probe'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
@@ -145,9 +152,27 @@ export type AgentSessionMainPanelProps = {
   onCancelPendingSplit: () => void
   onAddChatToSplit: (chatId: string) => void
   onRemoveChatFromSplit: (chatId: string) => void
+  /** X2 Fix 1: dispatcher del rename dialog del shell. El strip y el
+   *  ChatTilingContainer lo llaman en vez de un `window.prompt` local. */
+  promptRenameTerminal: (terminalId: string) => void
+  /** X3 Fase 3: handlers del shell (fuente única). Antes había copias
+   *  locales que hacían casi lo mismo pero con divergencias sutiles
+   *  (por ejemplo el close local llamaba `onRemoveChatFromSplit`
+   *  además de `deleteTerminal`, produciendo doble efecto). */
+  deleteTerminalPermanently: (terminalId: string) => Promise<void>
+  toggleTerminalOrganizeLabel: (
+    terminalId: string,
+    label: 'pinned' | 'archive'
+  ) => Promise<void>
+  moveTerminalToProject: (
+    terminalId: string,
+    projectId: string | null
+  ) => Promise<void>
   dissolveTabGroup: (groupId: string) => void
   renameTabGroup: (group: SessionGroup) => void
   setTabGroupColor: (groupId: string, color: string | null) => void
+  /** X4.2b: pin/unpin del grupo. */
+  setTabGroupPinned: (groupId: string, pinned: boolean) => void
   closeTabGroup: (groupId: string) => void
   selectedChatIds: Set<string>
   toggleSelectChat: (id: string) => void
@@ -156,7 +181,24 @@ export type AgentSessionMainPanelProps = {
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
+  perfCount('render.AgentSessionMainPanel')
   const location = useLocation()
+  // FAS-107 GF3: detect `/terminals/:id` here (rather than prop-drilling
+  // from App.tsx) since the shell already reads `location`. When present,
+  // the main pane renders TerminalPanel instead of chat/split.
+  const terminalRouteMatch = matchPath(
+    '/terminals/:terminalId',
+    location.pathname
+  )
+  const terminalId =
+    terminalRouteMatch?.params.terminalId?.startsWith('term_')
+      ? terminalRouteMatch.params.terminalId
+      : null
+  // FAS-107 GF9: clear activity dot when the terminal becomes the active
+  // pane. New output only counts as "unseen" while it lives elsewhere.
+  useEffect(() => {
+    if (terminalId) clearTerminalActivity(terminalId)
+  }, [terminalId])
   const {
     client,
     navigate,
@@ -236,15 +278,97 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     onCancelPendingSplit,
     onAddChatToSplit,
     onRemoveChatFromSplit,
+    promptRenameTerminal,
+    deleteTerminalPermanently,
+    toggleTerminalOrganizeLabel,
+    moveTerminalToProject,
     dissolveTabGroup,
     renameTabGroup,
     setTabGroupColor,
+    setTabGroupPinned,
     closeTabGroup,
     selectedChatIds,
     toggleSelectChat,
     clearSelectChats,
     createSplitFromSelection
   } = props
+
+  // FAS-107: terminals for the active project. Used by the split
+  // picker's "New terminal" card and by the tab strip (when the caller
+  // decides to render terminal chips).
+  const {
+    terminals,
+    refresh: refreshTerminals,
+    addOptimistic: addTerminalOptimistic
+  } = useAppTerminals(client, activeProjectId)
+
+  /**
+   * Creates a terminal and returns its id. The caller (ChatTilingContainer
+   * via SplitPicker) is responsible for actually splicing the id into the
+   * group — this keeps a single source of truth for the pending-vs-not
+   * branching and the picker-reset side effect, both of which already
+   * live in the container's `handlePicked` flow.
+   *
+   * Returns `null` on failure so the caller can no-op (leaves the picker
+   * open for retry).
+   */
+  const handlePickTerminal = useCallback(async (): Promise<string | null> => {
+    if (!activeGroup) return null
+    try {
+      const term = await client.createTerminal({
+        projectId: activeProjectId,
+        originChatId: activeGroup.activeChatId,
+        workspacePath: session?.workspacePath ?? null
+      })
+      // Optimistic insert so the renderer's `terminals?.find(t => t.id
+      // === chatId)` detects the new id BEFORE the background refresh
+      // completes. Without this the first render after the pending group
+      // promotes would fall into ChatLeaf.
+      addTerminalOptimistic(term)
+      refreshTerminals()
+      // FAS-107 X3 Fase 2: registrar el terminal como tab abierto para
+      // que sobreviva a la disolución del split. Antes NO se registraba
+      // → si el user removía el otro item del split, el terminal quedaba
+      // huérfano (survivor invisible en strip y sidebar).
+      openSessionTab(term.id)
+      return term.id
+    } catch (err) {
+      console.error('createTerminal failed', err)
+      return null
+    }
+  }, [
+    activeGroup,
+    client,
+    activeProjectId,
+    session?.workspacePath,
+    addTerminalOptimistic,
+    refreshTerminals,
+    openSessionTab
+  ])
+
+  const handlePickNewChat = useCallback(async (): Promise<string | null> => {
+    if (!activeGroup) return null
+    try {
+      const created = await client.createSession({
+        workspacePath: null,
+        projectId: activeProjectId ?? null
+      })
+      return created.id
+    } catch (err) {
+      console.error('createSession failed', err)
+      return null
+    }
+  }, [activeGroup, client, activeProjectId])
+
+  // FAS-107 X3 Fase 3: los handlers locales se reemplazaron por
+  // aliases al dispatcher del shell (fuente única). El close local
+  // hacía además `onRemoveChatFromSplit` — ese cleanup ya lo cubre
+  // `pruneChatFromGroups` que corre cuando el terminal desaparece del
+  // store. Rename ya delegaba desde X2 Fix 1.
+  const handleCloseTerminal = deleteTerminalPermanently
+  const handleRenameTerminal = promptRenameTerminal
+  const handleToggleTerminalOrganizeLabel = toggleTerminalOrganizeLabel
+  const handleMoveTerminalToProjectLocal = moveTerminalToProject
 
   const isNarrow = useIsNarrowWindow(1280)
   // En split view con ventana angosta, el side panel deja de ser una columna
@@ -329,6 +453,22 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const showDraftTerminal = isDraft && !inProject && terminalOpen
   const showWorkspaceFiles =
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
+  // The Files panel mounts after `workspaceSessionId` resolves, i.e. after
+  // the collapse effect in `useAppPanelPersistence` already ran for this
+  // session. Without this it paints open at `defaultSize` and only
+  // collapses on the next session change — which reflows every pane in a
+  // split (and refits every terminal) on the first pane click.
+  const filesPanelMounted = showWorkspaceFiles && !asSheet
+  useLayoutEffect(() => {
+    if (!filesPanelMounted) return
+    const panel = filesPanelRef.current
+    if (!panel) return
+    if (filesPanelCollapsed) {
+      if (!panel.isCollapsed()) panel.collapse()
+    } else if (panel.isCollapsed()) {
+      panel.expand()
+    }
+  }, [filesPanelMounted, filesPanelCollapsed, filesPanelRef])
 
   // El picker vive DENTRO del ChatTilingContainer cuando el grupo activo
   // está en modo pending (recién creado desde "Create split view").
@@ -431,6 +571,33 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     ]
   )
 
+  // Handlers arrive recreated on every shell render; pin them so the
+  // memoized mounts see stable `shared` fields (see SessionChatMount).
+  const sharedGlobals = useStableHandlers({
+    isInspect,
+    showChatSkeleton,
+    projects,
+    recentProjectIds,
+    onNewProject,
+    selectAllProjects,
+    selectProjectScope,
+    updateSession,
+    chatScrollRef,
+    chatEndRef,
+    expandedToolRunKeys,
+    runIdByMessageId,
+    usageByRunId,
+    copiedMessageId,
+    setCopiedMessageId,
+    liveDelta,
+    showScrollToBottom,
+    scrollChatToBottom,
+    patchChat,
+    ensureWorkspaceForMentions,
+    navigate,
+    client,
+    error
+  })
   const buildSplitMountProps = useCallback(
     (chatId: string) => {
       const chatSession =
@@ -441,60 +608,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           sessionId: chatId,
           session: chatSession
         },
-        shared: {
-          isInspect,
-          showChatSkeleton,
-          projects,
-          recentProjectIds,
-          onNewProject,
-          selectAllProjects,
-          selectProjectScope,
-          updateSession,
-          chatScrollRef,
-          chatEndRef,
-          expandedToolRunKeys,
-          runIdByMessageId,
-          usageByRunId,
-          copiedMessageId,
-          setCopiedMessageId,
-          liveDelta,
-          showScrollToBottom,
-          scrollChatToBottom,
-          patchChat,
-          ensureWorkspaceForMentions,
-          navigate,
-          client,
-          error
-        }
+        shared: sharedGlobals
       }
     },
-    [
-      allSessions,
-      perSessionBaseArgs,
-      isInspect,
-      showChatSkeleton,
-      projects,
-      recentProjectIds,
-      onNewProject,
-      selectAllProjects,
-      selectProjectScope,
-      updateSession,
-      chatScrollRef,
-      chatEndRef,
-      expandedToolRunKeys,
-      runIdByMessageId,
-      usageByRunId,
-      copiedMessageId,
-      setCopiedMessageId,
-      liveDelta,
-      showScrollToBottom,
-      scrollChatToBottom,
-      patchChat,
-      ensureWorkspaceForMentions,
-      navigate,
-      client,
-      error
-    ]
+    [allSessions, perSessionBaseArgs, sharedGlobals]
   )
 
   return (
@@ -540,11 +657,32 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           await prepareDraftWorkspace()
         }}
         createSession={props.createSession}
+        onCreateTerminal={async () => {
+          // FAS-107 GF5: dropdown "+" → create terminal in active project,
+          // add it to `openTabIds` so a chip renders in the strip, then
+          // navigate to the standalone /terminals/:id route.
+          try {
+            const term = await client.createTerminal({
+              projectId: activeProjectId ?? null
+            })
+            addTerminalOptimistic(term)
+            openSessionTab(term.id)
+            navigate(`/terminals/${term.id}`)
+          } catch (err) {
+            console.error('createTerminal (dropdown) failed', err)
+          }
+        }}
+        terminals={terminals}
+        onCloseTerminal={handleCloseTerminal}
+        onRenameTerminal={handleRenameTerminal}
+        onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
+        onMoveTerminalToProject={handleMoveTerminalToProjectLocal}
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
         onDissolveGroup={dissolveTabGroup}
         onRenameGroup={renameTabGroup}
         onSetGroupColor={setTabGroupColor}
+        onSetGroupPinned={setTabGroupPinned}
         onCloseGroup={closeTabGroup}
         selectedChatIds={selectedChatIds}
         onToggleSelectChat={toggleSelectChat}
@@ -552,6 +690,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onCreateSplitFromSelection={createSplitFromSelection}
         inSplitGroup={Boolean(activeGroup)}
         activeGroupId={activeGroup?.id ?? null}
+        activeTerminalId={terminalId ?? null}
       />
       <ResizablePanelGroup
         direction="horizontal"
@@ -566,7 +705,39 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           minSize={30}
           className="min-w-0"
         >
-          {activeGroup ? (
+          {terminalId ? (
+            // FAS-107 GF3 + W1: Terminal-as-main-pane. Ruta
+            // `/terminals/:id` — el main slot entero es un terminal. El
+            // xterm vive en el portal layer (ver terminal-layer/) y el
+            // TerminalPlaceholder solo reserva el hueco donde el layer
+            // se posiciona.
+            //
+            // X3 Fase 7: header con paridad al del pane del split
+            // (rename / move to project / pin / color / archive /
+            // split). `focused` fijo en true porque un terminal solo
+            // siempre tiene el foco de su ruta.
+            <main className="relative flex h-full min-w-0 flex-col">
+              <TerminalSplitPanelHeader
+                terminal={
+                  terminals.find(t => t.id === terminalId) ?? null
+                }
+                focused
+                onFocusPanel={() => {}}
+                projects={projects}
+                onRename={handleRenameTerminal}
+                onTogglePin={id =>
+                  void handleToggleTerminalOrganizeLabel(id, 'pinned')
+                }
+                onToggleArchive={id =>
+                  void handleToggleTerminalOrganizeLabel(id, 'archive')
+                }
+                onMoveToProject={handleMoveTerminalToProjectLocal}
+              />
+              <div className="min-h-0 min-w-0 flex-1">
+                <TerminalPlaceholder terminalId={terminalId} />
+              </div>
+            </main>
+          ) : activeGroup ? (
             <ChatTilingContainer
               group={activeGroup}
               sessions={allSessions}
@@ -582,7 +753,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 allTabGroups: tabGroups,
                 onPickPartner: onPickSplitPartner,
                 onCancelPending: onCancelPendingSplit,
-                onAddChat: onAddChatToSplit
+                onAddChat: onAddChatToSplit,
+                onPickNewChat: handlePickNewChat,
+                onPickTerminal: handlePickTerminal
               }}
               onLayoutChange={(fingerprint, tree) => {
                 setTabGroupLayoutForMonitor(activeGroup.id, fingerprint, tree)
@@ -590,9 +763,55 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               onCloseChat={chatId => {
                 onRemoveChatFromSplit(chatId)
               }}
+              terminals={terminals}
+              terminalClient={client}
+              // X2 Fix 3+4: dentro de un split, "Close pane" y el
+              // context-menu del pane deben SACAR el terminal del split
+              // (no borrarlo). Antes se pasaba `handleCloseTerminal` que
+              // llama `deleteTerminal` → el terminal desaparecía del disco.
+              // `onRemoveChatFromSplit` acepta term_ ids y auto-disuelve
+              // si el grupo queda con <2 items.
+              onCloseTerminal={terminalId => onRemoveChatFromSplit(terminalId)}
+              onRenameTerminal={handleRenameTerminal}
+              onToggleTerminalOrganizeLabel={handleToggleTerminalOrganizeLabel}
+              onMoveTerminalToProject={handleMoveTerminalToProjectLocal}
             />
           ) : (
           <main className="relative flex h-full min-w-0 flex-col">
+            {isDraft ? (
+              // FAS-107 GF4: mini switcher at the top of a fresh draft
+              // pane so the user can start as Agent (default) or spawn a
+              // new Terminal from the same place.
+              <div className="border-border/40 flex shrink-0 items-center justify-center gap-1 border-b px-2 py-1">
+                <button
+                  type="button"
+                  className="text-foreground border-sky-500 inline-flex h-7 items-center gap-1.5 rounded-md border-b-2 px-3 text-[12px] font-medium"
+                  aria-current="page"
+                >
+                  <MessageSquare className="size-3.5 text-sky-500" />
+                  <span>Agent</span>
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground hover:border-orange-500/50 inline-flex h-7 items-center gap-1.5 rounded-md border-b-2 border-transparent px-3 text-[12px]"
+                  onClick={async () => {
+                    try {
+                      const term = await client.createTerminal({
+                        projectId: activeProjectId ?? null
+                      })
+                      addTerminalOptimistic(term)
+                      openSessionTab(term.id)
+                      navigate(`/terminals/${term.id}`)
+                    } catch (err) {
+                      console.error('draft → terminal failed', err)
+                    }
+                  }}
+                >
+                  <SquareTerminal className="size-3.5 text-orange-500" />
+                  <span>Terminal</span>
+                </button>
+              </div>
+            ) : null}
             <SessionChatBody
             client={client}
             navigate={navigate}
@@ -655,7 +874,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             ref={filesPanelRef}
             collapsible
             collapsedSize={0}
-            defaultSize={35}
+            // Mount collapsed when state says so; otherwise the first paint
+            // is open and the collapse effect costs a second layout pass
+            // over every pane in the split.
+            defaultSize={filesPanelCollapsed ? 0 : 35}
             minSize={20}
             maxSize={55}
             onCollapse={() => setFilesPanelCollapsed(true)}

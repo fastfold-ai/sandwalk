@@ -90,6 +90,8 @@ def _store_oauth_token_response(
     if resource:
         cfg.set(f"{prefix}_oauth_resource", str(resource))
     cfg.save()
+    # A fresh token (refresh or reconnect) ends any refresh backoff.
+    _REFRESH_BACKOFF_UNTIL.pop(prefix.removeprefix("mcp."), None)
     return access_token
 
 
@@ -143,6 +145,31 @@ def _refresh_oauth_access_token(
     )
 
 
+# Servers whose refresh just failed, with the time to try again. A dead grant
+# (``invalid_grant``) stays dead until the user reconnects; without this every
+# agent turn paid a ~0.5s blocking HTTPS round-trip for nothing.
+_REFRESH_BACKOFF_UNTIL: dict[str, float] = {}
+REFRESH_BACKOFF_SEC = 600.0
+
+
+def clear_oauth_refresh_backoff(entry_id: str | None = None) -> None:
+    """Forget refresh backoff (after a reconnect, or all when ``entry_id`` is None)."""
+    if entry_id is None:
+        _REFRESH_BACKOFF_UNTIL.clear()
+    else:
+        _REFRESH_BACKOFF_UNTIL.pop(entry_id, None)
+
+
+def _refresh_backed_off(entry_id: str) -> bool:
+    until = _REFRESH_BACKOFF_UNTIL.get(entry_id)
+    if until is None:
+        return False
+    if time.monotonic() >= until:
+        _REFRESH_BACKOFF_UNTIL.pop(entry_id, None)
+        return False
+    return True
+
+
 def ensure_fresh_catalog_oauth_token(
     entry: McpCatalogEntry,
     config: Config | None = None,
@@ -159,6 +186,8 @@ def ensure_fresh_catalog_oauth_token(
     refresh = _cfg_secret(cfg, f"{prefix}_refresh_token", None)
     if not refresh:
         # Expired with no refresh — force reconnect rather than 401 loops.
+        return None
+    if _refresh_backed_off(entry.id):
         return None
 
     client_id = str(cfg.get(f"{prefix}_client_id") or "").strip()
@@ -193,6 +222,7 @@ def ensure_fresh_catalog_oauth_token(
         cfg=cfg,
     )
     if refreshed:
+        _REFRESH_BACKOFF_UNTIL.pop(entry.id, None)
         try:
             from agent_server.mcp_service.health_cache import save_status_message
 
@@ -201,6 +231,7 @@ def ensure_fresh_catalog_oauth_token(
             pass
         return refreshed
 
+    _REFRESH_BACKOFF_UNTIL[entry.id] = time.monotonic() + REFRESH_BACKOFF_SEC
     # Do not keep presenting a known-expired access token as usable.
     try:
         from agent_server.mcp_service.health_cache import save_status_message

@@ -13,6 +13,11 @@ import { isDraftAgentSessionId } from '@/lib/draft-agent'
 
 import { syncSandboxPhaseFromStatus } from './session-sandbox-status-sync'
 
+/** Server close code for "no such session" (see sessions_sandbox_stream.py). */
+export const SANDBOX_STREAM_SESSION_GONE = 4404
+/** A stream that closes sooner than this after opening counts as a failure. */
+const HEALTHY_STREAM_MIN_MS = 1000
+
 export function useSessionSandboxStream({
   client,
   health,
@@ -34,11 +39,14 @@ export function useSessionSandboxStream({
     // Group ids arrive here only via defensive paths; the group's child
     // chats each own their own sandbox stream. Opening a WS to
     // /sessions/grp_*/sandbox/stream 404s and burns reconnect budget.
+    // S2: `term_*` ids también deben skipearse — terminales no tienen
+    // sandbox (viven en su propio endpoint /v1/terminals/:id).
     if (
       !sessionId ||
       !health ||
       isDraftAgentSessionId(sessionId) ||
-      isSessionGroupId(sessionId)
+      isSessionGroupId(sessionId) ||
+      sessionId.startsWith('term_')
     ) {
       setSessionSandboxStatus(null)
       setSessionSandboxPhase('idle')
@@ -53,6 +61,7 @@ export function useSessionSandboxStream({
     let reconnectTimer: number | null = null
     let reconnectDelayMs = 1000
     let hardFailures = 0
+    let openedAt: number | null = null
 
     const applyStatus = (status: SessionSandboxStatus) => {
       if (cancelled) return
@@ -86,8 +95,10 @@ export function useSessionSandboxStream({
       const ws = new WebSocket(client.sandboxStreamUrl(sessionId))
       socket = ws
       ws.onopen = () => {
-        reconnectDelayMs = 1000
-        hardFailures = 0
+        // The server accepts before validating (so auth/404 failures close
+        // cleanly), so "open" alone is not proof of a healthy stream — the
+        // backoff is reset in onclose only if the socket stayed up.
+        openedAt = Date.now()
         refresh()
       }
       ws.onmessage = event => {
@@ -102,6 +113,19 @@ export function useSessionSandboxStream({
       }
       ws.onclose = event => {
         if (cancelled) return
+        if (event.code === SANDBOX_STREAM_SESSION_GONE) {
+          // The session no longer exists (deleted elsewhere). Reconnecting
+          // can never succeed and used to hammer the API at 1 Hz per pane.
+          setSessionSandboxStatus(null)
+          return
+        }
+        const stayedUp =
+          openedAt != null && Date.now() - openedAt >= HEALTHY_STREAM_MIN_MS
+        openedAt = null
+        if (stayedUp) {
+          reconnectDelayMs = 1000
+          hardFailures = 0
+        }
         if (event.code === 1006 || event.code === 4401 || event.code === 1011) {
           hardFailures += 1
           reconnectDelayMs = Math.min(
@@ -126,10 +150,19 @@ export function useSessionSandboxStream({
       }
     }
 
+    // T3: retrasar el connect() con setTimeout(0) para que si React
+    // StrictMode desmonta el effect inmediatamente (double-invoke en
+    // dev), `cancelled` se marca ANTES de intentar abrir el WS. Sin
+    // esto el browser logea "WebSocket closed before established" en
+    // cada mount/unmount de dev — ruido inútil.
     refresh()
-    connect()
+    const startTimer = window.setTimeout(() => {
+      if (cancelled) return
+      connect()
+    }, 0)
     return () => {
       cancelled = true
+      window.clearTimeout(startTimer)
       if (reconnectTimer != null) window.clearTimeout(reconnectTimer)
       try {
         socket?.close()
