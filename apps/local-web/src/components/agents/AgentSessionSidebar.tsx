@@ -32,8 +32,8 @@ import {
 } from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { useStableCallback } from '@/hooks/useStableCallback'
-import { useSessionActivity } from '@/lib/session-activity'
-import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import type { SessionActivityMap } from '@/lib/session-activity'
+import type { TabItemSection } from '@/lib/sessions'
 import {
   readSidebarUnreadFilter,
   UNREAD_DOT_COLOR,
@@ -52,7 +52,7 @@ type AgentSessionSidebarProps = {
   sections: SessionSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
@@ -125,7 +125,7 @@ export function AgentSessionSidebar({
   sections,
   collapsedSidebarSections,
   sessionId,
-  chatBySessionId,
+  activityBySessionId,
   orderedVisibleSessionIds,
   selectedSessionIds,
   threadMenuOpenId,
@@ -180,9 +180,6 @@ export function AgentSessionSidebar({
 }: AgentSessionSidebarProps) {
   const location = useLocation()
   const attentionIds = useSessionAttentionIds()
-  // Narrow the per-token chat store down to the two flags the list paints
-  // so `SidebarSessionList` (memo) skips renders while chats stream.
-  const activityBySessionId = useSessionActivity(chatBySessionId)
   // Handlers recreated by parent hooks on every render would defeat the
   // list's memo; pin their identity here (they always call the latest).
   const stableSelectSessionRange = useStableCallback(selectSessionRange)

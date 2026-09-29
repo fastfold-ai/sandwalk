@@ -25,8 +25,10 @@ class _RunPipelineMixin:
     ) -> None:
         try:
             emit_runtime_event = make_event_emitter(self.store, session_id, run_id)
-            history = self.store.list_messages(session_id)
-            run_context = build_run_context(self.store, session_id)
+            history = await asyncio.to_thread(self.store.list_messages, session_id)
+            # Resolves MCP servers, which may refresh OAuth tokens over HTTPS —
+            # never block the API loop on that (it serialized every request).
+            run_context = await asyncio.to_thread(build_run_context, self.store, session_id)
             run_started_at = time.monotonic()
 
             def _on_runner_ready(runner: object) -> None:

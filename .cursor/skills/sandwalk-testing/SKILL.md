@@ -50,7 +50,8 @@ already running, so `scripts/dev-ui.sh` may stay up.
 ```bash
 pnpm --filter @sandwalk/agent-local-web e2e:install   # once
 pnpm e2e                    # tests/: grid renders, hosts track placeholders, PTY round-trip,
-                            #         FAS-121 scrollback across pane switches, no resize spam
+                            #         FAS-121 scrollback across pane switches, no resize spam,
+                            #         UI re-bootstraps after an API outage (route-aborted /v1)
 pnpm e2e:bench              # bench/: gridReady, scrollTranscript, paneSwitch, terminalBurst
 pnpm e2e:compare apps/local-web/e2e/results/grid-baseline.json apps/local-web/e2e/results/grid-latest.json
 ```
@@ -101,6 +102,14 @@ grid: `live.postLatencyP50/P95Ms` (API `POST /messages`), `live.firstVisibleP50/
 (reply painted in its pane), `live.completeP50/P95/MaxMs` (run idle),
 `live.failures` split into `stillRunning` / `emptyReply` / `replyNotVisible`,
 plus the UI counters under N concurrent streams. Report → `e2e/results/grid-live-latest.json`.
+
+Reading the live numbers: `live.postLatency*` is the API accepting the
+message (should be tens of ms; hundreds under 16 concurrent runs = GIL
+contention from graph compiles); `first-visible` − server `total run` (from
+`[perf]` log lines) is UI/API delivery lag. Agent turns run in worker threads
+of the API process, so heavy CPU per turn slows every request — keep per-turn
+work cached (`skills_sources` cache, tool memo) and never block the loop with
+network I/O (the MCP OAuth refresh did; it now backs off after a failure).
 
 Known: Fable 5 / 5.1 refuse the agent prompt (`stop_reason=refusal`, shows in
 the transcript as "(Agent produced no text output — model returned

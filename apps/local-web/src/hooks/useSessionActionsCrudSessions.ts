@@ -13,6 +13,7 @@ import {
   type DraftSessionSeed,
   isDraftAgentSessionId
 } from '@/lib/draft-agent'
+import { clearSessionAttention } from '@/lib/session-attention'
 import { downloadMarkdown, emptySessionChatState } from '@/lib/sessions'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
@@ -361,6 +362,7 @@ export function useSessionActionsCrudSessions({
 
   const deleteSession = async (target: AgentSession) => {
     await client.deleteSession(target.id)
+    clearSessionAttention(target.id)
     let neighbor: string | null = null
     let scopeEmpty = false
     // FAS-107 X4.4-hotfix: SOLO quitar el target.id de cada scope.

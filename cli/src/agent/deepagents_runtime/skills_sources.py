@@ -7,11 +7,37 @@ import logging
 import shutil
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 logger = logging.getLogger("runner")
 
 _STAGING_LOCK = threading.Lock()
+
+# Staging result per requested name set. Resolving ~100 SKILL.md files and
+# checking the staging dir costs ~1s per agent turn; the answer only changes
+# when skills are installed/removed/toggled, which call
+# ``invalidate_skill_sources_cache``. The TTL is a safety net.
+_SOURCE_DIRS_CACHE: dict[tuple[str, ...], tuple[float, list[str]]] = {}
+_SOURCE_DIRS_TTL_SEC = 60.0
+
+
+def invalidate_skill_sources_cache() -> None:
+    """Forget cached staging roots (call after any skill install/remove/toggle)."""
+    with _STAGING_LOCK:
+        _SOURCE_DIRS_CACHE.clear()
+
+
+def _cached_source_dirs(key: tuple[str, ...]) -> list[str] | None:
+    entry = _SOURCE_DIRS_CACHE.get(key)
+    if entry is None:
+        return None
+    stamped_at, dirs = entry
+    if time.monotonic() - stamped_at > _SOURCE_DIRS_TTL_SEC:
+        return None
+    if any(not Path(d).is_dir() for d in dirs):
+        return None
+    return list(dirs)
 
 
 def skill_source_dirs() -> list[str]:
@@ -72,11 +98,22 @@ def skill_source_dirs_for_names(skill_names: list[str]) -> list[str]:
     Staging is keyed by content hash and reused across concurrent callers so
     Context estimates / bench cells / agent runs do not race on rmtree+mkdir.
     """
-    from agent.skills import skill_info
-
     names = [str(name).strip() for name in skill_names if str(name).strip()]
     if not names:
         return []
+    cache_key = tuple(sorted(set(names)))
+    cached = _cached_source_dirs(cache_key)
+    if cached is not None:
+        return cached
+
+    result = _stage_skill_source_dirs(names)
+    with _STAGING_LOCK:
+        _SOURCE_DIRS_CACHE[cache_key] = (time.monotonic(), list(result))
+    return result
+
+
+def _stage_skill_source_dirs(names: list[str]) -> list[str]:
+    from agent.skills import skill_info
 
     resolved: list[tuple[str, Path]] = []
     for name in names:

@@ -45,11 +45,19 @@ import { perfCount } from '@/lib/perf-probe'
 import { resolveItemLocation } from '@/lib/resolve-item-location'
 import { resolveStripActiveId } from '@/lib/strip-active'
 import { useTerminalsStore } from '@/lib/terminals-store'
-import { recoverUnreadFromSessions } from '@/lib/session-attention'
+import { useChatActivity } from '@/lib/session-activity'
+import {
+  pruneSessionAttention,
+  recoverUnreadFromSessions
+} from '@/lib/session-attention'
+import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { visibleSessionIds } from '@/lib/sessions'
 
 export default function App() {
   perfCount('render.App')
+  // Shell-level chat signal: flips only when a run starts/stops or asks for
+  // approval — per-token updates stay inside each pane's own subscription.
+  const activityBySessionId = useChatActivity()
   const location = useLocation()
   const navigate = useNavigate()
   useMacDesktopOverlay()
@@ -96,6 +104,7 @@ export default function App() {
       try {
         terminalsLive.removeOptimistic(terminalId)
         await bootstrap.client.deleteTerminal(terminalId)
+        clearTerminalActivity(terminalId)
         terminalsLive.refresh()
       } catch (err) {
         console.error('deleteTerminal (global) failed', err)
@@ -472,6 +481,15 @@ export default function App() {
     )
     if (missed.length > 0) notifyMissedCompletions(missed.length)
   }, [bootstrap.health, bootstrap.sessions, effectiveSessionId])
+
+  // Unread ids are persisted; forget the ones whose chat no longer exists so
+  // the Bell / Dock badge can actually go dark (FAS-120). Only when the list
+  // is unscoped — a project scope hides other projects' chats.
+  const sessionsScopeForPrune = ui.projectScopeId
+  useEffect(() => {
+    if (!bootstrap.health || sessionsScopeForPrune || bootstrap.sessions.length === 0) return
+    pruneSessionAttention(bootstrap.sessions.map(s => s.id))
+  }, [bootstrap.health, bootstrap.sessions, sessionsScopeForPrune])
 
   useGlobalSessionEvents({
     client: bootstrap.client,
@@ -1160,6 +1178,7 @@ export default function App() {
           bootstrap,
           context,
           chat: layer.chat,
+          activityBySessionId,
           tabs,
           actions: layer.actions,
           sandbox: layer.sandbox,

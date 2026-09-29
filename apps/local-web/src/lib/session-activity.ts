@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 
+import { useChatStoreZ } from '@/hooks/chat-store'
 import type { SessionChatState } from '@/lib/sessions'
 
 /**
@@ -63,4 +64,16 @@ export function useSessionActivity(
   const ref = useRef<SessionActivityMap>(EMPTY)
   ref.current = deriveSessionActivity(chatBySessionId, ref.current)
   return ref.current
+}
+
+/**
+ * Shell-level subscription: only re-renders when a spinner/approval flag
+ * flips somewhere, never per token. Backed by the chat store directly.
+ */
+export function useChatActivity(): SessionActivityMap {
+  const ref = useRef<SessionActivityMap>(EMPTY)
+  return useChatStoreZ(state => {
+    ref.current = deriveSessionActivity(state.chatBySessionId, ref.current)
+    return ref.current
+  })
 }

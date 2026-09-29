@@ -44,7 +44,7 @@ export function AppShell(props: AppShellProps) {
           sections={props.sections}
           collapsedSidebarSections={props.collapsedSidebarSections}
           sessionId={props.sessionId}
-          chatBySessionId={props.chatBySessionId}
+          activityBySessionId={props.activityBySessionId}
           orderedVisibleSessionIds={props.orderedVisibleSessionIds}
           selectedSessionIds={props.selectedSessionIds}
           threadMenuOpenId={props.threadMenuOpenId}

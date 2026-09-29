@@ -6,6 +6,7 @@ import {
   getAttentionSessionIds,
   hasSessionAttention,
   markSessionAttention,
+  pruneSessionAttention,
   recoverUnreadFromSessions,
   SESSION_ATTENTION_STORAGE_KEY,
   SESSION_LAST_READ_INIT_KEY,
@@ -174,5 +175,32 @@ describe('clearAllSessionAttention', () => {
   it('is a no-op when already empty', () => {
     clearAllSessionAttention()
     expect(getAttentionSessionIds().size).toBe(0)
+  })
+})
+
+describe('pruneSessionAttention', () => {
+  it('forgets chats that no longer exist and stray group ids, keeps terminals', () => {
+    clearAllSessionAttention()
+    markSessionAttention('chat-live')
+    markSessionAttention('chat-deleted')
+    markSessionAttention('grp_stale')
+    markSessionAttention('term_other_project')
+    const removed = pruneSessionAttention(['chat-live', 'chat-x'])
+    expect(removed.sort()).toEqual(['chat-deleted', 'grp_stale'])
+    expect([...getAttentionSessionIds()].sort()).toEqual(['chat-live', 'term_other_project'])
+  })
+
+  it('prunes terminals only when given the full terminal list', () => {
+    clearAllSessionAttention()
+    markSessionAttention('term_a')
+    markSessionAttention('term_gone')
+    expect(pruneSessionAttention([], ['term_a'])).toEqual(['term_gone'])
+    expect([...getAttentionSessionIds()]).toEqual(['term_a'])
+  })
+
+  it('is a no-op when nothing is stale', () => {
+    clearAllSessionAttention()
+    markSessionAttention('chat-live')
+    expect(pruneSessionAttention(['chat-live'])).toEqual([])
   })
 })

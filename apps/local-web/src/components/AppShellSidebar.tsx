@@ -18,7 +18,8 @@ import { ShellNavStrip } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useSidebarPixelWidth } from '@/hooks/useSidebarPixelWidth'
 import type { CreateDraftSession } from '@/lib/draft-agent'
-import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
+import type { SessionActivityMap } from '@/lib/session-activity'
+import type { TabItemSection } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 export type AppShellSidebarProps = {
@@ -39,7 +40,7 @@ export type AppShellSidebarProps = {
   sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
@@ -138,7 +139,7 @@ export function AppShellSidebar({
   sections,
   collapsedSidebarSections,
   sessionId,
-  chatBySessionId,
+  activityBySessionId,
   orderedVisibleSessionIds,
   selectedSessionIds,
   threadMenuOpenId,
@@ -239,7 +240,7 @@ export function AppShellSidebar({
             sections={sections}
             collapsedSidebarSections={collapsedSidebarSections}
             sessionId={sessionId}
-            chatBySessionId={chatBySessionId}
+            activityBySessionId={activityBySessionId}
             orderedVisibleSessionIds={orderedVisibleSessionIds}
             selectedSessionIds={selectedSessionIds}
             threadMenuOpenId={threadMenuOpenId}

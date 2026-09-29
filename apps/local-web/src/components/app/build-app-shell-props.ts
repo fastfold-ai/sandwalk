@@ -13,6 +13,7 @@ import type { useSessionActions } from '@/hooks/useSessionActions'
 import type { useSessionChatState } from '@/hooks/useSessionChatState'
 import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
 import type { TabItem, TabItemSection } from '@/lib/sessions'
+import type { SessionActivityMap } from '@/lib/session-activity'
 
 type AppShellBridgeInput = {
   offlineStatus: AppShellProps['offlineStatus']
@@ -29,6 +30,8 @@ type AppShellBridgeInput = {
     session: AppShellProps['session']
   }
   chat: ReturnType<typeof useSessionChatState>
+  /** Spinner / approval flags per session (see `useChatActivity`). */
+  activityBySessionId: SessionActivityMap
   tabs: ReturnType<typeof useAppOpenTabs>
   actions: ReturnType<typeof useSessionActions>
   sandbox: ReturnType<typeof useSessionSandbox>
@@ -113,7 +116,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
      * cuando estás en él) se usa `input.route.sessionId` derivado.
      */
     sessionId: input.effectiveSessionId,
-    chatBySessionId: input.chat.chatBySessionId,
+    activityBySessionId: input.activityBySessionId,
     orderedVisibleSessionIds: input.orderedVisibleSessionIds,
     selectedSessionIds: input.actions.selectedSessionIds,
     threadMenuOpenId: input.ui.threadMenuOpenId,

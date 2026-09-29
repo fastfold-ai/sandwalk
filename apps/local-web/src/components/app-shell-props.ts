@@ -29,6 +29,7 @@ import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import type { CreateDraftSession } from '@/lib/draft-agent'
+import type { SessionActivityMap } from '@/lib/session-activity'
 import { type SessionChatState, type TabItem, type TabItemSection } from '@/lib/sessions'
 import { type parseCatalogSkillId,type SkillsViewMode } from '@/lib/skills-catalog'
 
@@ -55,7 +56,7 @@ export type AppShellProps = {
   sections: TabItemSection[]
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null

@@ -11,6 +11,7 @@ install still surfaces as a single, clear preflight error.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -91,7 +92,11 @@ class DeepAgentsBuildMixin:
             or ""
         ).strip()
         capy_mode = bool(ctx.get("capy_mode"))
-        tools, sandbox, code_trace_buffer, display_name_map = create_ct_langchain_tools(
+        # ~1.3s of CPU (297 tool wrappers + schemas). Off the event loop so
+        # concurrent runs do not stall the API and every other run's stream.
+        # ``to_thread`` copies contextvars, so ``tool_session_var`` still applies.
+        tools, sandbox, code_trace_buffer, display_name_map = await asyncio.to_thread(
+            create_ct_langchain_tools,
             self.session,
             exclude_categories=exclude_cats,
             exclude_tools=exclude_tool_names,
@@ -354,10 +359,10 @@ class DeepAgentsBuildMixin:
         # (name+description at startup). Respect specialist allowlists and the
         # Skills UI enable/disable toggles — never pass raw on-disk roots.
         allowed_skill_names = ctx.get("allowed_skill_names")
-        skills_sources = resolve_skill_source_dirs(
-            None
-            if allowed_skill_names is None
-            else list(allowed_skill_names or [])
+        # Disk scan of every SKILL.md (~1s) — keep it off the event loop.
+        skills_sources = await asyncio.to_thread(
+            resolve_skill_source_dirs,
+            None if allowed_skill_names is None else list(allowed_skill_names or []),
         )
         # Never root filesystem tools at "/" — relative paths like
         # ./artifacts/... would resolve to /artifacts/... and fail.
@@ -392,8 +397,6 @@ class DeepAgentsBuildMixin:
             background_sync=effective_backend == "modal",
         )
         if sandbox_handle.kind == "modal" and not sandbox_handle.seeded:
-            import asyncio
-
             seeded_ok = await asyncio.to_thread(
                 wait_until_seeded,
                 sandbox_handle,
@@ -465,7 +468,9 @@ class DeepAgentsBuildMixin:
                 )
             )
         create_kwargs["middleware"] = tuple(middleware)
-        agent = create_deep_agent(**create_kwargs)
+        # Graph compile inspects every tool signature for the main agent and
+        # each subagent (~1s CPU); run it in a worker thread.
+        agent = await asyncio.to_thread(create_deep_agent, **create_kwargs)
         return agent, sandbox_handle
 
     def _build_deepagents_exec_result(

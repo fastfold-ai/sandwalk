@@ -301,7 +301,7 @@ export function useSessionChatStream({
                 )
               )
             } else if (event.type === 'session.updated') {
-              void loadSessionsRef.current?.()
+              refreshSessionRow(id)
               // Compact (and similar) rewrites history — refresh the transcript.
               void client.listMessages(id).then(history => {
                 patchChat(id, prev => ({
@@ -357,8 +357,36 @@ export function useSessionChatStream({
                   messagesLoaded: true
                 }))
               })
-              void loadSessionsRef.current?.()
+              refreshSessionRow(id)
             }
+  }
+
+  /**
+   * Re-read one session row instead of the whole list. With N panes
+   * streaming, every `session.updated` / run end used to refetch all ~4k
+   * sessions per pane; the global events stream already patches status in
+   * place, this just picks up server-side fields (auto title, timestamps).
+   * Falls back to the full reload only if the row cannot be fetched.
+   */
+  function refreshSessionRow(id: string) {
+    void client
+      .listSessionsByIds([id])
+      .then(rows => {
+        const fresh = rows.find(row => row.id === id)
+        if (!fresh) return
+        setSessions(current => {
+          let found = false
+          const next = current.map(item => {
+            if (item.id !== id) return item
+            found = true
+            return { ...item, ...fresh }
+          })
+          return found ? next : current
+        })
+      })
+      .catch(() => {
+        void loadSessionsRef.current?.()
+      })
   }
 
   useEffect(() => {

@@ -37,6 +37,51 @@ test.describe('live agent grid', () => {
     archiveReport(SUITE)
   })
 
+  test('POST /messages latency: idle vs 4 concurrent (no UI)', async () => {
+    test.setTimeout(120_000)
+    const api = new E2EApi(env)
+    const ids: string[] = []
+    for (let i = 0; i < 5; i += 1) {
+      ids.push(
+        (await api.createSession(`[e2e] post-latency ${i + 1}`, { provider: env.liveProvider, model: env.liveModel })).id
+      )
+    }
+    try {
+      const idle = (await api.sendMessage(ids[0], PROMPT)).latencyMs
+      // Let that run's build settle so the concurrent batch starts clean.
+      await new Promise(r => setTimeout(r, 6_000))
+      const t0 = Date.now()
+      const batch = await Promise.all(ids.slice(1).map(id => api.sendMessage(id, PROMPT)))
+      const wall = Date.now() - t0
+      const m: Measurement = {
+        name: 'postLatency',
+        durationMs: wall,
+        longTasks: 0,
+        longTaskMs: 0,
+        frames: 0,
+        fps: 0,
+        counters: {
+          'live.postIdleMs': idle,
+          'live.postConcurrent4P50Ms': percentile(batch.map(b => b.latencyMs), 50),
+          'live.postConcurrent4MaxMs': Math.max(...batch.map(b => b.latencyMs)),
+          'live.apiHealthP50Ms': await api.healthLatencyMs()
+        }
+      }
+      recordMeasurement(SUITE, m, { grids: env.liveGrids }, RUN_ID)
+      // eslint-disable-next-line no-console
+      console.log(`  postLatency idle=${idle}ms  4-concurrent p50/max=${m.counters['live.postConcurrent4P50Ms']}/${m.counters['live.postConcurrent4MaxMs']}ms  wall=${wall}ms`)
+      // Wait for the runs to finish before deleting the sessions.
+      const deadline = Date.now() + 60_000
+      while (Date.now() < deadline) {
+        const statuses = await Promise.all(ids.map(id => api.getSession(id).then(s => s.status).catch(() => 'idle')))
+        if (statuses.every(s => s === 'idle')) break
+        await new Promise(r => setTimeout(r, 500))
+      }
+    } finally {
+      await Promise.allSettled(ids.map(id => api.deleteSession(id)))
+    }
+  })
+
   for (const spec of env.liveGrids) {
     const { rows, cols } = parseGridSpec(spec)
     const panes = rows * cols

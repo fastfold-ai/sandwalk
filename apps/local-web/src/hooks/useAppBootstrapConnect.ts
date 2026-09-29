@@ -49,6 +49,9 @@ type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
  * former 2s cadence produced. Focus/visibility change still triggers an
  * immediate refresh for perceived snappiness. */
 const SESSION_LIST_REFRESH_MS = 60_000
+/** Liveness probe cadence while connected, and misses before reconnecting. */
+const HEALTH_WATCHDOG_MS = 5_000
+const HEALTH_WATCHDOG_MISSES = 2
 
 type UseAppBootstrapConnectArgs = {
   client: LocalAgentClient
@@ -405,6 +408,37 @@ export function useAppBootstrapConnect({
     if (needsAuthLogin || connectionPaused) return
     void connect()
   }, [connect, connectionPaused, needsAuthLogin])
+
+  // Health watchdog. Once connected, nothing above notices the API going
+  // away (an `sandwalk serve` restart, the menubar helper relaunching):
+  // `health` stays set, no `error` is raised, so the local-server retry loop
+  // in `useLocalServerWait` never engages and streams/polls stay dead until
+  // a page reload. Probe cheaply; after two misses hand off to that loop.
+  useEffect(() => {
+    if (!health || needsAuthLogin || connectionPaused) return
+    if (!isLocalBackendUrl(backendUrl)) return
+    let misses = 0
+    let cancelled = false
+    const probe = async () => {
+      if (cancelled || document.visibilityState !== 'visible') return
+      try {
+        await client.health()
+        misses = 0
+      } catch (cause) {
+        if (cancelled || !isBackendUnavailableError(cause)) return
+        misses += 1
+        if (misses < HEALTH_WATCHDOG_MISSES) return
+        setHealth(null)
+        setError('Backend unreachable: Failed to fetch')
+        setErrorStack(null)
+      }
+    }
+    const timer = window.setInterval(() => void probe(), HEALTH_WATCHDOG_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [backendUrl, client, connectionPaused, health, needsAuthLogin])
 
   // Work can arrive from outside this client: a `sandwalk` CLI session, or a
   // Slack mention spawning one. Neither goes through the UI, and session
