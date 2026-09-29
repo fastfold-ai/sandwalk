@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/resizable'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useAppTerminals } from '@/hooks/useAppTerminals'
+import { useStableHandlers } from '@/hooks/useStableHandlers'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { perfCount } from '@/lib/perf-probe'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
@@ -570,6 +571,33 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     ]
   )
 
+  // Handlers arrive recreated on every shell render; pin them so the
+  // memoized mounts see stable `shared` fields (see SessionChatMount).
+  const sharedGlobals = useStableHandlers({
+    isInspect,
+    showChatSkeleton,
+    projects,
+    recentProjectIds,
+    onNewProject,
+    selectAllProjects,
+    selectProjectScope,
+    updateSession,
+    chatScrollRef,
+    chatEndRef,
+    expandedToolRunKeys,
+    runIdByMessageId,
+    usageByRunId,
+    copiedMessageId,
+    setCopiedMessageId,
+    liveDelta,
+    showScrollToBottom,
+    scrollChatToBottom,
+    patchChat,
+    ensureWorkspaceForMentions,
+    navigate,
+    client,
+    error
+  })
   const buildSplitMountProps = useCallback(
     (chatId: string) => {
       const chatSession =
@@ -580,60 +608,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           sessionId: chatId,
           session: chatSession
         },
-        shared: {
-          isInspect,
-          showChatSkeleton,
-          projects,
-          recentProjectIds,
-          onNewProject,
-          selectAllProjects,
-          selectProjectScope,
-          updateSession,
-          chatScrollRef,
-          chatEndRef,
-          expandedToolRunKeys,
-          runIdByMessageId,
-          usageByRunId,
-          copiedMessageId,
-          setCopiedMessageId,
-          liveDelta,
-          showScrollToBottom,
-          scrollChatToBottom,
-          patchChat,
-          ensureWorkspaceForMentions,
-          navigate,
-          client,
-          error
-        }
+        shared: sharedGlobals
       }
     },
-    [
-      allSessions,
-      perSessionBaseArgs,
-      isInspect,
-      showChatSkeleton,
-      projects,
-      recentProjectIds,
-      onNewProject,
-      selectAllProjects,
-      selectProjectScope,
-      updateSession,
-      chatScrollRef,
-      chatEndRef,
-      expandedToolRunKeys,
-      runIdByMessageId,
-      usageByRunId,
-      copiedMessageId,
-      setCopiedMessageId,
-      liveDelta,
-      showScrollToBottom,
-      scrollChatToBottom,
-      patchChat,
-      ensureWorkspaceForMentions,
-      navigate,
-      client,
-      error
-    ]
+    [allSessions, perSessionBaseArgs, sharedGlobals]
   )
 
   return (
