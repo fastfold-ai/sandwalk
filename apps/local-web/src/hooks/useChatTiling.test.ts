@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildDefaultTree,
+  buildGridTree,
   closePane,
   extractChatIds,
   reconcileTree,
@@ -190,5 +191,42 @@ describe('reconcileTree', () => {
     const next = reconcileTree(t, ['a', 'b', 'c'])
     expect(next).toStrictEqual(t)
     expect(extractChatIds(next)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('buildGridTree', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f']
+
+  it('lays ids out row-major as a vertical branch of horizontal rows', () => {
+    const tree = buildGridTree(ids, 2, 3)
+    expect(tree.type).toBe('branch')
+    if (tree.type !== 'branch') return
+    expect(tree.direction).toBe('vertical')
+    expect(tree.children).toHaveLength(2)
+    const [top, bottom] = tree.children
+    expect(top.type === 'branch' && top.direction).toBe('horizontal')
+    expect(extractChatIds(top)).toEqual(['a', 'b', 'c'])
+    expect(extractChatIds(bottom)).toEqual(['d', 'e', 'f'])
+    expect(extractChatIds(tree)).toEqual(ids)
+  })
+
+  it('spills extra ids into more rows and keeps a short last row', () => {
+    const tree = buildGridTree(['a', 'b', 'c', 'd', 'e'], 2, 2)
+    expect(tree.type === 'branch' && tree.children).toHaveLength(3)
+    if (tree.type !== 'branch') return
+    const last = tree.children[2]
+    expect(last.type).toBe('chat') // single leaf, no wrapper branch
+    expect(extractChatIds(tree)).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('collapses to a single row when everything fits in one', () => {
+    const tree = buildGridTree(['a', 'b'], 1, 4)
+    expect(tree.type === 'branch' && tree.direction).toBe('horizontal')
+    expect(extractChatIds(tree)).toEqual(['a', 'b'])
+  })
+
+  it('falls back to the default tree for degenerate input', () => {
+    expect(buildGridTree(['a'], 4, 4)).toEqual(buildDefaultTree(['a']))
+    expect(buildGridTree(ids, 0, 4)).toEqual(buildDefaultTree(ids))
   })
 })

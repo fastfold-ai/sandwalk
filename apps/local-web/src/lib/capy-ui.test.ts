@@ -7,6 +7,7 @@ import {
   createDoubleTap,
   formatCapyUnreadBadge,
   isCapyHandsFreeKey,
+  parseGridLayout,
   shouldRevealCapyMinimized
 } from './capy-ui'
 
@@ -94,5 +95,20 @@ describe('Capy hands-free key', () => {
     expect(tap(1300)).toBe(false)
     expect(isCapyHandsFreeKey({ key: 'Control' })).toBe(true)
     expect(isCapyHandsFreeKey({ key: 'c', metaKey: true })).toBe(false)
+  })
+})
+
+describe('parseGridLayout', () => {
+  it('accepts positive integer rows/cols', () => {
+    expect(parseGridLayout({ rows: 4, cols: 4 })).toEqual({ rows: 4, cols: 4 })
+    expect(parseGridLayout({ rows: '2', cols: '3' })).toEqual({ rows: 2, cols: 3 })
+  })
+
+  it('rejects anything else', () => {
+    expect(parseGridLayout(null)).toBeNull()
+    expect(parseGridLayout('4x4')).toBeNull()
+    expect(parseGridLayout({ rows: 0, cols: 4 })).toBeNull()
+    expect(parseGridLayout({ rows: 1.5, cols: 2 })).toBeNull()
+    expect(parseGridLayout({ rows: 99, cols: 2 })).toBeNull()
   })
 })

@@ -77,6 +77,42 @@ export function buildDefaultTreeFromRefs(refs: WorkspaceItemRef[]): PaneNode {
   }
 }
 
+/**
+ * Lay `itemIds` out as `rows × cols`: a vertical branch of horizontal rows
+ * (row-major). Extra ids beyond `rows * cols` spill into additional rows;
+ * a short last row keeps equal ratios among its own children.
+ */
+export function buildGridTree(
+  itemIds: string[],
+  rows: number,
+  cols: number
+): PaneNode {
+  const ids = itemIds.filter(Boolean)
+  const perRow = Math.max(1, Math.floor(cols))
+  if (ids.length <= 1 || rows < 1) return buildDefaultTree(ids)
+  const rowNodes: PaneNode[] = []
+  for (let start = 0; start < ids.length; start += perRow) {
+    const slice = ids.slice(start, start + perRow)
+    rowNodes.push(
+      slice.length === 1
+        ? idToLeaf(slice[0])
+        : {
+            type: 'branch',
+            direction: 'horizontal',
+            ratios: equalRatios(slice.length),
+            children: slice.map(idToLeaf)
+          }
+    )
+  }
+  if (rowNodes.length === 1) return rowNodes[0]
+  return {
+    type: 'branch',
+    direction: 'vertical',
+    ratios: equalRatios(rowNodes.length),
+    children: rowNodes
+  }
+}
+
 function refToLeaf(ref: WorkspaceItemRef): PaneNode {
   if (ref.kind === 'chat') return { type: 'chat', chatId: ref.id }
   return { type: 'terminal', terminalId: ref.id }

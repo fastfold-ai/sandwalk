@@ -34,7 +34,9 @@ import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { useOfflineStatus } from '@/hooks/useOfflineStatus'
 import { notifyMissedCompletions } from '@/lib/browser-notifications'
-import { applyCapyOpenSplit } from '@/lib/capy-ui'
+import { buildGridTree } from '@/hooks/useChatTiling'
+import { applyCapyOpenSplit, parseGridLayout } from '@/lib/capy-ui'
+import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
 import { setFocusedItemId } from '@/lib/focused-item'
@@ -481,8 +483,20 @@ export default function App() {
       const ids = Array.isArray(payload.sessionIds)
         ? payload.sessionIds.filter((id): id is string => typeof id === 'string')
         : []
+      // Optional `layout: { rows, cols }` (POST /v1/ui/commands, dev-grid
+      // script, e2e harness) — otherwise the default single row.
+      const layout = parseGridLayout(payload.layout)
       void bootstrap.loadSessions({ force: true }).then(() => {
-        applyCapyOpenSplit(ids, createSplitGroup, path => navigate(path))
+        const groupId = applyCapyOpenSplit(ids, createSplitGroup, path =>
+          navigate(path)
+        )
+        if (groupId && layout) {
+          tabGroupsStore.setGroupLayoutForMonitor(
+            groupId,
+            getMonitorFingerprint(),
+            buildGridTree(ids, layout.rows, layout.cols)
+          )
+        }
       })
     }
   })
