@@ -21,9 +21,14 @@ const [base, cand] = args.map(p => JSON.parse(readFileSync(p, 'utf8')))
 
 /** Lower is better for these; counters starting with these prefixes too. */
 const LOWER_IS_BETTER = ['durationMs', 'longTasks', 'longTaskMs']
-const COUNTER_PREFIXES = ['terminal.', 'render.']
+const COUNTER_PREFIXES = ['terminal.', 'render.', 'live.']
 /** Informational counters: shown, never flagged (more filtering is good). */
-const NEUTRAL_COUNTERS = new Set(['terminal.scrollIgnored', 'terminal.inputQueued', 'terminal.wsOpen'])
+const NEUTRAL_COUNTERS = new Set([
+  'terminal.scrollIgnored',
+  'terminal.inputQueued',
+  'terminal.wsOpen',
+  'live.panes'
+])
 /** Minimum absolute change before a % delta counts (sub-second timings are noisy). */
 const MIN_ABS_DELTA = { durationMs: 250, longTaskMs: 200, longTasks: 3, default: 2 }
 

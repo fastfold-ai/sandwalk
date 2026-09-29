@@ -9,8 +9,17 @@ export type GridFixture = {
   terminalIds: string[]
   /** localStorage entries that make the SPA boot into the group. */
   storage: Record<string, string>
+  /** Rows × columns to lay the panes out in (default: one row). */
+  layout: { rows: number; cols: number } | null
   /** Remove everything this seed created on the API. */
   cleanup: () => Promise<void>
+}
+
+/** Parse "4x2" → { rows: 4, cols: 2 }. */
+export function parseGridSpec(spec: string): { rows: number; cols: number } {
+  const match = /^(\d+)\s*x\s*(\d+)$/i.exec(spec.trim())
+  if (!match) throw new Error(`bad grid spec "${spec}" (expected RxC, e.g. 4x2)`)
+  return { rows: Number(match[1]), cols: Number(match[2]) }
 }
 
 export type SeededGrid = GridFixture
@@ -30,7 +39,14 @@ function randomId(prefix: string): string {
  */
 export async function createGridFixture(
   env: E2EEnv,
-  options: { chats: number; terminals: number }
+  options: {
+    chats: number
+    terminals: number
+    layout?: { rows: number; cols: number } | null
+    /** Provider/model for the chats (live bench); default = server config. */
+    provider?: string | null
+    model?: string | null
+  }
 ): Promise<GridFixture> {
   const api = new E2EApi(env)
   if (!(await api.health())) {
@@ -41,7 +57,12 @@ export async function createGridFixture(
 
   const chats = []
   for (let i = 0; i < options.chats; i += 1) {
-    chats.push(await api.createSession(`${E2E_TITLE_PREFIX} chat ${i + 1}`))
+    chats.push(
+      await api.createSession(`${E2E_TITLE_PREFIX} chat ${i + 1}`, {
+        provider: options.provider,
+        model: options.model
+      })
+    )
   }
   const terminals = []
   for (let i = 0; i < options.terminals; i += 1) {
@@ -80,6 +101,7 @@ export async function createGridFixture(
     chatIds,
     terminalIds,
     storage,
+    layout: options.layout ?? null,
     cleanup: async () => {
       await Promise.allSettled([
         ...chatIds.map(id => api.deleteSession(id)),
@@ -91,12 +113,46 @@ export async function createGridFixture(
 
 /** Boot `page` into the seeded group and wait for every pane to mount. */
 export async function openGrid(page: Page, fixture: GridFixture): Promise<void> {
-  await page.addInitScript(entries => {
-    for (const [key, value] of Object.entries(entries)) {
-      if (value === '') window.localStorage.removeItem(key)
-      else window.localStorage.setItem(key, value)
-    }
-  }, fixture.storage)
+  await page.addInitScript(
+    ({ entries, layout, itemIds }) => {
+      for (const [key, value] of Object.entries(entries)) {
+        if (value === '') window.localStorage.removeItem(key)
+        else window.localStorage.setItem(key, value)
+      }
+      if (!layout) return
+      // Lay the panes out as rows × cols. The tree is keyed by the same
+      // monitor fingerprint `monitor-fingerprint.ts` computes in-page
+      // (screen size × DPR), so it must be built here, not in Node.
+      const fp = `${Math.round(window.screen.width)}x${Math.round(window.screen.height)}@${Math.round(window.devicePixelRatio || 1)}`
+      const leaf = (id: string) =>
+        id.startsWith('term_') ? { type: 'terminal', terminalId: id } : { type: 'chat', chatId: id }
+      const rows: unknown[] = []
+      for (let r = 0; r < layout.rows; r += 1) {
+        const slice = itemIds.slice(r * layout.cols, (r + 1) * layout.cols)
+        if (slice.length === 0) break
+        rows.push(
+          slice.length === 1
+            ? leaf(slice[0])
+            : {
+                type: 'branch',
+                direction: 'horizontal',
+                ratios: slice.map(() => 1 / slice.length),
+                children: slice.map(leaf)
+              }
+        )
+      }
+      const tree =
+        rows.length === 1
+          ? rows[0]
+          : { type: 'branch', direction: 'vertical', ratios: rows.map(() => 1 / rows.length), children: rows }
+      const raw = window.localStorage.getItem('fastfold.tab-groups')
+      if (!raw) return
+      const groups = JSON.parse(raw) as Array<{ layout?: unknown }>
+      for (const group of groups) group.layout = { perMonitor: { [fp]: tree } }
+      window.localStorage.setItem('fastfold.tab-groups', JSON.stringify(groups))
+    },
+    { entries: fixture.storage, layout: fixture.layout, itemIds: [...fixture.chatIds, ...fixture.terminalIds] }
+  )
   await page.goto(`/agents/${fixture.groupId}?perf=1`)
   await expect(page.locator('[data-pane-id]')).toHaveCount(
     fixture.chatIds.length + fixture.terminalIds.length,
@@ -108,7 +164,7 @@ export async function openGrid(page: Page, fixture: GridFixture): Promise<void> 
 export async function seedGrid(
   page: Page,
   env: E2EEnv,
-  options: { chats: number; terminals: number }
+  options: { chats: number; terminals: number; layout?: { rows: number; cols: number } | null }
 ): Promise<SeededGrid> {
   const fixture = await createGridFixture(env, options)
   await openGrid(page, fixture)

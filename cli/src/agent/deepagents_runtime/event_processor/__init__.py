@@ -58,6 +58,7 @@ class _EventProcessor(
             "tool_calls": self.tool_calls,
             "token_usage": self.token_usage,
             "model_call_count": self.model_call_count,
+            "empty_model_turns": self.empty_model_turns,
             "pending_background_tasks": [],
             "completed_background_tasks": [],
         }

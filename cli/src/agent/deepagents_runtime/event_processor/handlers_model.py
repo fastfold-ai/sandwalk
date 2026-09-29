@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import time
 
 from agent.deepagents_runtime.event_text import _text_from_content
+
+logger = logging.getLogger(__name__)
 
 
 class EventProcessorModelHandlersMixin:
@@ -37,6 +40,12 @@ class EventProcessorModelHandlersMixin:
         self._add_usage(output)
         text = _text_from_content(getattr(output, "content", "")) if output is not None else ""
         if not text.strip():
+            # A model turn with no prose is normal when it only called tools;
+            # with no tool calls either it is the whole answer going missing
+            # (refusal, max_tokens, provider hiccup). Keep the provider's
+            # stop reason so the summary and logs can say why.
+            if output is not None and not getattr(output, "tool_calls", None):
+                self._note_empty_model_turn(output)
             return
         if self.group_tools:
             self._close_group()
@@ -52,3 +61,35 @@ class EventProcessorModelHandlersMixin:
         snippet = text.strip().replace("\n", " ")[:40]
         if snippet:
             self._emit_progress("activity", text=snippet)
+
+    def _note_empty_model_turn(self, output: object) -> None:
+        meta = getattr(output, "response_metadata", None)
+        meta = meta if isinstance(meta, dict) else {}
+        stop_reason = (
+            meta.get("stop_reason")
+            or meta.get("finish_reason")
+            or meta.get("stopReason")
+            or meta.get("done_reason")
+        )
+        content = getattr(output, "content", None)
+        block_types: list[str] = []
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    block_types.append(str(block.get("type") or "?"))
+                else:
+                    block_types.append(type(block).__name__)
+        note = {
+            "call": self.model_call_count,
+            "stop_reason": str(stop_reason) if stop_reason is not None else None,
+            "content_blocks": block_types,
+            "model": meta.get("model") or meta.get("model_name"),
+        }
+        self.empty_model_turns.append(note)
+        logger.info(
+            "[llm] empty model turn #%s: stop_reason=%s content_blocks=%s model=%s",
+            note["call"],
+            note["stop_reason"],
+            ",".join(block_types) or "-",
+            note["model"],
+        )

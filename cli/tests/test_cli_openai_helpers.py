@@ -251,7 +251,7 @@ class TestPromptCompatibleModel:
         console, buf = captured_console
         monkeypatch.setattr("cli.console", console)
         cfg = Config(data={"llm.model": "custom-model"})
-        monkeypatch.setattr("cli._fetch_compatible_models_for_setup", lambda *a, **k: [])
+        monkeypatch.setattr("cli.setup.model_prompt._fetch_compatible_models_for_setup", lambda *a, **k: [])
         monkeypatch.setattr("builtins.input", lambda _: "")
         model = _prompt_compatible_model_for_setup(cfg, "http://localhost:11434/v1", "ollama")
         assert model == "custom-model"

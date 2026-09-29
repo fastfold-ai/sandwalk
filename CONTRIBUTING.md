@@ -52,16 +52,28 @@ Mac:
 pnpm lint:mac
 ```
 
+## Dev loop
+
+```bash
+scripts/dev-api.sh        # agent API from this checkout (:8787); restart after Python edits
+scripts/dev-ui.sh         # Tauri window + Vite (:1420) with HMR; `scripts/dev-ui.sh web` for browser only
+scripts/stop-packaged-app.sh   # if the installed Sandwalk.app / menubar server holds :8787
+```
+
 ## Tests
 
 ```bash
-pnpm test:cli:coverage
-pnpm --filter @sandwalk/agent-local-web test:coverage
+scripts/verify.sh         # same gate as CI: web typecheck/lint/build/coverage + cli ruff/mypy/pytest
+scripts/verify.sh web     # or: cli | e2e
+pnpm e2e                  # Playwright: split grid + terminals (needs the API running)
+pnpm e2e:bench            # perf benchmarks; compare runs with `pnpm e2e:compare a.json b.json`
 # macOS only:
 pnpm test:mac
 ```
 
-See [.github/TESTING.md](.github/TESTING.md) for coverage gates and Codecov flags.
+See [.github/TESTING.md](.github/TESTING.md) for coverage gates, the e2e/perf
+harness, and the live multi-agent bench. The same workflow is packaged for
+coding agents in [AGENTS.md](AGENTS.md) and `.cursor/skills/`.
 
 ## Pull requests
 

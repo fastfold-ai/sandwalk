@@ -170,10 +170,24 @@ Monorepo: `cli/`, `apps/local-web/`, `apps/sandwalk-mac/`, `apps/packaging/`. Se
 git clone https://github.com/fastfold-ai/sandwalk.git
 cd sandwalk
 pnpm install
-cd cli && uv sync && uv run sandwalk serve
-# another terminal:
-pnpm --filter @sandwalk/agent-local-web dev
+cd cli && uv sync --extra dev && cd ..
+scripts/dev-api.sh        # agent API from this checkout on :8787
+scripts/dev-ui.sh         # another terminal: Tauri window + Vite :1420 (`web` for browser only)
 ```
+
+Testing mirrors CI in one command, plus a Playwright harness for the split
+grid / terminals and perf benchmarks with before/after comparison:
+
+```bash
+scripts/verify.sh         # typecheck, lint, build, unit tests + coverage gates (web + cli)
+pnpm e2e                  # grid + terminal e2e against your running API
+pnpm e2e:bench            # perf report → apps/local-web/e2e/results/grid-latest.json
+pnpm e2e:compare apps/local-web/e2e/results/grid-baseline.json apps/local-web/e2e/results/grid-latest.json
+```
+
+Working with an AI agent? [AGENTS.md](AGENTS.md) and the project skills in
+`.cursor/skills/` (`sandwalk-dev-loop`, `sandwalk-testing`) encode the dev and
+test cycle; [.github/TESTING.md](.github/TESTING.md) has the details.
 
 ## License
 

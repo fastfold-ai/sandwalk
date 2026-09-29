@@ -206,6 +206,26 @@ Env knobs: `SANDWALK_WEB_URL` (default `http://127.0.0.1:1420`),
 `SANDWALK_E2E_TERMINALS` (bench grid size, default 6 / 2). Failures keep a
 Playwright trace under `apps/local-web/e2e/.artifacts/`.
 
+#### Live multi-agent grid bench (real messages)
+
+`e2e/bench/grid-live.bench.spec.ts` opens R×C grids of chats, sends one tiny
+prompt to every pane at once, and records per grid the API `POST /messages`
+latency (p50/p95), time until each reply is painted in its pane, time until
+each run is idle, failures split by layer (`stillRunning` / `emptyReply` /
+`replyNotVisible`), and the UI render counters under N concurrent streams.
+It costs tokens, so it is opt-in:
+
+```bash
+SANDWALK_E2E_LIVE=1 SANDWALK_E2E_GRIDS=2x2,4x2,4x4 \
+SANDWALK_E2E_PROVIDER=anthropic SANDWALK_E2E_MODEL=claude-sonnet-5 \
+pnpm --filter @sandwalk/agent-local-web exec playwright test --project=bench --grep 'live agent grid'
+# → apps/local-web/e2e/results/grid-live-latest.json
+```
+
+Pin a model that answers the agent prompt: Fable 5 / 5.1 currently return
+`stop_reason=refusal` for Sandwalk's tool set, which the transcript now reports
+as "(Agent produced no text output — model returned stop_reason=refusal)".
+
 ---
 
 ## Mac App

@@ -240,7 +240,7 @@ def test_prompt_compatible_model_for_setup_uses_discovered_selection(monkeypatch
 def test_prompt_compatible_model_for_setup_allows_manual_entry(monkeypatch):
     cfg = Config(data={"llm.model": "llama3.1"})
     monkeypatch.setattr(
-        "cli._fetch_compatible_models_for_setup",
+        "cli.setup.model_prompt._fetch_compatible_models_for_setup",
         lambda base_url, backend, api_key=None: ["gemma4:12b"],
     )
     answers = iter(["2", "qwen3.6:27b"])

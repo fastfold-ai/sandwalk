@@ -37,6 +37,8 @@ def _merge_deepagents_chunks(acc: dict, chunk: dict) -> dict:
         "token_usage": usage,
         "model_call_count": int(acc.get("model_call_count", 0) or 0)
         + int(chunk.get("model_call_count", 0) or 0),
+        "empty_model_turns": list(acc.get("empty_model_turns") or [])
+        + list(chunk.get("empty_model_turns") or []),
     }
 
 

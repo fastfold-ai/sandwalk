@@ -11,6 +11,15 @@ export type E2EEnv = {
   benchPanes: number
   /** Terminals to add to the bench grid. */
   benchTerminals: number
+  /** Live agent bench (sends real messages → costs tokens). */
+  live: boolean
+  /** Grid shapes for the live bench, e.g. ["2x2", "4x2"]. */
+  liveGrids: string[]
+  /** Per-grid budget for every agent to finish replying. */
+  liveTimeoutMs: number
+  /** Provider/model for live sessions (else the server default). */
+  liveProvider: string | null
+  liveModel: string | null
 }
 
 function settingsPathCandidates(): string[] {
@@ -52,6 +61,14 @@ export function resolveE2EEnv(): E2EEnv {
     apiUrl,
     apiKey: resolveApiKey(),
     benchPanes: Number(process.env.SANDWALK_E2E_PANES || 6),
-    benchTerminals: Number(process.env.SANDWALK_E2E_TERMINALS || 2)
+    benchTerminals: Number(process.env.SANDWALK_E2E_TERMINALS || 2),
+    live: ['1', 'true', 'yes'].includes((process.env.SANDWALK_E2E_LIVE || '').toLowerCase()),
+    liveGrids: (process.env.SANDWALK_E2E_GRIDS || '2x2')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean),
+    liveTimeoutMs: Number(process.env.SANDWALK_E2E_LIVE_TIMEOUT_MS || 120_000),
+    liveProvider: (process.env.SANDWALK_E2E_PROVIDER || '').trim() || null,
+    liveModel: (process.env.SANDWALK_E2E_MODEL || '').trim() || null
   }
 }

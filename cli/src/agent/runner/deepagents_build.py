@@ -22,6 +22,30 @@ from agent.types import ExecutionResult, Plan, Step
 logger = logging.getLogger("runner")
 
 
+def _empty_output_summary(empty_turns: object) -> str:
+    """User-facing text for a run whose model turns produced no prose.
+
+    Includes the provider stop reason when the event processor captured one
+    (``refusal``, ``max_tokens``, …) so an empty reply is diagnosable from the
+    transcript instead of looking like the agent silently gave up.
+    """
+    base = "(Agent produced no text output)"
+    turns = [t for t in (empty_turns or []) if isinstance(t, dict)]
+    if not turns:
+        return base
+    last = turns[-1]
+    reason = last.get("stop_reason")
+    blocks = [str(b) for b in (last.get("content_blocks") or []) if b]
+    details: list[str] = []
+    if reason:
+        details.append(f"stop_reason={reason}")
+    if blocks:
+        details.append("content=" + ",".join(blocks))
+    if not details:
+        return base
+    return f"{base[:-1]} — model returned {'; '.join(details)})"
+
+
 class DeepAgentsBuildMixin:
     """Tool/prompt/agent construction and result assembly for deepagents runs."""
 
@@ -461,7 +485,9 @@ class DeepAgentsBuildMixin:
         token_usage = dict(result.get("token_usage") or {})
         model_call_count = int(result.get("model_call_count", 0))
 
-        summary = "\n".join(full_text).strip() or "(Agent produced no text output)"
+        summary = "\n".join(full_text).strip() or _empty_output_summary(
+            result.get("empty_model_turns")
+        )
         guardrail_unverified_execution = False
         if _looks_like_unverified_execution_claim(summary, tool_calls):
             guardrail_unverified_execution = True

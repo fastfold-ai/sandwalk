@@ -36,10 +36,20 @@ export class E2EApi {
     }
   }
 
-  createSession(title: string): Promise<SeededSession> {
+  createSession(
+    title: string,
+    options: { provider?: string | null; model?: string | null } = {}
+  ): Promise<SeededSession> {
     return this.request<SeededSession>('/sessions', {
       method: 'POST',
-      body: JSON.stringify({ title, workspacePath: null, projectId: null, clientSurface: 'ui' })
+      body: JSON.stringify({
+        title,
+        workspacePath: null,
+        projectId: null,
+        clientSurface: 'ui',
+        ...(options.provider ? { provider: options.provider } : {}),
+        ...(options.model ? { model: options.model } : {})
+      })
     })
   }
 
@@ -56,5 +66,38 @@ export class E2EApi {
 
   deleteTerminal(id: string): Promise<void> {
     return this.request<void>(`/terminals/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
+
+  /** Send a chat message and return the request latency (ms) with the run id. */
+  async sendMessage(sessionId: string, content: string): Promise<{ runId: string; latencyMs: number }> {
+    const started = performance.now()
+    const result = await this.request<{ runId: string }>(
+      `/sessions/${encodeURIComponent(sessionId)}/messages`,
+      { method: 'POST', body: JSON.stringify({ content }) }
+    )
+    return { runId: result.runId, latencyMs: Math.round(performance.now() - started) }
+  }
+
+  getSession(id: string): Promise<{ id: string; status: string }> {
+    return this.request<{ id: string; status: string }>(`/sessions/${encodeURIComponent(id)}`)
+  }
+
+  async listMessages(id: string): Promise<Array<{ role: string; content?: unknown }>> {
+    const result = await this.request<{ data: Array<{ role: string; content?: unknown }> }>(
+      `/sessions/${encodeURIComponent(id)}/messages`
+    )
+    return result.data
+  }
+
+  /** Median round-trip of `GET /v1/health` over `samples` requests. */
+  async healthLatencyMs(samples = 10): Promise<number> {
+    const times: number[] = []
+    for (let i = 0; i < samples; i += 1) {
+      const started = performance.now()
+      await fetch(`${this.env.apiUrl}/v1/health`, { headers: this.headers() })
+      times.push(performance.now() - started)
+    }
+    times.sort((a, b) => a - b)
+    return Math.round(times[Math.floor(times.length / 2)])
   }
 }
