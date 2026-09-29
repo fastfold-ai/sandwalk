@@ -34,7 +34,13 @@ test.describe('grid benchmarks', () => {
     console.log(
       `  ${m.name.padEnd(20)} ${String(m.durationMs).padStart(6)}ms  longTasks=${m.longTasks} (${m.longTaskMs}ms)  fps=${m.fps}  ` +
         Object.entries(m.counters)
-          .filter(([k]) => k.startsWith('terminal.') || k.startsWith('render.'))
+          .filter(
+            ([k]) =>
+              k.startsWith('terminal.') ||
+              k.startsWith('render.') ||
+              // memo-miss diagnostics: which prop forced a re-render
+              k.startsWith('props.')
+          )
           .map(([k, v]) => `${k}=${v}`)
           .join(' ') +
         `\n  → ${latest}`

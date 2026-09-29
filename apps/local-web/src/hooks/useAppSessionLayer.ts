@@ -17,6 +17,7 @@ import { buildConversationTimeline } from '@/components/agents/transcript'
 import { buildAgentComposerSlotProps } from '@/components/app/build-agent-composer-slot-props'
 import { usePrefetchSessionMessages } from '@/hooks/useAppRouteContext'
 import { useChatScroll } from '@/hooks/useChatScroll'
+import { useLatestRef } from '@/hooks/useLatestRef'
 import { useSessionActions } from '@/hooks/useSessionActions'
 import { useSessionChatSend } from '@/hooks/useSessionChatSend'
 import { useSessionChatState } from '@/hooks/useSessionChatState'
@@ -107,6 +108,8 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     args.subscribeActiveChat === false ? null : args.sessionId
   )
   args.setChatBySessionIdRef.current = chat.setChatBySessionId
+  const sessionsRef = useLatestRef(args.sessions)
+  const tabGroupsRef = useLatestRef(args.tabGroups)
 
   useSessionChatStream({
     client: args.client,
@@ -114,7 +117,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     sessionId:
       args.enableTranscriptStream === false ? null : args.sessionId,
     sessionIdRef: args.sessionIdRef,
-    sessions: args.sessions,
+    sessionsRef,
     chatBySessionIdRef: chat.chatBySessionIdRef,
     patchChat: chat.patchChat,
     setSessions: args.setSessions,
@@ -143,6 +146,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     sessionIdRef: args.sessionIdRef,
     session: args.session,
     sessions: args.sessions,
+    sessionsRef,
     setSessions: args.setSessions,
     activeProject: args.activeProject,
     openTabsByProject: args.openTabsByProject,
@@ -155,6 +159,7 @@ export function useAppSessionLayer(args: SessionLayerArgs) {
     openTabIds: args.openTabIds,
     setOpenTabIds: args.setOpenTabIds,
     tabGroups: args.tabGroups,
+    tabGroupsRef,
     patchChat: chat.patchChat,
     setChatBySessionId: chat.setChatBySessionId,
     composerLiveRef: chat.composerLiveRef,

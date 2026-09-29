@@ -17,15 +17,14 @@ type UseSessionActionsTabsArgs = Pick<
   | 'tabsScopeKey'
   | 'sessionId'
   | 'stripSessionId'
-  | 'sessions'
-  | 'lastSessionByScope'
+  | 'sessionsRef'
   | 'setLastSessionByScope'
   | 'setProjectScopeId'
   | 'setRecentProjectIds'
   | 'openTabIds'
   | 'setOpenTabIds'
   | 'patchOpenTabs'
-  | 'tabGroups'
+  | 'tabGroupsRef'
 >
 
 export function useSessionActionsTabs({
@@ -34,14 +33,14 @@ export function useSessionActionsTabs({
   tabsScopeKey,
   sessionId,
   stripSessionId,
-  sessions,
+  sessionsRef,
   setLastSessionByScope,
   setProjectScopeId,
   setRecentProjectIds,
   openTabIds,
   setOpenTabIds,
   patchOpenTabs,
-  tabGroups
+  tabGroupsRef
 }: UseSessionActionsTabsArgs) {
   const closeSessionTab = (id: string) => {
     const scopeProjectId = activeProjectId
@@ -61,7 +60,7 @@ export function useSessionActionsTabs({
         if (!scopeProjectId) return true
         return (term.projectId ?? null) === scopeProjectId
       }
-      const item = sessions.find(session => session.id === tabId)
+      const item = sessionsRef.current.find(session => session.id === tabId)
       if (!item) return false
       if (!scopeProjectId) return true
       return item.projectId === scopeProjectId
@@ -141,10 +140,10 @@ export function useSessionActionsTabs({
     // sweeping them away with the rest.
     const activeTabId = stripSessionId ?? sessionId
     const pinnedGroupIds = new Set(
-      tabGroups.filter(g => g.pinned).map(g => g.id)
+      tabGroupsRef.current.filter(g => g.pinned).map(g => g.id)
     )
     const pinnedChatIds = new Set(
-      sessions
+      sessionsRef.current
         .filter(s => s.organizeLabel === 'pinned')
         .map(s => s.id)
     )

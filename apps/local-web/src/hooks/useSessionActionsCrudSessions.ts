@@ -26,7 +26,6 @@ type SessionCrudArgs = Pick<
   | 'tabsScopeKey'
   | 'sessionId'
   | 'sessionIdRef'
-  | 'sessions'
   | 'setSessions'
   | 'setOpenTabsByProject'
   | 'setLastSessionByScope'

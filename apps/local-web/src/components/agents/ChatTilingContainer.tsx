@@ -4,7 +4,8 @@ import type {
   AgentSession,
   PaneNode,
   SessionGroup,
-  TerminalSession
+  TerminalSession,
+  WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -33,8 +34,8 @@ import {
   type SplitDirection,
   splitPane
 } from '@/hooks/useChatTiling'
-import { useMonitorFingerprint } from '@/lib/monitor-fingerprint'
 import { useStableHandlers } from '@/hooks/useStableHandlers'
+import { useMonitorFingerprint } from '@/lib/monitor-fingerprint'
 import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
@@ -702,6 +703,8 @@ function ratiosAreClose(a: number[], b: number[], epsilon = 0.001): boolean {
   return true
 }
 
+const EMPTY_WORKSPACE_FILES: WorkspaceFile[] = []
+
 function ChatLeaf({
   chatId,
   focused,
@@ -727,7 +730,20 @@ function ChatLeaf({
   onClose: (chatId: string) => void
   canClose: boolean
 }) {
-  const props = buildMountProps(chatId)
+  const built = buildMountProps(chatId)
+  // `workspaceFiles` is the app-level listing for the *active* session, so
+  // it only describes the focused pane. Hand unfocused panes a stable empty
+  // list: they'd otherwise show the wrong workspace in @-mentions and
+  // re-render every time focus moves (a new listing per focused session).
+  const props = focused
+    ? built
+    : {
+        ...built,
+        perSessionArgs: {
+          ...built.perSessionArgs,
+          workspaceFiles: EMPTY_WORKSPACE_FILES
+        }
+      }
   const chatSession = sessions.find(s => s.id === chatId) || null
   // The parent-built header props don't know about the tiling tree, so
   // we inject the four split handlers here — they mirror the right-click

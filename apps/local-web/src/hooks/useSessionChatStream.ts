@@ -13,18 +13,22 @@ import {
   notifyRunCompleted
 } from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
-import { shallowEqualObjects } from '@/lib/stable-equal'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { registerTranscriptSseHandler } from '@/lib/events-mux-registry'
 import { markSessionAttention } from '@/lib/session-attention'
 import type { SessionChatState } from '@/lib/sessions'
+import { shallowEqualObjects } from '@/lib/stable-equal'
 
 type UseSessionChatStreamArgs = {
   client: LocalAgentClient
   health: BackendHealth | null
   sessionId: string | null
   sessionIdRef: MutableRefObject<string | null>
-  sessions: AgentSession[]
+  /**
+   * Latest sessions list, by ref: only read when a session is (re)hydrated,
+   * so split panes don't re-render every time any row changes.
+   */
+  sessionsRef: MutableRefObject<AgentSession[]>
   chatBySessionIdRef: MutableRefObject<Record<string, SessionChatState>>
   patchChat: (
     id: string,
@@ -63,7 +67,7 @@ export function useSessionChatStream({
   health,
   sessionId,
   sessionIdRef,
-  sessions,
+  sessionsRef,
   chatBySessionIdRef,
   patchChat,
   setSessions,
@@ -142,7 +146,7 @@ export function useSessionChatStream({
     // Menubar "New Agent" navigates here before loadSessions includes the row —
     // treat a missing meta the same as a fresh idle session so we don't sit on
     // a blank main pane waiting for the list poll.
-    const meta = sessions.find(item => item.id === sessionId)
+    const meta = sessionsRef.current.find(item => item.id === sessionId)
     const looksEmpty =
       !meta || (!meta.lastMessageAt && meta.status === 'idle')
     if (looksEmpty) {
@@ -193,8 +197,9 @@ export function useSessionChatStream({
         }
       })
     return () => controller.abort()
-    // Intentionally omit `sessions` — only re-hydrate when the active session changes.
-  }, [client, health, patchChat, sessionId])
+    // `sessionsRef` is read, not depended on — only re-hydrate when the
+    // active session changes.
+  }, [client, health, patchChat, sessionId, sessionsRef])
 
   // Cursor per session so intentional stream restarts (and EventSource
   // reconnects that lose Last-Event-ID) don't replay the entire history —

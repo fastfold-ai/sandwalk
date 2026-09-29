@@ -2,7 +2,6 @@ import type { SessionGroup, TerminalSession } from '@sandwalk/agent-ui-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-import { OfflineBanner } from '@/components/app/OfflineBanner'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
@@ -13,9 +12,9 @@ import {
 } from '@/components/app/app-display'
 import { AppShellConnected } from '@/components/app/AppShellConnected'
 import { buildAppShellProps } from '@/components/app/build-app-shell-props'
+import { OfflineBanner } from '@/components/app/OfflineBanner'
 import { AppGates } from '@/components/AppGates'
 import { useAppBootstrap } from '@/hooks/useAppBootstrap'
-import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { useAppOpenTabs } from '@/hooks/useAppOpenTabs'
 import {
   useAppRouteContext,
@@ -26,32 +25,34 @@ import { useAppSessionEffects } from '@/hooks/useAppSessionEffects'
 import { useAppSessionLayer } from '@/hooks/useAppSessionLayer'
 import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppTabGroups } from '@/hooks/useAppTabGroups'
+import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { useAppUiState } from '@/hooks/useAppUiState'
+import { buildGridTree } from '@/hooks/useChatTiling'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useEventsMux } from '@/hooks/useEventsMux'
 import { useGlobalSessionEvents } from '@/hooks/useGlobalSessionEvents'
+import { useLatestRef } from '@/hooks/useLatestRef'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { useOfflineStatus } from '@/hooks/useOfflineStatus'
 import { notifyMissedCompletions } from '@/lib/browser-notifications'
-import { buildGridTree } from '@/hooks/useChatTiling'
 import { applyCapyOpenSplit, parseGridLayout } from '@/lib/capy-ui'
-import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
 import { setFocusedItemId } from '@/lib/focused-item'
 import { setItemOpener } from '@/lib/item-opener'
+import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
 import { perfCount } from '@/lib/perf-probe'
 import { resolveItemLocation } from '@/lib/resolve-item-location'
-import { resolveStripActiveId } from '@/lib/strip-active'
-import { useTerminalsStore } from '@/lib/terminals-store'
 import { useChatActivity } from '@/lib/session-activity'
 import {
   pruneSessionAttention,
   recoverUnreadFromSessions
 } from '@/lib/session-attention'
-import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { visibleSessionIds } from '@/lib/sessions'
+import { resolveStripActiveId } from '@/lib/strip-active'
+import { clearTerminalActivity } from '@/lib/terminal-attention'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 export default function App() {
   perfCount('render.App')
@@ -756,6 +757,10 @@ export default function App() {
   // its own chatId + session. Computed once so secondary mounts within
   // a group can boot their pipeline with the same shared handles the
   // active mount uses.
+  // Panes read the sessions list by ref (see usePerSessionChatState) so
+  // a row update in one chat doesn't re-render every other pane.
+  const sessionsRef = useLatestRef(bootstrap.sessions)
+  const tabGroupsRef = useLatestRef(tabGroupsStore.allTabGroups)
   const perSessionBaseArgs = useMemo(
     () => ({
       client: bootstrap.client,
@@ -764,7 +769,7 @@ export default function App() {
       activeProjectId: context.activeProjectId,
       activeProject: context.activeProject,
       tabsScopeKey: tabs.tabsScopeKey,
-      sessions: bootstrap.sessions,
+      sessionsRef,
       setSessions: bootstrap.setSessions,
       setError: bootstrap.setError,
       loadSessions: bootstrap.loadSessions,
@@ -781,14 +786,13 @@ export default function App() {
       loadModelOptions: bootstrap.loadModelOptions,
       openTabsByProject: ui.openTabsByProject,
       setOpenTabsByProject: ui.setOpenTabsByProject,
-      lastSessionByScope: ui.lastSessionByScope,
       setLastSessionByScope: ui.setLastSessionByScope,
       setProjectScopeId: ui.setProjectScopeId,
       setRecentProjectIds: ui.setRecentProjectIds,
       patchOpenTabs: tabs.patchOpenTabs,
       openTabIds: tabs.openTabIds,
       setOpenTabIds: tabs.setOpenTabIds,
-      tabGroups: tabGroupsStore.allTabGroups,
+      tabGroupsRef,
       setCollapsedSidebarSections: ui.setCollapsedSidebarSections,
       setWorkspaceVersion: ui.setWorkspaceVersion,
       workspaceFiles: ui.workspaceFiles,
@@ -805,7 +809,7 @@ export default function App() {
       context.activeProjectId,
       context.activeProject,
       tabs.tabsScopeKey,
-      bootstrap.sessions,
+      sessionsRef,
       bootstrap.setSessions,
       bootstrap.setError,
       bootstrap.loadSessions,
@@ -822,14 +826,13 @@ export default function App() {
       bootstrap.loadModelOptions,
       ui.openTabsByProject,
       ui.setOpenTabsByProject,
-      ui.lastSessionByScope,
       ui.setLastSessionByScope,
       ui.setProjectScopeId,
       ui.setRecentProjectIds,
       tabs.patchOpenTabs,
       tabs.openTabIds,
       tabs.setOpenTabIds,
-      tabGroupsStore.allTabGroups,
+      tabGroupsRef,
       ui.setCollapsedSidebarSections,
       ui.setWorkspaceVersion,
       ui.workspaceFiles,
