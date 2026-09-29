@@ -182,6 +182,7 @@ export function ChatTranscript({
       <ScrollArea
         ref={chatScrollRef}
         className="chat-scrollbar min-h-0 flex-1"
+        data-transcript=""
       >
         <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
           <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">

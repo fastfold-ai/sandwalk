@@ -115,6 +115,9 @@ export function TerminalLeaf({
       onMouseDownCapture={focusPanel}
       onFocusCapture={focusPanel}
       aria-label={`Terminal pane: ${terminal?.title ?? 'Terminal'}`}
+      data-pane-id={terminalId}
+      data-pane-kind="terminal"
+      data-pane-focused={focused ? 'true' : undefined}
     >
       <TerminalSplitPanelHeader
         terminal={terminal}

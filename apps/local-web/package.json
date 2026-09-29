@@ -22,7 +22,12 @@
     "tauri:dev": "tauri dev --features devtools",
     "tauri:build": "tauri build",
     "package:dmg": "bash ../packaging/package-macos-dmg.sh",
-    "relaunch:mac": "bash ../packaging/relaunch-macos-app.sh"
+    "relaunch:mac": "bash ../packaging/relaunch-macos-app.sh",
+    "e2e": "playwright test --project=e2e",
+    "e2e:ui": "playwright test --project=e2e --ui",
+    "e2e:bench": "playwright test --project=bench",
+    "e2e:compare": "node e2e/compare.mjs",
+    "e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "@assistant-ui/react": "0.14.20",
@@ -76,6 +81,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "3.3.1",
     "@eslint/js": "^9.36.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tauri-apps/cli": "^2.9.0",
     "@testing-library/jest-dom": "^6.9.1",

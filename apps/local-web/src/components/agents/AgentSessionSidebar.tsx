@@ -31,6 +31,8 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
+import { useStableCallback } from '@/hooks/useStableCallback'
+import { useSessionActivity } from '@/lib/session-activity'
 import { type SessionChatState, type TabItemSection } from '@/lib/sessions'
 import {
   readSidebarUnreadFilter,
@@ -178,6 +180,32 @@ export function AgentSessionSidebar({
 }: AgentSessionSidebarProps) {
   const location = useLocation()
   const attentionIds = useSessionAttentionIds()
+  // Narrow the per-token chat store down to the two flags the list paints
+  // so `SidebarSessionList` (memo) skips renders while chats stream.
+  const activityBySessionId = useSessionActivity(chatBySessionId)
+  // Handlers recreated by parent hooks on every render would defeat the
+  // list's memo; pin their identity here (they always call the latest).
+  const stableSelectSessionRange = useStableCallback(selectSessionRange)
+  const stableToggleSessionSelected = useStableCallback(toggleSessionSelected)
+  const stableOpenRenameDialog = useStableCallback(openRenameDialog)
+  const stableUpdateSession = useStableCallback(updateSession)
+  const stableExportTranscript = useStableCallback(exportTranscript)
+  const stableOnSelectTabGroup = useStableCallback(onSelectTabGroup)
+  const stableOnRenameTabGroup = useStableCallback(onRenameTabGroup)
+  const stableOnDissolveTabGroup = useStableCallback(onDissolveTabGroup)
+  const stableOnCloseTabGroup = useStableCallback(onCloseTabGroup)
+  const stableOnSetTabGroupColor = useStableCallback(onSetTabGroupColor)
+  const stableOnSetTabGroupPinned = useStableCallback(onSetTabGroupPinned)
+  const stableOnGoToChatProject = useStableCallback(onGoToChatProject)
+  const stableOnCloseTerminal = useStableCallback(onCloseTerminal)
+  const stableOnRemoveTerminalFromSplit = useStableCallback(onRemoveTerminalFromSplit)
+  const stableOnMoveTerminalToProject = useStableCallback(onMoveTerminalToProject)
+  const stableOnRenameTerminal = useStableCallback(onRenameTerminal)
+  const stableOnToggleTerminalOrganizeLabel = useStableCallback(
+    onToggleTerminalOrganizeLabel
+  )
+  const stableSetTabGroupActiveChat = useStableCallback(setTabGroupActiveChat)
+  const stableOnClearSessionSelection = useStableCallback(onClearSessionSelection)
   const [unreadOnly, setUnreadOnly] = useState(readSidebarUnreadFilter)
   const hasUnread = attentionIds.size > 0
 
@@ -349,41 +377,41 @@ export function AgentSessionSidebar({
         scopeKey={activeProjectId}
         collapsedSidebarSections={collapsedSidebarSections}
         sessionId={sessionId}
-        chatBySessionId={chatBySessionId}
+        activityBySessionId={activityBySessionId}
         orderedVisibleSessionIds={orderedVisibleSessionIds}
         selectedSessionIds={selectedSessionIds}
         threadMenuOpenId={threadMenuOpenId}
         projects={projects}
         navigate={navigate}
         setCollapsedSidebarSections={setCollapsedSidebarSections}
-        selectSessionRange={selectSessionRange}
-        toggleSessionSelected={toggleSessionSelected}
+        selectSessionRange={stableSelectSessionRange}
+        toggleSessionSelected={stableToggleSessionSelected}
         setSelectionAnchorId={setSelectionAnchorId}
         openSessionTab={openSessionTab}
         prefetchSessionMessages={prefetchSessionMessages}
         setThreadMenuOpenId={setThreadMenuOpenId}
-        openRenameDialog={openRenameDialog}
-        updateSession={updateSession}
-        exportTranscript={exportTranscript}
+        openRenameDialog={stableOpenRenameDialog}
+        updateSession={stableUpdateSession}
+        exportTranscript={stableExportTranscript}
         setDeleteTarget={setDeleteTarget}
-        onClearSessionSelection={onClearSessionSelection}
-        onSelectTabGroup={onSelectTabGroup}
-        onRenameTabGroup={onRenameTabGroup}
-        onDissolveTabGroup={onDissolveTabGroup}
-        onCloseTabGroup={onCloseTabGroup}
-        onSetTabGroupColor={onSetTabGroupColor}
-        onSetTabGroupPinned={onSetTabGroupPinned}
+        onClearSessionSelection={stableOnClearSessionSelection}
+        onSelectTabGroup={stableOnSelectTabGroup}
+        onRenameTabGroup={stableOnRenameTabGroup}
+        onDissolveTabGroup={stableOnDissolveTabGroup}
+        onCloseTabGroup={stableOnCloseTabGroup}
+        onSetTabGroupColor={stableOnSetTabGroupColor}
+        onSetTabGroupPinned={stableOnSetTabGroupPinned}
         activeProjectId={activeProjectId}
-        onGoToChatProject={onGoToChatProject}
+        onGoToChatProject={stableOnGoToChatProject}
         activeGroupChildId={activeGroupChildId}
-        setTabGroupActiveChat={setTabGroupActiveChat}
+        setTabGroupActiveChat={stableSetTabGroupActiveChat}
         unreadOnly={unreadOnly}
         activeTerminalId={activeTerminalId ?? null}
-        onCloseTerminal={onCloseTerminal}
-        onRemoveTerminalFromSplit={onRemoveTerminalFromSplit}
-        onMoveTerminalToProject={onMoveTerminalToProject}
-        onRenameTerminal={onRenameTerminal}
-        onToggleTerminalOrganizeLabel={onToggleTerminalOrganizeLabel}
+        onCloseTerminal={stableOnCloseTerminal}
+        onRemoveTerminalFromSplit={stableOnRemoveTerminalFromSplit}
+        onMoveTerminalToProject={stableOnMoveTerminalToProject}
+        onRenameTerminal={stableOnRenameTerminal}
+        onToggleTerminalOrganizeLabel={stableOnToggleTerminalOrganizeLabel}
       />
       <div className="relative shrink-0 p-2">
         <SidebarBatchBar

@@ -34,6 +34,7 @@ import {
   splitPane
 } from '@/hooks/useChatTiling'
 import { useMonitorFingerprint } from '@/lib/monitor-fingerprint'
+import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
 /**
@@ -132,6 +133,7 @@ export function ChatTilingContainer({
   onToggleTerminalOrganizeLabel,
   onMoveTerminalToProject
 }: ChatTilingContainerProps) {
+  perfCount('render.ChatTilingContainer')
   const chatIds = group.itemIds
   const activeChatId = group.activeChatId
   const isPending = Boolean(group.isPending)
@@ -774,6 +776,9 @@ function ChatLeaf({
         })
       }}
       aria-label={`Chat pane for ${chatSession?.title || 'session'}`}
+      data-pane-id={chatId}
+      data-pane-kind="chat"
+      data-pane-focused={focused ? 'true' : undefined}
     >
       <ChatSplitPanelHeader {...headerProps} />
       <div className="flex h-full min-w-0 flex-1 flex-col">

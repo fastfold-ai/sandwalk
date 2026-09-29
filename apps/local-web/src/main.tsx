@@ -12,6 +12,7 @@ import { DesktopUpdateProvider } from './hooks/useDesktopUpdate.tsx'
 import { installBlockBrowserBackspace } from './lib/block-browser-backspace.ts'
 import { isMacDesktopOverlay, platformOS } from './lib/desktop.ts'
 import { usesDesktopHashRouter } from './lib/desktop-spa-route.ts'
+import { installPerfProbe } from './lib/perf-probe.ts'
 import {
   applyAccentColor,
   applyAppFont,
@@ -36,6 +37,7 @@ import {
   watchSystemTheme
 } from './lib/theme.ts'
 
+installPerfProbe()
 applyTheme(getStoredTheme())
 applyPalette(getStoredPalette())
 applyAccentColor(getStoredAccentColor())

@@ -14,7 +14,7 @@ import {
   Terminal,
   X
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { ProjectMark } from '@/components/agents/ProjectMark'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
@@ -37,6 +37,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { copyText } from '@/lib/clipboard'
+import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
 import { useSessionTabColors } from './session-tab-colors'
@@ -146,6 +147,7 @@ export function ChatSplitPanelHeader({
   onSplitUp,
   onSplitDown
 }: ChatSplitPanelHeaderProps) {
+  perfCount('render.ChatSplitPanelHeader')
   const { tabColors, setTabColor } = useSessionTabColors()
   const [cliOpen, setCliOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -464,7 +466,7 @@ export function ChatSplitPanelHeader({
  * tiene configurado. Cuando el chat no tiene proyecto asociado, se
  * muestra un fallback discreto con su propia explicación.
  */
-export function ProjectMetaHover({
+function ProjectMetaHoverInner({
   project
 }: {
   project: AgentProject | null
@@ -573,6 +575,9 @@ export function ProjectMetaHover({
     </Popover>
   )
 }
+
+/** Memoized: one per pane header; `project` comes from the projects store. */
+export const ProjectMetaHover = memo(ProjectMetaHoverInner)
 
 function ProjectFicha({ project }: { project: AgentProject }) {
   /*

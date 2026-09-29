@@ -39,6 +39,7 @@ import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
 import { setFocusedItemId } from '@/lib/focused-item'
 import { setItemOpener } from '@/lib/item-opener'
+import { perfCount } from '@/lib/perf-probe'
 import { resolveItemLocation } from '@/lib/resolve-item-location'
 import { resolveStripActiveId } from '@/lib/strip-active'
 import { useTerminalsStore } from '@/lib/terminals-store'
@@ -46,6 +47,7 @@ import { recoverUnreadFromSessions } from '@/lib/session-attention'
 import { visibleSessionIds } from '@/lib/sessions'
 
 export default function App() {
+  perfCount('render.App')
   const location = useLocation()
   const navigate = useNavigate()
   useMacDesktopOverlay()
@@ -988,19 +990,38 @@ export default function App() {
    * activo — sin redirect.
    */
 
-  const { sections, openTabs } = buildSessionSidebarModel({
-    sessions: bootstrap.sessions,
-    // Pass ALL groups (across every scope) so the model can resolve a
-    // `grp_xxx` even when the active project doesn't match the scope
-    // the group was created in. `buildSessionSidebarModel` filters
-    // internally by scope, but it can still recognize a cross-scope
-    // group in `openTabIds`.
-    tabGroups: tabGroupsStore.allTabGroups,
-    activeProjectId: context.activeProjectId,
-    openTabIds: cleanedOpenTabIds,
-    activeSessionId: route.sessionId,
-    terminals: terminalsLive.terminals
-  })
+  // Memoized: App re-renders on every streamed token (chat store lives in
+  // a root context), and this walks every session. Stable identities here
+  // also let the sidebar list and tab strip skip re-rendering per token.
+  const sidebarModelSessions = bootstrap.sessions
+  const sidebarModelGroups = tabGroupsStore.allTabGroups
+  const sidebarModelProjectId = context.activeProjectId
+  const sidebarModelActiveId = route.sessionId
+  const sidebarModelTerminals = terminalsLive.terminals
+  const { sections, openTabs } = useMemo(
+    () =>
+      buildSessionSidebarModel({
+        sessions: sidebarModelSessions,
+        // Pass ALL groups (across every scope) so the model can resolve a
+        // `grp_xxx` even when the active project doesn't match the scope
+        // the group was created in. `buildSessionSidebarModel` filters
+        // internally by scope, but it can still recognize a cross-scope
+        // group in `openTabIds`.
+        tabGroups: sidebarModelGroups,
+        activeProjectId: sidebarModelProjectId,
+        openTabIds: cleanedOpenTabIds,
+        activeSessionId: sidebarModelActiveId,
+        terminals: sidebarModelTerminals
+      }),
+    [
+      sidebarModelSessions,
+      sidebarModelGroups,
+      sidebarModelProjectId,
+      cleanedOpenTabIds,
+      sidebarModelActiveId,
+      sidebarModelTerminals
+    ]
+  )
   const orderedVisibleSessionIds = useMemo(
     () => visibleSessionIds(sections, ui.collapsedSidebarSections),
     [sections, ui.collapsedSidebarSections]

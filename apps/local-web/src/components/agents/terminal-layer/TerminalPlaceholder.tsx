@@ -54,5 +54,11 @@ export function TerminalPlaceholder({
 
   // El div ocupa el espacio con `h-full w-full` (o lo que el caller
   // ponga). El terminal real se posiciona encima via el layer.
-  return <div ref={nodeRef} className={className ?? 'h-full w-full'} />
+  return (
+    <div
+      ref={nodeRef}
+      className={className ?? 'h-full w-full'}
+      data-terminal-placeholder={terminalId}
+    />
+  )
 }

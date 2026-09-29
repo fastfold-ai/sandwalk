@@ -68,6 +68,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
+import { perfCount } from '@/lib/perf-probe'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -188,6 +189,7 @@ export function SessionTabs({
     projectId: string | null
   ) => void | Promise<void>
 }) {
+  perfCount('render.SessionTabs')
   const [menu, setMenu] = useState<TabContextMenuState | null>(null)
   // Confirmation modal for "Delete Split View": the action dissolves
   // the group (chats become standalone conversations again) —

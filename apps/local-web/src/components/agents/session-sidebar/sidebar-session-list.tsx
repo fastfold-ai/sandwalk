@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import {
   type Dispatch,
+  memo,
   type MouseEvent,
   type SetStateAction,
   useEffect,
@@ -54,10 +55,11 @@ import {
 } from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
+import { perfCount } from '@/lib/perf-probe'
+import type { SessionActivityMap } from '@/lib/session-activity'
 import {
   type GroupChild,
   relativeTime,
-  type SessionChatState,
   type TabItemSection
 } from '@/lib/sessions'
 import {
@@ -203,7 +205,8 @@ export type SidebarSessionListProps = {
   scopeKey?: string | null
   collapsedSidebarSections: Record<string, boolean>
   sessionId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  /** Spinner / approval flags only — see `useSessionActivity`. */
+  activityBySessionId: SessionActivityMap
   orderedVisibleSessionIds: string[]
   selectedSessionIds: Set<string>
   threadMenuOpenId: string | null
@@ -270,12 +273,12 @@ export type SidebarSessionListProps = {
   ) => void | Promise<void>
 }
 
-export function SidebarSessionList({
+function SidebarSessionListInner({
   sections,
   scopeKey = null,
   collapsedSidebarSections,
   sessionId,
-  chatBySessionId,
+  activityBySessionId,
   selectedSessionIds,
   threadMenuOpenId,
   projects,
@@ -310,6 +313,7 @@ export function SidebarSessionList({
   onRenameTerminal,
   onToggleTerminalOrganizeLabel
 }: SidebarSessionListProps) {
+  perfCount('render.SidebarSessionList')
   const [displayedSections, setDisplayedSections] = useState(sections)
   const [listOpacity, setListOpacity] = useState(1)
   const [visibleBySection, setVisibleBySection] = useState<
@@ -446,7 +450,7 @@ export function SidebarSessionList({
                             group={item.group}
                             children={item.children}
                             activeId={sessionId}
-                            chatBySessionId={chatBySessionId}
+                            activityBySessionId={activityBySessionId}
                             tabColors={tabColors}
                             selectedSessionIds={selectedSessionIds}
                             attentionIds={attentionIds}
@@ -642,9 +646,9 @@ export function SidebarSessionList({
                                   <SessionStatusIcon
                                     status={
                                       chat.status === 'awaiting_approval' ||
-                                      chatBySessionId[item.id]?.pendingApproval
+                                      activityBySessionId[item.id]?.pendingApproval
                                         ? 'awaiting_approval'
-                                        : chatBySessionId[item.id]?.runActive
+                                        : activityBySessionId[item.id]?.runActive
                                           ? 'running'
                                           : chat.status
                                     }
@@ -841,6 +845,27 @@ export function SidebarSessionList({
 }
 
 /**
+ * Memoized: the parent re-renders on every streamed token (chat store in
+ * a root context); this list only needs to repaint when sessions,
+ * selection, or activity flags change.
+ */
+export const SidebarSessionList = memo(SidebarSessionListInner, (prev, next) => {
+  // Shallow compare, but record which prop broke memoization so the perf
+  // harness (`props.SidebarSessionList.<name>`) shows what still churns.
+  let equal = true
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]) as Set<
+    keyof SidebarSessionListProps
+  >
+  for (const key of keys) {
+    if (!Object.is(prev[key], next[key])) {
+      perfCount(`props.SidebarSessionList.${String(key)}`)
+      equal = false
+    }
+  }
+  return equal
+})
+
+/**
  * Item de grupo de split view en el sidebar. Se pinta como una fila con
  * chevron collapsible; los chats hijos aparecen anidados debajo con una
  * indent y una línea vertical sutil (Arc/Notion style). La memoria de
@@ -852,7 +877,7 @@ function SidebarGroupItem({
   children: groupChildren,
   activeId,
   activeChildId,
-  chatBySessionId,
+  activityBySessionId,
   tabColors,
   selectedSessionIds,
   attentionIds,
@@ -883,7 +908,7 @@ function SidebarGroupItem({
   children: GroupChild[]
   activeId: string | null
   activeChildId: string | null
-  chatBySessionId: Record<string, SessionChatState>
+  activityBySessionId: SessionActivityMap
   tabColors: Record<string, string>
   selectedSessionIds: Set<string>
   attentionIds: ReadonlySet<string>
@@ -1242,9 +1267,9 @@ function SidebarGroupItem({
                       <SessionStatusIcon
                         status={
                           chat.status === 'awaiting_approval' ||
-                          chatBySessionId[chat.id]?.pendingApproval
+                          activityBySessionId[chat.id]?.pendingApproval
                             ? 'awaiting_approval'
-                            : chatBySessionId[chat.id]?.runActive
+                            : activityBySessionId[chat.id]?.runActive
                               ? 'running'
                               : chat.status
                         }

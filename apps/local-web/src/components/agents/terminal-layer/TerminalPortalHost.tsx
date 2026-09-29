@@ -13,6 +13,7 @@ import {
 } from '@/lib/browser-notifications'
 import { getFocusedItemId } from '@/lib/focused-item'
 import { getTerminalLongRunningThresholdMs } from '@/lib/notification-settings'
+import { perfCount, perfTrackTerminal } from '@/lib/perf-probe'
 import { markTerminalActivity } from '@/lib/terminal-attention'
 import { useTerminalsStore } from '@/lib/terminals-store'
 import {
@@ -80,6 +81,17 @@ const RECONNECT_MAX_ATTEMPTS = 12
 const SNAPSHOT_SAVE_INTERVAL_MS = 30_000
 /** Evento que Rust emite al `RunEvent::ExitRequested` para forzar save. */
 const SNAPSHOT_FORCE_SAVE_EVENT = 'sandwalk:force-save-snapshots'
+/**
+ * Debounce for `fit.proposeDimensions()` + `term.resize()` + the PTY
+ * resize RPC. CSS reflows (active-pane change in a split, window
+ * resize) move the placeholder several times within a few ms; fitting
+ * on every frame forces layout reads per terminal and floods the shell
+ * with SIGWINCH, which is what clips scrollback (FAS-121). Following the
+ * placeholder visually stays immediate — only the fit waits.
+ */
+const RESIZE_DEBOUNCE_MS = 50
+/** Max bytes of keyboard input held while the PTY socket is connecting. */
+const PENDING_INPUT_LIMIT = 4096
 
 export function TerminalPortalHost({
   client,
@@ -186,9 +198,56 @@ export function TerminalPortalHost({
     })
   }
 
+  /** Last placeholder box we fitted the xterm to (CSS px). */
+  const lastBoxRef = useRef<{ width: number; height: number }>({
+    width: -1,
+    height: -1
+  })
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * Fit the xterm grid to the host. `term.resize` fires `term.onResize`,
+   * which owns the (deduped) PTY resize RPC.
+   */
+  const applyFit = () => {
+    fitTimerRef.current = null
+    const fit = fitRef.current
+    const term = termRef.current
+    if (!fit || !term || !hostRef.current) return
+    perfCount('terminal.fit')
+    try {
+      const dims = fit.proposeDimensions()
+      // Guard duro: fit puede devolver dimensiones degeneradas durante
+      // transiciones de layout. Si es el caso, no propagamos al PTY.
+      if (!dims || dims.cols < 10 || dims.rows < 3) return
+      if (dims.cols === term.cols && dims.rows === term.rows) return
+      term.resize(dims.cols, dims.rows)
+    } catch {
+      // ignore — cualquier miscálculo del fit se corrige en el siguiente frame
+    }
+  }
+
+  const scheduleFit = (immediate: boolean) => {
+    if (fitTimerRef.current != null) {
+      clearTimeout(fitTimerRef.current)
+      fitTimerRef.current = null
+    }
+    if (immediate) {
+      applyFit()
+      return
+    }
+    fitTimerRef.current = setTimeout(applyFit, RESIZE_DEBOUNCE_MS)
+  }
+
+  /**
+   * Follow the placeholder. Positioning is one `getBoundingClientRect`
+   * plus style writes and runs on every scheduled frame; the expensive
+   * `fit` only runs when the box actually changed size (debounced).
+   */
   const applyPosition = () => {
     const host = hostRef.current
     if (!host) return
+    perfCount('terminal.applyPosition')
     const entry = registry.getPlaceholder(terminalId)
     if (!entry || !entry.node.isConnected) {
       host.style.display = 'none'
@@ -206,30 +265,16 @@ export function TerminalPortalHost({
     host.style.width = `${rect.width}px`
     host.style.height = `${rect.height}px`
     host.style.pointerEvents = 'auto'
-    const fit = fitRef.current
-    const term = termRef.current
-    if (!fit || !term) return
-    try {
-      const dims = fit.proposeDimensions()
-      // Guard duro: fit puede devolver dimensiones degeneradas durante
-      // transiciones de layout. Si es el caso, no propagamos al PTY.
-      if (!dims || dims.cols < 10 || dims.rows < 3) return
-      term.resize(dims.cols, dims.rows)
-      if (
-        (dims.cols !== lastDimsRef.current.cols ||
-          dims.rows !== lastDimsRef.current.rows) &&
-        socketRef.current?.readyState === WebSocket.OPEN &&
-        ptyRef.current
-      ) {
-        lastDimsRef.current = { cols: dims.cols, rows: dims.rows }
-        void client.updatePtySession(terminalId, ptyRef.current.id, {
-          cols: dims.cols,
-          rows: dims.rows
-        })
-      }
-    } catch {
-      // ignore — cualquier miscálculo del fit se corrige en el siguiente frame
-    }
+    const last = lastBoxRef.current
+    const sizeChanged =
+      Math.abs(rect.width - last.width) >= 0.5 ||
+      Math.abs(rect.height - last.height) >= 0.5
+    if (!sizeChanged) return
+    const firstFit = last.width < 0
+    lastBoxRef.current = { width: rect.width, height: rect.height }
+    // First layout after attach fits right away so the prompt renders at
+    // the correct width; later size changes are debounced.
+    scheduleFit(firstFit)
   }
 
   // Effect 1 · Crear xterm + WS + listeners globales. Corre UNA vez al
@@ -257,15 +302,27 @@ export function TerminalPortalHost({
     term.loadAddon(fit)
     termRef.current = term
     fitRef.current = fit
+    perfTrackTerminal(terminalId, term)
 
     const stopThemeWatch = watchTerminalTheme(() => {
       term.options.theme = buildTerminalTheme(isDocumentDark())
     })
 
+    // Keystrokes typed before the PTY WebSocket is open (the restored
+    // snapshot paints a prompt immediately, the socket lands a beat later)
+    // are queued and flushed in `ws.onopen` instead of being dropped.
+    const pendingInput: string[] = []
+    let pendingInputBytes = 0
     term.onData(data => {
-      if (socketRef.current?.readyState === WebSocket.OPEN) {
-        socketRef.current.send(data)
+      const ws = socketRef.current
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(data)
+        return
       }
+      if (pendingInputBytes + data.length > PENDING_INPUT_LIMIT) return
+      pendingInput.push(data)
+      pendingInputBytes += data.length
+      perfCount('terminal.inputQueued')
     })
 
     term.onResize(({ cols, rows }) => {
@@ -281,6 +338,7 @@ export function TerminalPortalHost({
         socketRef.current?.readyState === WebSocket.OPEN &&
         ptyRef.current
       ) {
+        perfCount('terminal.ptyResizeRpc')
         void client.updatePtySession(terminalId, ptyRef.current.id, {
           cols,
           rows
@@ -347,6 +405,12 @@ export function TerminalPortalHost({
         ws.onopen = () => {
           if (cancelled) return
           reconnectAttempts = 0
+          perfCount('terminal.wsOpen')
+          if (pendingInput.length > 0) {
+            for (const chunk of pendingInput) ws.send(chunk)
+            pendingInput.length = 0
+            pendingInputBytes = 0
+          }
           try {
             const dims = fit.proposeDimensions()
             if (dims && dims.cols >= 10 && dims.rows >= 3) {
@@ -429,7 +493,25 @@ export function TerminalPortalHost({
     // ---- Listeners de posicionamiento ----
     const onWindow = () => schedulePosition()
     window.addEventListener('resize', onWindow)
-    window.addEventListener('scroll', onWindow, { capture: true })
+    // Scroll is captured at the window so nested scrollers are seen, but
+    // only scrollers that contain this terminal's placeholder can move
+    // it. A chat transcript scrolling in another pane must not cost a
+    // layout read per terminal per frame.
+    const onScroll = (event: Event) => {
+      const target = event.target
+      if (target === document || target === window) {
+        schedulePosition()
+        return
+      }
+      const entry = registry.getPlaceholder(terminalId)
+      if (!entry || !(target instanceof Node)) return
+      if (target.contains(entry.node)) {
+        schedulePosition()
+      } else {
+        perfCount('terminal.scrollIgnored')
+      }
+    }
+    window.addEventListener('scroll', onScroll, { capture: true })
 
     const observer = new ResizeObserver(() => schedulePosition())
     let observedNode: HTMLDivElement | null = null
@@ -507,7 +589,7 @@ export function TerminalPortalHost({
       unsubObserver()
       observer.disconnect()
       window.removeEventListener('resize', onWindow)
-      window.removeEventListener('scroll', onWindow, { capture: true })
+      window.removeEventListener('scroll', onScroll, { capture: true })
       document.removeEventListener('visibilitychange', onVisibilityChange)
       clearInterval(snapshotInterval)
       unlistenForceSave?.()
@@ -516,6 +598,11 @@ export function TerminalPortalHost({
         window.cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
+      if (fitTimerRef.current != null) {
+        clearTimeout(fitTimerRef.current)
+        fitTimerRef.current = null
+      }
+      lastBoxRef.current = { width: -1, height: -1 }
       try {
         socketRef.current?.close()
       } catch {
@@ -526,6 +613,7 @@ export function TerminalPortalHost({
       } catch {
         // ignore
       }
+      perfTrackTerminal(terminalId, null)
       termRef.current = null
       fitRef.current = null
       socketRef.current = null

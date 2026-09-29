@@ -450,6 +450,22 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const showDraftTerminal = isDraft && !inProject && terminalOpen
   const showWorkspaceFiles =
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
+  // The Files panel mounts after `workspaceSessionId` resolves, i.e. after
+  // the collapse effect in `useAppPanelPersistence` already ran for this
+  // session. Without this it paints open at `defaultSize` and only
+  // collapses on the next session change — which reflows every pane in a
+  // split (and refits every terminal) on the first pane click.
+  const filesPanelMounted = showWorkspaceFiles && !asSheet
+  useLayoutEffect(() => {
+    if (!filesPanelMounted) return
+    const panel = filesPanelRef.current
+    if (!panel) return
+    if (filesPanelCollapsed) {
+      if (!panel.isCollapsed()) panel.collapse()
+    } else if (panel.isCollapsed()) {
+      panel.expand()
+    }
+  }, [filesPanelMounted, filesPanelCollapsed, filesPanelRef])
 
   // El picker vive DENTRO del ChatTilingContainer cuando el grupo activo
   // está en modo pending (recién creado desde "Create split view").
