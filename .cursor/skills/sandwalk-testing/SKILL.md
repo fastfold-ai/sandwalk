@@ -108,8 +108,16 @@ message (should be tens of ms; hundreds under 16 concurrent runs = GIL
 contention from graph compiles); `first-visible` − server `total run` (from
 `[perf]` log lines) is UI/API delivery lag. Agent turns run in worker threads
 of the API process, so heavy CPU per turn slows every request — keep per-turn
-work cached (`skills_sources` cache, tool memo) and never block the loop with
-network I/O (the MCP OAuth refresh did; it now backs off after a failure).
+work cached (`skills_sources` cache, tool memo, MCP tool lists are shared
+across concurrent runs and served stale-while-revalidating) and never block
+the loop with network I/O (the MCP OAuth refresh did; it now backs off after
+a failure). CPU-bound builds (tools + graph compile) go through
+`agent/runner/build_slots.py` — `SANDWALK_BUILD_CONCURRENCY` (default 2)
+bounds how many run at once so the loop stays responsive. The server `[perf]`
+lines to read per run: `tools n=… +Xs`, `create_deep_agent +Xs`,
+`first_stream +Xs` (LLM latency). The offline bench also prints
+`props.<Component>.<prop>=N` memo-miss counters — that is the prop that
+forced a re-render; chase the largest one.
 
 Known: Fable 5 / 5.1 refuse the agent prompt (`stop_reason=refusal`, shows in
 the transcript as "(Agent produced no text output — model returned
