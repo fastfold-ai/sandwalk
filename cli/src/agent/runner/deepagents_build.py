@@ -17,6 +17,7 @@ import os
 import time
 from pathlib import Path
 
+from agent.runner.build_slots import run_cpu_bound
 from agent.runner_helpers import _looks_like_unverified_execution_claim
 from agent.types import ExecutionResult, Plan, Step
 
@@ -95,7 +96,7 @@ class DeepAgentsBuildMixin:
         # ~1.3s of CPU (297 tool wrappers + schemas). Off the event loop so
         # concurrent runs do not stall the API and every other run's stream.
         # ``to_thread`` copies contextvars, so ``tool_session_var`` still applies.
-        tools, sandbox, code_trace_buffer, display_name_map = await asyncio.to_thread(
+        tools, sandbox, code_trace_buffer, display_name_map = await run_cpu_bound(
             create_ct_langchain_tools,
             self.session,
             exclude_categories=exclude_cats,
@@ -469,8 +470,9 @@ class DeepAgentsBuildMixin:
             )
         create_kwargs["middleware"] = tuple(middleware)
         # Graph compile inspects every tool signature for the main agent and
-        # each subagent (~1s CPU); run it in a worker thread.
-        agent = await asyncio.to_thread(create_deep_agent, **create_kwargs)
+        # each subagent (~1s CPU); run it in a worker thread, throttled so a
+        # grid of concurrent runs doesn't time-slice the GIL into N× builds.
+        agent = await run_cpu_bound(create_deep_agent, **create_kwargs)
         return agent, sandbox_handle
 
     def _build_deepagents_exec_result(

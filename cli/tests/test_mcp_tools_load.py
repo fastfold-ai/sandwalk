@@ -110,3 +110,105 @@ def test_success_cache_skips_reload():
     assert [t.name for t in first] == ["ok"]
     assert [t.name for t in second] == ["ok"]
     assert loads == 1
+
+
+def test_concurrent_runs_share_one_load_per_server():
+    """A grid fans out N runs at once; the server must be listed only once."""
+    loads = 0
+
+    async def slow(name: str, connection: dict):
+        nonlocal loads
+        loads += 1
+        await asyncio.sleep(0.2)
+        return [_Tool("shared")]
+
+    def _one_run():
+        # Each agent run drives its own loop in its own thread.
+        return asyncio.run(
+            mcp_tools.create_external_mcp_tools(
+                [_server("shared")], per_server_timeout_s=2.0, use_cache=True
+            )
+        )
+
+    import concurrent.futures
+
+    with patch.object(mcp_tools, "_load_one_server", side_effect=slow):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _i: _one_run(), range(8)))
+
+    assert loads == 1
+    assert all([t.name for t in tools] == ["shared"] for tools in results)
+
+
+def test_stale_entry_is_served_and_refreshed_in_background():
+    loads = 0
+
+    async def load(name: str, connection: dict):
+        nonlocal loads
+        loads += 1
+        return [_Tool(f"v{loads}")]
+
+    with patch.object(mcp_tools, "_load_one_server", side_effect=load):
+        first = asyncio.run(
+            mcp_tools.create_external_mcp_tools(
+                [_server("s")], per_server_timeout_s=1.0, use_cache=True
+            )
+        )
+        assert [t.name for t in first] == ["v1"]
+
+        # Age the entry past the fresh TTL but inside the stale window.
+        key = next(iter(mcp_tools._success_cache))
+        stored_at, tools, names = mcp_tools._success_cache[key]
+        mcp_tools._success_cache[key] = (
+            stored_at - mcp_tools.SUCCESS_CACHE_TTL_S - 1,
+            tools,
+            names,
+        )
+
+        t0 = time.monotonic()
+        second = asyncio.run(
+            mcp_tools.create_external_mcp_tools(
+                [_server("s")], per_server_timeout_s=1.0, use_cache=True
+            )
+        )
+        # Stale list returned immediately, no blocking on the refresh.
+        assert [t.name for t in second] == ["v1"]
+        assert time.monotonic() - t0 < 0.5
+
+        # Background refresh lands and the next caller sees the new list.
+        deadline = time.monotonic() + 2.0
+        while loads < 2 and time.monotonic() < deadline:
+            time.sleep(0.02)
+        for _ in range(50):
+            hit = mcp_tools._cached_success(key)
+            if hit is not None and hit[2] and [t.name for t in hit[0]] == ["v2"]:
+                break
+            time.sleep(0.02)
+        third = asyncio.run(
+            mcp_tools.create_external_mcp_tools(
+                [_server("s")], per_server_timeout_s=1.0, use_cache=True
+            )
+        )
+    assert loads == 2
+    assert [t.name for t in third] == ["v2"]
+
+
+def test_entries_older_than_stale_window_are_dropped():
+    async def load(name: str, connection: dict):
+        return [_Tool("x")]
+
+    with patch.object(mcp_tools, "_load_one_server", side_effect=load):
+        asyncio.run(
+            mcp_tools.create_external_mcp_tools(
+                [_server("old")], per_server_timeout_s=1.0, use_cache=True
+            )
+        )
+        key = next(iter(mcp_tools._success_cache))
+        stored_at, tools, names = mcp_tools._success_cache[key]
+        mcp_tools._success_cache[key] = (
+            stored_at - mcp_tools.STALE_CACHE_MAX_S - 1,
+            tools,
+            names,
+        )
+        assert mcp_tools._cached_success(key, allow_stale=True) is None
+        assert key not in mcp_tools._success_cache
