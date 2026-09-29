@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from collections.abc import AsyncIterator
+import logging
+import time
+from collections.abc import AsyncIterator, Awaitable
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import StreamingResponse
@@ -21,7 +23,16 @@ from agent_server.routes.sse_util import sse_data
 from agent_server.session_event_bus import session_event_bus
 from agent_server.store.event_notifier import EVENT_NOTIFIER
 
-MAX_MUX_SESSIONS = 16
+# One SSE carries every visible pane's transcript. 16 silently dropped the
+# 17th pane of a 4x4 grid (16 panes + the registered active chat) — its
+# reply landed in the DB but never reached the UI. 64 covers an 8x8 grid
+# plus extras; ids past the cap are logged, not swallowed.
+MAX_MUX_SESSIONS = 64
+# Sessions are normally re-read only when their notifier generation moves.
+# This sweep re-reads everything on a slow cadence as a safety net for
+# writers that append with ``notify=False``.
+FULL_SWEEP_S = 5.0
+_LOG = logging.getLogger("agent_server")
 
 
 def parse_session_ids(raw: str | None) -> list[str]:
@@ -32,9 +43,14 @@ def parse_session_ids(raw: str | None) -> list[str]:
         if not sid or sid in seen:
             continue
         seen.add(sid)
-        out.append(sid)
         if len(out) >= MAX_MUX_SESSIONS:
+            _LOG.warning(
+                "events mux: more than %d sessions requested; dropping %s…",
+                MAX_MUX_SESSIONS,
+                sid,
+            )
             break
+        out.append(sid)
     return out
 
 
@@ -50,6 +66,42 @@ def parse_after_cursors(raw: str | None) -> dict[str, int]:
             continue
         cursors[sid] = max(0, int(seq.strip()))
     return cursors
+
+
+async def wait_lifecycle_or_wake(
+    lifecycle_get: Awaitable[dict],
+    wake: Awaitable[dict | None],
+) -> tuple[dict | None, dict | None]:
+    """Race a lifecycle-queue read against the transcript notifier.
+
+    Returns ``(lifecycle_event, generations)``; whichever side did not win is
+    None. Both child tasks are always cancelled and awaited — including when
+    the caller itself is cancelled because the SSE client went away. Without
+    that, every disconnect left a pending ``Queue.get()`` task behind
+    ("Task was destroyed but it is pending!" once per dropped stream).
+    """
+    life_task = asyncio.ensure_future(lifecycle_get)
+    wake_task = asyncio.ensure_future(wake)
+    try:
+        done, _pending = await asyncio.wait(
+            {life_task, wake_task}, return_when=asyncio.FIRST_COMPLETED
+        )
+    finally:
+        for task in (life_task, wake_task):
+            if not task.done():
+                task.cancel()
+        for task in (life_task, wake_task):
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+    lifecycle_event: dict | None = None
+    generations: dict | None = None
+    if life_task in done and not life_task.cancelled():
+        with contextlib.suppress(Exception):
+            lifecycle_event = life_task.result()
+    if wake_task in done and not wake_task.cancelled():
+        with contextlib.suppress(Exception):
+            generations = wake_task.result() or {}
+    return lifecycle_event, generations
 
 
 def register_events_mux_routes(app: FastAPI, deps: AppDeps) -> None:
@@ -73,14 +125,29 @@ def register_events_mux_routes(app: FastAPI, deps: AppDeps) -> None:
                 cursors.setdefault(sid, 0)
             yield ": connected\n\n"
             held_lifecycle: dict | None = None
+            # Per-session (generation, monotonic time) of our last DB read.
+            # A token on one pane used to trigger a list_events query for
+            # every pane on the stream (16 panes streaming = 256 queries per
+            # round); now only sessions whose generation moved are read.
+            last_read: dict[str, tuple[int, float]] = {}
             try:
                 while (
                     not shutdown_event.is_set()
                     and not await request.is_disconnected()
                 ):
                     emitted = False
+                    now = time.monotonic()
                     for sid in session_ids:
-                        gens[sid] = EVENT_NOTIFIER.generation(sid)
+                        gen = EVENT_NOTIFIER.generation(sid)
+                        gens[sid] = gen
+                        prev = last_read.get(sid)
+                        if (
+                            prev is not None
+                            and prev[0] == gen
+                            and now - prev[1] < FULL_SWEEP_S
+                        ):
+                            continue
+                        last_read[sid] = (gen, now)
                         events = await asyncio.to_thread(
                             store.list_events,
                             sid,
@@ -125,31 +192,14 @@ def register_events_mux_routes(app: FastAPI, deps: AppDeps) -> None:
                         emitted = True
                     if not emitted:
                         yield ": heartbeat\n\n"
-                    life_task = asyncio.create_task(lifecycle_q.get())
-                    wake_task = asyncio.create_task(
-                        EVENT_NOTIFIER.async_wait_for_any(session_ids, gens, 1.0)
+                    lifecycle_hit, wake_hit = await wait_lifecycle_or_wake(
+                        lifecycle_q.get(),
+                        EVENT_NOTIFIER.async_wait_for_any(session_ids, gens, 1.0),
                     )
-                    done, pending = await asyncio.wait(
-                        {life_task, wake_task},
-                        return_when=asyncio.FIRST_COMPLETED,
-                    )
-                    for task in pending:
-                        task.cancel()
-                    for task in pending:
-                        with contextlib.suppress(
-                            asyncio.CancelledError, Exception
-                        ):
-                            await task
-                    if life_task in done and not life_task.cancelled():
-                        try:
-                            held_lifecycle = life_task.result()
-                        except (asyncio.CancelledError, Exception):
-                            held_lifecycle = None
-                    if wake_task in done and not wake_task.cancelled():
-                        try:
-                            gens.update(wake_task.result() or {})
-                        except Exception:
-                            pass
+                    if lifecycle_hit is not None:
+                        held_lifecycle = lifecycle_hit
+                    if wake_hit:
+                        gens.update(wake_hit)
             finally:
                 session_event_bus.unsubscribe_queue(lifecycle_q)
                 OBSERVABILITY.sse_closed()
