@@ -22,6 +22,9 @@ Dashboard (after first upload): https://app.codecov.io/gh/fastfold-ai/sandwalk
 pnpm install
 pnpm test                 # unit tests
 pnpm test:coverage        # unit tests + coverage (writes apps/local-web/coverage/)
+pnpm e2e                  # Playwright grid/terminal e2e (needs sandwalk serve on :8787)
+pnpm e2e:bench            # grid perf benchmarks → apps/local-web/e2e/results/
+pnpm e2e:compare a.json b.json
 
 # Agent CLI + Agent Server
 pnpm test:cli             # unit + functional CLI (excludes live/network/pexpect)
@@ -138,12 +141,16 @@ pnpm --filter @sandwalk/agent-local-web test
 pnpm --filter @sandwalk/agent-local-web test:coverage
 ```
 
-Coverage include set (Vitest `vitest.config.ts`):
+Coverage include set (Vitest `vitest.config.ts`) and gates:
 
-- `src/components/agents/transcript.ts`
-- `src/components/agents/composer-parts.ts`
-- `src/components/agents/skill-examples.ts`
-- `src/lib/**`
+| Glob | Lines | Functions | Notes |
+|------|-------|-----------|-------|
+| `src/lib/**` | 80% | 80% | Pure helpers — the strict gate (branches 70%) |
+| `src/components/agents/{transcript,composer-parts,skill-examples}.ts` | 75% | 70% | Pure agent helpers |
+| `src/hooks/**` | 25% | 30% | Floor; raise as hook tests land |
+| `src/components/app/**` | 40% | 50% | App-shell model (`app-display`, `build-*-props`) |
+| `src/components/agents/terminal-layer/**` | 10% | 15% | Registry is unit-tested; xterm/WS code is covered by the e2e harness |
+| *global* | 55% | 60% | Over everything above (branches 50%, statements 52%) |
 
 Reports:
 
@@ -154,6 +161,50 @@ Reports:
 ```bash
 open apps/local-web/coverage/index.html
 ```
+
+### E2E + performance harness (Playwright)
+
+Drives the real SPA against a real `sandwalk serve`. Cases live in
+[`apps/local-web/e2e/`](../apps/local-web/e2e/): `tests/` are functional
+(split grid renders every chat/terminal pane, terminal hosts track their
+placeholders, PTY round-trip, **FAS-121** scrollback survives pane switches,
+no PTY resize spam), `bench/` writes timing + counter reports.
+
+```bash
+# 1. API (checkout Python, auth on) — the harness never starts this for you
+cd cli && .venv/bin/sandwalk serve --host 127.0.0.1 --port 8787
+
+# 2. From the monorepo root (Vite is started on :1420 if not already running,
+#    so `pnpm tauri:dev` can stay up)
+pnpm --filter @sandwalk/agent-local-web e2e:install   # once: Chromium
+pnpm e2e                                              # functional specs
+pnpm e2e:bench                                        # → apps/local-web/e2e/results/grid-latest.json
+pnpm e2e:compare apps/local-web/e2e/results/grid-baseline.json apps/local-web/e2e/results/grid-latest.json
+```
+
+How it works:
+
+- `fixtures/seed.ts` creates N chats + T terminals through the REST API,
+  writes the same localStorage keys `app-storage.ts` reads (tab group, open
+  tabs, remembered API key) and boots `/agents/<grp>?perf=1`.
+- `?perf=1` (always on in dev) exposes `window.__sandwalkPerf`: counters from
+  `perfCount()` in hot paths (`terminal.applyPosition`, `terminal.fit`,
+  `terminal.ptyResizeRpc`, `render.<Component>`, `props.SidebarSessionList.<prop>`)
+  and live xterm instances for buffer assertions. Increments are one property
+  write; safe to leave in production code.
+- `fixtures/perf.ts` measures long tasks (`PerformanceObserver`), frames and
+  counter deltas around an interaction; each measurement is upserted into
+  `e2e/results/<suite>-latest.json` and archived with a timestamp.
+- `compare.mjs` diffs two reports and exits 1 on regressions past the
+  threshold (`--threshold=0.25` default, with absolute floors so sub-second
+  timings do not flap). Copy a good `*-latest.json` to `*-baseline.json`
+  before a perf change to get a before/after table.
+
+Env knobs: `SANDWALK_WEB_URL` (default `http://127.0.0.1:1420`),
+`SANDWALK_API_URL` (default `http://127.0.0.1:8787`), `SANDWALK_API_KEY`
+(else read from the Sandwalk `settings.json`), `SANDWALK_E2E_PANES` /
+`SANDWALK_E2E_TERMINALS` (bench grid size, default 6 / 2). Failures keep a
+Playwright trace under `apps/local-web/e2e/.artifacts/`.
 
 ---
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { resolveE2EEnv } from '../fixtures/env'
-import { type BenchReport, gitSha, measure, type Measurement, wheelScroll, writeReport } from '../fixtures/perf'
+import { archiveReport, measure, type Measurement, recordMeasurement, wheelScroll } from '../fixtures/perf'
 import {
   createGridFixture,
   focusPane,
@@ -14,42 +14,39 @@ import {
 } from '../fixtures/seed'
 
 const env = resolveE2EEnv()
+const SUITE = 'grid'
+const CONFIG = { chats: env.benchPanes, terminals: env.benchTerminals, viewport: '1600x1000' }
+// One id per `playwright test` invocation; workers inherit the env.
+const RUN_ID = process.env.SANDWALK_BENCH_RUN_ID ?? `${Date.now()}`
 
 /**
  * Grid benchmarks. Not assertions on absolute numbers (machines differ) —
- * they write `e2e/results/grid-latest.json`; compare two runs with
- * `pnpm e2e:compare`. A few loose sanity bounds guard against
- * catastrophic regressions (e.g. the scroll storm coming back).
+ * every measurement is upserted into `e2e/results/grid-latest.json`;
+ * compare two runs with `pnpm e2e:compare`. A few loose sanity bounds
+ * guard against catastrophic regressions (e.g. the scroll storm coming back).
  */
 test.describe('grid benchmarks', () => {
   let grid: GridFixture
-  const measurements: Measurement[] = []
+
+  const record = (m: Measurement) => {
+    const latest = recordMeasurement(SUITE, m, CONFIG, RUN_ID)
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ${m.name.padEnd(20)} ${String(m.durationMs).padStart(6)}ms  longTasks=${m.longTasks} (${m.longTaskMs}ms)  fps=${m.fps}  ` +
+        Object.entries(m.counters)
+          .filter(([k]) => k.startsWith('terminal.') || k.startsWith('render.'))
+          .map(([k, v]) => `${k}=${v}`)
+          .join(' ') +
+        `\n  → ${latest}`
+    )
+  }
 
   test.beforeAll(async () => {
     grid = await createGridFixture(env, { chats: env.benchPanes, terminals: env.benchTerminals })
   })
 
   test.afterAll(async () => {
-    const report: BenchReport = {
-      suite: 'grid',
-      createdAt: new Date().toISOString(),
-      gitSha: gitSha(),
-      config: { chats: env.benchPanes, terminals: env.benchTerminals, viewport: '1600x1000' },
-      measurements
-    }
-    const { latest } = writeReport(report)
-    // eslint-disable-next-line no-console
-    console.log(`\nbench report → ${latest}`)
-    for (const m of measurements) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `  ${m.name.padEnd(22)} ${String(m.durationMs).padStart(6)}ms  longTasks=${m.longTasks} (${m.longTaskMs}ms)  fps=${m.fps}  ` +
-          Object.entries(m.counters)
-            .filter(([k]) => k.startsWith('terminal.') || k.startsWith('render.'))
-            .map(([k, v]) => `${k}=${v}`)
-            .join(' ')
-      )
-    }
+    archiveReport(SUITE)
     await grid?.cleanup()
   })
 
@@ -57,7 +54,7 @@ test.describe('grid benchmarks', () => {
     const started = Date.now()
     await openGrid(page, grid)
     await waitForTerminals(page, grid.terminalIds)
-    measurements.push({
+    record({
       name: 'gridReady',
       durationMs: Date.now() - started,
       longTasks: 0,
@@ -82,7 +79,7 @@ test.describe('grid benchmarks', () => {
     const m = await measure(page, 'scrollTranscript', async () => {
       await wheelScroll(page, scroller, 2000)
     })
-    measurements.push(m)
+    record(m)
     // Scrolling a chat must not reposition every terminal per frame.
     const positions = m.counters['terminal.applyPosition'] ?? 0
     const ignored = m.counters['terminal.scrollIgnored'] ?? 0
@@ -103,7 +100,7 @@ test.describe('grid benchmarks', () => {
         }
       }
     })
-    measurements.push(m)
+    record(m)
     expect(m.counters['terminal.ptyResizeRpc'] ?? 0).toBeLessThanOrEqual(grid.terminalIds.length)
   })
 
@@ -119,6 +116,6 @@ test.describe('grid benchmarks', () => {
         .poll(() => readTerminalText(page, termId), { timeout: 90_000 })
         .toContain(`${marker}-1000`)
     })
-    measurements.push(m)
+    record(m)
   })
 })

@@ -894,7 +894,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             ref={filesPanelRef}
             collapsible
             collapsedSize={0}
-            defaultSize={35}
+            // Mount collapsed when state says so; otherwise the first paint
+            // is open and the collapse effect costs a second layout pass
+            // over every pane in the split.
+            defaultSize={filesPanelCollapsed ? 0 : 35}
             minSize={20}
             maxSize={55}
             onCollapse={() => setFilesPanelCollapsed(true)}

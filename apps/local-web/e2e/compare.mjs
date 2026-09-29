@@ -22,6 +22,10 @@ const [base, cand] = args.map(p => JSON.parse(readFileSync(p, 'utf8')))
 /** Lower is better for these; counters starting with these prefixes too. */
 const LOWER_IS_BETTER = ['durationMs', 'longTasks', 'longTaskMs']
 const COUNTER_PREFIXES = ['terminal.', 'render.']
+/** Informational counters: shown, never flagged (more filtering is good). */
+const NEUTRAL_COUNTERS = new Set(['terminal.scrollIgnored', 'terminal.inputQueued', 'terminal.wsOpen'])
+/** Minimum absolute change before a % delta counts (sub-second timings are noisy). */
+const MIN_ABS_DELTA = { durationMs: 250, longTaskMs: 200, longTasks: 3, default: 2 }
 
 const byName = list => Object.fromEntries(list.map(m => [m.name, m]))
 const b = byName(base.measurements)
@@ -48,11 +52,17 @@ for (const name of Object.keys({ ...b, ...c })) {
   const counterKeys = new Set([...Object.keys(mb.counters), ...Object.keys(mc.counters)])
   for (const key of [...counterKeys].sort()) {
     if (!COUNTER_PREFIXES.some(p => key.startsWith(p))) continue
-    rows.push([key, mb.counters[key] ?? 0, mc.counters[key] ?? 0, true])
+    rows.push([key, mb.counters[key] ?? 0, mc.counters[key] ?? 0, NEUTRAL_COUNTERS.has(key) ? null : true])
   }
   for (const [key, from, to, lowerBetter] of rows) {
     const delta = pct(from, to)
-    const bad = lowerBetter ? delta > threshold && to - from > 2 : delta < -threshold
+    const minAbs = MIN_ABS_DELTA[key] ?? MIN_ABS_DELTA.default
+    const bad =
+      lowerBetter === null
+        ? false
+        : lowerBetter
+          ? delta > threshold && to - from >= minAbs
+          : delta < -threshold && from - to >= minAbs
     if (bad) regressions += 1
     console.log(`  ${key.padEnd(28)} ${String(from).padStart(8)} → ${String(to).padStart(8)}  ${fmt(delta).padStart(7)} ${bad ? ' REGRESSION' : ''}`)
   }

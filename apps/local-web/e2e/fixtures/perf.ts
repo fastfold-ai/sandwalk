@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { Page } from '@playwright/test'
@@ -101,15 +101,58 @@ export async function wheelScroll(page: Page, selector: string, ms: number, delt
   }
 }
 
-export function writeReport(report: BenchReport, dir = join(process.cwd(), 'e2e', 'results')): { path: string; latest: string } {
+const RESULTS_DIR = join(process.cwd(), 'e2e', 'results')
+
+function latestPath(suite: string, dir = RESULTS_DIR): string {
+  return join(dir, `${suite}-latest.json`)
+}
+
+function readLatest(suite: string, dir = RESULTS_DIR): BenchReport | null {
+  try {
+    return JSON.parse(readFileSync(latestPath(suite, dir), 'utf8')) as BenchReport
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Upsert one measurement into `<suite>-latest.json` right away. A failing
+ * spec makes Playwright restart the worker (and with it any in-memory
+ * list), so the report is assembled on disk, one measurement at a time.
+ * `runId` groups measurements from one `playwright test` invocation.
+ */
+export function recordMeasurement(
+  suite: string,
+  measurement: Measurement,
+  config: Record<string, unknown>,
+  runId: string,
+  dir = RESULTS_DIR
+): string {
   mkdirSync(dir, { recursive: true })
+  const existing = readLatest(suite, dir)
+  const sameRun = existing?.config?.runId === runId
+  const measurements = sameRun ? existing!.measurements.filter(m => m.name !== measurement.name) : []
+  measurements.push(measurement)
+  const report: BenchReport = {
+    suite,
+    createdAt: new Date().toISOString(),
+    gitSha: gitSha(),
+    config: { ...config, runId },
+    measurements
+  }
+  const latest = latestPath(suite, dir)
+  writeFileSync(latest, JSON.stringify(report, null, 2))
+  return latest
+}
+
+/** Copy the current latest report to a timestamped archive file. */
+export function archiveReport(suite: string, dir = RESULTS_DIR): { path: string; report: BenchReport } | null {
+  const report = readLatest(suite, dir)
+  if (!report) return null
   const stamp = report.createdAt.replace(/[:.]/g, '-')
-  const path = join(dir, `${report.suite}-${stamp}.json`)
-  const latest = join(dir, `${report.suite}-latest.json`)
-  const body = JSON.stringify(report, null, 2)
-  writeFileSync(path, body)
-  writeFileSync(latest, body)
-  return { path, latest }
+  const path = join(dir, `${suite}-${stamp}.json`)
+  writeFileSync(path, JSON.stringify(report, null, 2))
+  return { path, report }
 }
 
 export function gitSha(): string | null {
