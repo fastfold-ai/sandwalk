@@ -361,6 +361,7 @@ export default function App() {
     sessionId: effectiveSessionId,
     stripSessionId,
     enableTranscriptStream: !activeGroup,
+    subscribeActiveChat: !activeGroup,
     sessionIdRef: ui.sessionIdRef,
     session: context.session,
     activeProjectId: context.activeProjectId,

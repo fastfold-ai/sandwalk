@@ -34,6 +34,7 @@ import {
   splitPane
 } from '@/hooks/useChatTiling'
 import { useMonitorFingerprint } from '@/lib/monitor-fingerprint'
+import { useStableHandlers } from '@/hooks/useStableHandlers'
 import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
@@ -739,13 +740,15 @@ function ChatLeaf({
   // documents the same invariant — DO NOT drop this override without
   // also lifting the split handlers into the builder.
   const baseHeaderProps = buildHeaderProps(chatId, focused, focusPanel)
-  const headerProps: ChatSplitPanelHeaderProps = {
+  // Handlers are rebuilt by the parent every render; pin their identity so
+  // `memo(ChatSplitPanelHeader)` only re-renders on data changes.
+  const headerProps: ChatSplitPanelHeaderProps = useStableHandlers({
     ...baseHeaderProps,
     onSplitLeft: (id: string) => onSplit(id, 'horizontal', 'before'),
     onSplitRight: (id: string) => onSplit(id, 'horizontal', 'after'),
     onSplitUp: (id: string) => onSplit(id, 'vertical', 'before'),
     onSplitDown: (id: string) => onSplit(id, 'vertical', 'after')
-  }
+  })
   return (
     <div
       className={cn(

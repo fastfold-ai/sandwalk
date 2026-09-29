@@ -119,7 +119,7 @@ export type ChatSplitPanelHeaderProps = {
   onSplitDown?: (sessionId: string) => void
 }
 
-export function ChatSplitPanelHeader({
+function ChatSplitPanelHeaderInner({
   session,
   focused,
   onFocusPanel,
@@ -466,6 +466,13 @@ export function ChatSplitPanelHeader({
  * tiene configurado. Cuando el chat no tiene proyecto asociado, se
  * muestra un fallback discreto con su propia explicación.
  */
+/**
+ * Memoized: one per pane, re-rendered on every App cascade otherwise. The
+ * parent pins its handlers with `useStableHandlers`, so only real changes
+ * (session row, focus, panel flags) get through.
+ */
+export const ChatSplitPanelHeader = memo(ChatSplitPanelHeaderInner)
+
 function ProjectMetaHoverInner({
   project
 }: {

@@ -50,6 +50,39 @@ export function groupConsecutiveSameNameTools(
   return groups
 }
 
+/**
+ * Return `prev`'s item object wherever `next` is structurally identical, so
+ * `memo(ChatTranscriptTimelineItem)` sees a stable prop and skips the render.
+ * A streaming token only touches `liveDelta`; tool/todo events rebuild the
+ * whole list, and without this every message re-rendered its markdown.
+ */
+export function reuseTimelineItems(
+  prev: ChatTimelineItem[],
+  next: ChatTimelineItem[]
+): ChatTimelineItem[] {
+  if (prev === next) return prev
+  const prevByKey = new Map(prev.map(item => [item.key, item]))
+  let reusedAll = prev.length === next.length
+  const merged = next.map((item, index) => {
+    const before = prevByKey.get(item.key)
+    if (!before || before.kind !== item.kind) {
+      reusedAll = false
+      return item
+    }
+    let same = false
+    if (item.kind === 'entry' && before.kind === 'entry') {
+      same = before.entry === item.entry
+    } else if (item.kind === 'tool_run' && before.kind === 'tool_run') {
+      same =
+        before.tools.length === item.tools.length &&
+        before.tools.every((tool, i) => tool === item.tools[i])
+    }
+    if (!same || prev[index] !== before) reusedAll = false
+    return same ? before : item
+  })
+  return reusedAll ? prev : merged
+}
+
 export function buildChatTimelineItems(
   conversationTimeline: TranscriptEntry[]
 ): ChatTimelineItem[] {

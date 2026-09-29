@@ -6,6 +6,8 @@ import type {
 import { type Dispatch, type RefObject, type SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
+import { perfCount } from '@/lib/perf-probe'
+
 import { SessionChatBody } from '@/components/agents/session-main/session-chat-body'
 import {
   type PerSessionChatStateArgs,
@@ -71,6 +73,7 @@ export function SessionChatMount({
   shared,
   splitMode
 }: SessionChatMountProps) {
+  perfCount('render.SessionChatMount')
   const perSession = usePerSessionChatState(perSessionArgs)
   const {
     chat,
@@ -116,10 +119,14 @@ export function SessionChatMount({
       chatScrollRef={perSession.scroll.chatScrollRef}
       chatEndRef={perSession.scroll.chatEndRef}
       conversationTimeline={conversationTimeline}
-      expandedToolRunKeys={shared.expandedToolRunKeys}
+      /*
+       * Per-session, not `shared.*`: those are the shell's active chat and
+       * painted pane A's usage badges / expanded tool runs in pane B.
+       */
+      expandedToolRunKeys={chat.expandedToolRunKeys}
       patchChat={shared.patchChat}
-      runIdByMessageId={shared.runIdByMessageId}
-      usageByRunId={shared.usageByRunId}
+      runIdByMessageId={chat.runIdByMessageId}
+      usageByRunId={chat.usageByRunId}
       copiedMessageId={shared.copiedMessageId}
       setCopiedMessageId={shared.setCopiedMessageId}
       activeRunTools={activeRunTools}

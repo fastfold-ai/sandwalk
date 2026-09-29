@@ -13,6 +13,7 @@ import {
   notifyRunCompleted
 } from '@/lib/browser-notifications'
 import { reduceChatOnAgentEvent } from '@/lib/chat-actions'
+import { shallowEqualObjects } from '@/lib/stable-equal'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { registerTranscriptSseHandler } from '@/lib/events-mux-registry'
 import { markSessionAttention } from '@/lib/session-attention'
@@ -376,12 +377,16 @@ export function useSessionChatStream({
         if (!fresh) return
         setSessions(current => {
           let found = false
+          let changed = false
           const next = current.map(item => {
             if (item.id !== id) return item
             found = true
-            return { ...item, ...fresh }
+            const merged = { ...item, ...fresh }
+            if (shallowEqualObjects(item, merged)) return item
+            changed = true
+            return merged
           })
-          return found ? next : current
+          return found && changed ? next : current
         })
       })
       .catch(() => {

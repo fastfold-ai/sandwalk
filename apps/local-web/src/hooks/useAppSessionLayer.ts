@@ -60,6 +60,13 @@ type SessionLayerArgs = {
    * on blur dropped mux delivery until focus/reload.
    */
   enableTranscriptStream?: boolean
+  /**
+   * When false (a split group is showing), the shell does not subscribe to
+   * the active chat's per-token state: the panes render their own mounts,
+   * so a token would otherwise re-render App and everything under it.
+   * Actions and refs stay wired; only the reactive slice is skipped.
+   */
+  subscribeActiveChat?: boolean
   sessionIdRef: MutableRefObject<string | null>
   session: AgentSession | null
   activeProjectId: string | null
@@ -96,7 +103,9 @@ type SessionLayerArgs = {
 }
 
 export function useAppSessionLayer(args: SessionLayerArgs) {
-  const chat = useSessionChatState(args.sessionId)
+  const chat = useSessionChatState(
+    args.subscribeActiveChat === false ? null : args.sessionId
+  )
   args.setChatBySessionIdRef.current = chat.setChatBySessionId
 
   useSessionChatStream({

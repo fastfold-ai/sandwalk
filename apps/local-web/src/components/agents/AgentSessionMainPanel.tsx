@@ -38,6 +38,7 @@ import {
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
+import { perfCount } from '@/lib/perf-probe'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
@@ -179,6 +180,7 @@ export type AgentSessionMainPanelProps = {
 }
 
 export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
+  perfCount('render.AgentSessionMainPanel')
   const location = useLocation()
   // FAS-107 GF3: detect `/terminals/:id` here (rather than prop-drilling
   // from App.tsx) since the shell already reads `location`. When present,

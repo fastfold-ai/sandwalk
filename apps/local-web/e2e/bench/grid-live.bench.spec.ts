@@ -210,7 +210,12 @@ test.describe('live agent grid', () => {
           `  ${spec.padEnd(6)} panes=${panes} fail=${failures} (running=${stillRunning} empty=${emptyReply} notVisible=${replyNotVisible})  post p50/p95=${m.counters['live.postLatencyP50Ms']}/${m.counters['live.postLatencyP95Ms']}ms  ` +
             `first-visible p50/p95=${m.counters['live.firstVisibleP50Ms']}/${m.counters['live.firstVisibleP95Ms']}ms  ` +
             `complete p50/p95/max=${m.counters['live.completeP50Ms']}/${m.counters['live.completeP95Ms']}/${m.counters['live.completeMaxMs']}ms  ` +
-            `longTasks=${m.longTasks} (${m.longTaskMs}ms) fps=${m.fps} render.App=${m.counters['render.App'] ?? 0}\n  → ${latest}`
+            `longTasks=${m.longTasks} (${m.longTaskMs}ms) fps=${m.fps}\n  renders: ` +
+            Object.entries(m.counters)
+              .filter(([k]) => k.startsWith('render.') || k.startsWith('props.'))
+              .map(([k, v]) => `${k.replace(/^render\./, '')}=${v}`)
+              .join(' ') +
+            `\n  → ${latest}`
         )
         expect(failures, 'agents that never replied').toBe(0)
       } finally {

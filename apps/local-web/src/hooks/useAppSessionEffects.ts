@@ -17,6 +17,7 @@ import {
   writeProjectScopeId
 } from '@/lib/app-storage'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { sameArrayBy } from '@/lib/stable-equal'
 import { clearSessionAttention } from '@/lib/session-attention'
 
 type UseAppSessionEffectsArgs = {
@@ -262,17 +263,22 @@ export function useAppSessionEffects({
     // X4.4-hotfix: los grupos (`grp_*`) tampoco tienen filesystem propio.
     // Son contenedores de tabs, no sesiones reales del backend.
     if (listId.startsWith('term_') || listId.startsWith('grp_')) {
-      setWorkspaceFiles([])
+      setWorkspaceFiles(prev => (prev.length === 0 ? prev : []))
       return
     }
     let cancelled = false
     void client
       .listFiles(listId)
       .then(files => {
-        if (!cancelled) setWorkspaceFiles(files)
+        if (cancelled) return
+        setWorkspaceFiles(prev =>
+          sameArrayBy(prev, files, f => `${f.path}|${f.type}|${f.size}|${f.mtime}`)
+            ? prev
+            : files
+        )
       })
       .catch(() => {
-        if (!cancelled) setWorkspaceFiles([])
+        if (!cancelled) setWorkspaceFiles(prev => (prev.length === 0 ? prev : []))
       })
     return () => {
       cancelled = true

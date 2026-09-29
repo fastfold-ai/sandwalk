@@ -15,6 +15,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useRef, useState } from 'react'
 
 import { applyChatDateBoosts } from '@/lib/chat-date-boost'
+import { sameArrayBy } from '@/lib/stable-equal'
 import {
   type ComposerModelOption,
   toComposerModelOptions
@@ -364,7 +365,11 @@ export function useAppBootstrapLoaders({
       seen.add(skillKey)
       return true
     })
-    setSkills(unique)
+    // Same rows → keep the previous reference so memoized consumers
+    // (transcript rows, composer) do not re-render after every run.
+    setSkills(prev =>
+      sameArrayBy(prev, unique, skill => JSON.stringify(skill)) ? prev : unique
+    )
   }, [client])
 
   loadSkillsRef.current = loadSkills

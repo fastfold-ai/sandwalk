@@ -24,10 +24,12 @@ import {
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { perfCount } from '@/lib/perf-probe'
 
 export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
 
 export function AppShellMain(props: AppShellMainProps) {
+  perfCount('render.AppShellMain')
   // Draft New Agent already has SessionMainHeader (files/terminal chrome).
   // Don't stack a redundant "New Chat" title row when no tabs are open.
   const showSimpleTitleBar =

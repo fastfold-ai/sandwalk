@@ -1,6 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
-  AgentMessage,
   AgentPlanCard,
   AgentSession,
   AgentSkill,
@@ -9,6 +8,8 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { type Dispatch, memo, type SetStateAction } from 'react'
+
+import { perfCount } from '@/lib/perf-probe'
 
 import { ChatTranscriptMessageEntry } from '@/components/agents/chat-transcript-message-entry'
 import { type ChatTimelineItem } from '@/components/agents/chat-transcript-timeline'
@@ -31,7 +32,8 @@ type TimelineItemProps = {
   tools: TranscriptTool[]
   runIdByMessageId: Record<string, string>
   usageByRunId: Record<string, { inputTokens: number; outputTokens: number }>
-  messages: AgentMessage[]
+  /** Id of the newest message — marks which assistant entry is streaming. */
+  lastMessageId: string | undefined
   copiedMessageId: string | null
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   session: AgentSession | null | undefined
@@ -57,7 +59,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
   tools,
   runIdByMessageId,
   usageByRunId,
-  messages,
+  lastMessageId,
   copiedMessageId,
   setCopiedMessageId,
   session,
@@ -70,6 +72,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
   workspaceFiles = [],
   mentionChats = []
 }: TimelineItemProps) {
+  perfCount('render.TimelineItem')
   const hiddenPlans =
     hiddenPlanPaths instanceof Set
       ? hiddenPlanPaths
@@ -196,7 +199,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       runActive={runActive}
       runIdByMessageId={runIdByMessageId}
       usageByRunId={usageByRunId}
-      messages={messages}
+      lastMessageId={lastMessageId}
       copiedMessageId={copiedMessageId}
       setCopiedMessageId={setCopiedMessageId}
       session={session}
@@ -209,4 +212,16 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       mentionChats={mentionChats}
     />
   )
+},
+// Shallow compare; record which prop broke memoization so the perf harness
+// (`props.TimelineItem.<name>`) shows what still churns per token.
+(prev, next) => {
+  let equal = true
+  for (const key of Object.keys(next) as Array<keyof TimelineItemProps>) {
+    if (!Object.is(prev[key], next[key])) {
+      perfCount(`props.TimelineItem.${String(key)}`)
+      equal = false
+    }
+  }
+  return equal
 })

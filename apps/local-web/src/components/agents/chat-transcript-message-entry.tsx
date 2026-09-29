@@ -1,6 +1,5 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
-  AgentMessage,
   AgentSession,
   AgentSkill,
   McpServer,
@@ -24,6 +23,7 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { copyText } from '@/lib/clipboard'
+import { perfCount } from '@/lib/perf-probe'
 import {
   downloadMarkdown,
   formatMessagePopoverDate,
@@ -47,7 +47,7 @@ export function ChatTranscriptMessageEntry({
   runActive,
   runIdByMessageId,
   usageByRunId,
-  messages,
+  lastMessageId,
   copiedMessageId,
   setCopiedMessageId,
   session,
@@ -63,7 +63,7 @@ export function ChatTranscriptMessageEntry({
   runActive: boolean
   runIdByMessageId: Record<string, string>
   usageByRunId: Record<string, RunTokenUsage>
-  messages: AgentMessage[]
+  lastMessageId: string | undefined
   copiedMessageId: string | null
   setCopiedMessageId: Dispatch<SetStateAction<string | null>>
   session: AgentSession | null | undefined
@@ -75,6 +75,7 @@ export function ChatTranscriptMessageEntry({
   workspaceFiles?: WorkspaceFile[]
   mentionChats?: AgentSession[]
 }) {
+  perfCount('render.MessageEntry')
   const message = entry.message
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
@@ -82,7 +83,7 @@ export function ChatTranscriptMessageEntry({
   const messageRunId = runIdByMessageId[message.id] || null
   const messageUsage = (messageRunId && usageByRunId[messageRunId]) || null
   const hideActionsWhileStreaming =
-    runActive && isAssistant && message.id === messages.at(-1)?.id
+    runActive && isAssistant && message.id === lastMessageId
 
   return (
     <div

@@ -94,7 +94,12 @@ export function useOfflineStatus(intervalMs: number = 5000) {
         return
       }
       const data = (await response.json()) as Record<string, unknown>
-      setServer(normalizeOfflinePayload(data))
+      const next = normalizeOfflinePayload(data)
+      // Identical payload → keep the previous object so the 5s poll does
+      // not re-render the shell (and everything under it) for nothing.
+      setServer(prev =>
+        prev && JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+      )
       setApiUnreachable(false)
     } catch {
       setApiUnreachable(true)
