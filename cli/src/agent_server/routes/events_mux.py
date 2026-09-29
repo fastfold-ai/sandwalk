@@ -105,8 +105,6 @@ async def wait_lifecycle_or_wake(
 
 
 def register_events_mux_routes(app: FastAPI, deps: AppDeps) -> None:
-    store = deps.store
-
     @app.get("/v1/events")
     async def stream_mux_events(
         request: Request,
@@ -148,8 +146,9 @@ def register_events_mux_routes(app: FastAPI, deps: AppDeps) -> None:
                         ):
                             continue
                         last_read[sid] = (gen, now)
+                        owner = deps.store_for_session(sid)
                         events = await asyncio.to_thread(
-                            store.list_events,
+                            owner.list_events,
                             sid,
                             after_sequence=cursors.get(sid, 0),
                         )

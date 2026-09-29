@@ -59,6 +59,42 @@ class AppDeps:
     def worker_service(self) -> AgentService:
         return self.bench_service or self.service
 
+    def store_for_session(self, session_id: str) -> AgentStore:
+        """Chat store, or the bench store when the session lives there.
+
+        Bench cells are written to a separate database so their event flood
+        does not stall chat. Opening one from its project still has to find
+        the row, messages, and transcript.
+        """
+        if self.store.get_session(session_id) is not None:
+            return self.store
+        bench = self.bench_store
+        if (
+            bench is not None
+            and bench is not self.store
+            and bench.get_session(session_id) is not None
+        ):
+            return bench
+        return self.store
+
+    def list_visible_sessions(self, project_id: str | None):
+        """Project scope includes that project's bench cells."""
+        rows = self.store.list_sessions(project_id=project_id)
+        bench = self.bench_store
+        if not project_id or bench is None or bench is self.store:
+            return rows
+        seen = {session.id for session in rows}
+        extra = [
+            session
+            for session in bench.list_sessions(project_id=project_id)
+            if session.id not in seen
+        ]
+        if not extra:
+            return rows
+        merged = [*rows, *extra]
+        merged.sort(key=lambda session: (session.updated_at, session.id), reverse=True)
+        return merged
+
     def session_workspace(self, session_id: str) -> WorkspaceService:
         session = self.store.get_session(session_id)
         if session is None:

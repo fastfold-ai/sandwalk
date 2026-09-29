@@ -113,6 +113,9 @@ def create_app(
     service = AgentService(store)
     bench_store = AgentStore(store.path.with_name("bench-agent.db"), exclusive=True)
     bench_service = AgentService(bench_store)
+    # Runs already created their project only on the bench database.
+    for project in bench_store.list_projects():
+        store.insert_project_copy(project)
     library_service = LibraryService(store, service)
     connector_service = ConnectorService(store, service)
     integrations_service = IntegrationsService()

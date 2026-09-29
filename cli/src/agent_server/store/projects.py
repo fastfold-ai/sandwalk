@@ -86,6 +86,43 @@ class ProjectMixin:
             raise RuntimeError("Failed to create project.")
         return project
 
+    def insert_project_copy(self, project: AgentProject) -> bool:
+        """Insert ``project`` with its existing id. No-op when that id exists.
+
+        Bench runs live in a separate database. The sidebar lists projects
+        from the chat database, so the project row has to be copied across
+        or a new run never appears under Show bench.
+        """
+        if self.get_project(project.id) is not None:
+            return False
+        layout = project.home_layout if isinstance(project.home_layout, dict) else None
+        with self._write_lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO projects(
+                    id, name, description, agent_context, folder_path, icon, color,
+                    pinned, home_layout, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    project.id,
+                    project.name,
+                    project.description,
+                    project.agent_context,
+                    project.folder_path,
+                    project.icon,
+                    project.color,
+                    1 if project.pinned else 0,
+                    _layout_json(layout)
+                    if layout is not None
+                    else default_project_home_layout_json(),
+                    project.created_at.isoformat(),
+                    project.updated_at.isoformat(),
+                ),
+            )
+        return self.get_project(project.id) is not None
+
     def list_projects(self) -> list[AgentProject]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -101,10 +138,7 @@ class ProjectMixin:
                 ORDER BY projects.pinned DESC, projects.updated_at DESC, projects.id DESC
                 """
             ).fetchall()
-        return [
-            project_from_row(row, session_count=int(row["session_count"] or 0))
-            for row in rows
-        ]
+        return [project_from_row(row, session_count=int(row["session_count"] or 0)) for row in rows]
 
     def get_project(self, project_id: str) -> AgentProject | None:
         with self._connect() as connection:
@@ -168,9 +202,7 @@ class ProjectMixin:
             next_color = normalize_project_color(color)
         next_pinned = current.pinned if pinned is None else bool(pinned)
         if update_home_layout:
-            next_layout_raw = (
-                None if home_layout is None else _layout_json(home_layout)
-            )
+            next_layout_raw = None if home_layout is None else _layout_json(home_layout)
         else:
             next_layout_raw = (
                 json.dumps(current.home_layout, separators=(",", ":"))
@@ -208,7 +240,5 @@ class ProjectMixin:
                 "DELETE FROM sessions WHERE project_id = ?",
                 (project_id,),
             )
-            cursor = connection.execute(
-                "DELETE FROM projects WHERE id = ?", (project_id,)
-            )
+            cursor = connection.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         return cursor.rowcount > 0
