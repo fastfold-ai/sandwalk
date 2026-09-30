@@ -54,6 +54,9 @@ import { resolveStripActiveId } from '@/lib/strip-active'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
+/** Stable empty list so the sidebar-only model never sees a new array. */
+const EMPTY_TAB_IDS: string[] = []
+
 export default function App() {
   perfCount('render.App')
   // Shell-level chat signal: flips only when a run starts/stops or asks for
@@ -1034,7 +1037,26 @@ export default function App() {
   const sidebarModelProjectId = context.activeProjectId
   const sidebarModelActiveId = route.sessionId
   const sidebarModelTerminals = terminalsLive.terminals
-  const { sections, openTabs } = useMemo(
+  // Sidebar sections do not depend on which chat is open. Building them
+  // apart from the tab strip keeps their identity across a click, so the
+  // memoized list and every group row stay mounted instead of flashing.
+  const { sections } = useMemo(
+    () =>
+      buildSessionSidebarModel({
+        sessions: sidebarModelSessions,
+        tabGroups: sidebarModelGroups,
+        activeProjectId: sidebarModelProjectId,
+        openTabIds: EMPTY_TAB_IDS,
+        terminals: sidebarModelTerminals
+      }),
+    [
+      sidebarModelSessions,
+      sidebarModelGroups,
+      sidebarModelProjectId,
+      sidebarModelTerminals
+    ]
+  )
+  const { openTabs } = useMemo(
     () =>
       buildSessionSidebarModel({
         sessions: sidebarModelSessions,

@@ -84,6 +84,7 @@ type AgentSessionSidebarProps = {
   onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   onGoToChatProject?: (chat: AgentSession) => void
   activeGroupChildId?: string | null
+  openGroupId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: Dispatch<SetStateAction<Record<string, boolean>>>
   selectSessionRange: (orderedIds: string[], targetId: string) => void
@@ -157,6 +158,7 @@ export function AgentSessionSidebar({
   onSetTabGroupPinned,
   onGoToChatProject,
   activeGroupChildId,
+  openGroupId,
   setTabGroupActiveChat,
   setCollapsedSidebarSections,
   selectSessionRange,
@@ -401,6 +403,7 @@ export function AgentSessionSidebar({
         activeProjectId={activeProjectId}
         onGoToChatProject={stableOnGoToChatProject}
         activeGroupChildId={activeGroupChildId}
+        openGroupId={openGroupId}
         setTabGroupActiveChat={stableSetTabGroupActiveChat}
         unreadOnly={unreadOnly}
         activeTerminalId={activeTerminalId ?? null}

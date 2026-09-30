@@ -35,11 +35,11 @@ import type { NavigateFunction } from 'react-router-dom'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
-import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
 import { SessionSourceIcon } from '@/components/agents/SessionSourceIcon'
 import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
+import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
 import {
   Popover,
   PopoverAnchor,
@@ -47,12 +47,6 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
 import { navigateToSession } from '@/lib/navigate-session'
 import { perfCount } from '@/lib/perf-probe'
@@ -66,6 +60,10 @@ import {
   isSidebarGroupExpanded,
   setSidebarGroupExpanded
 } from '@/lib/sidebar-group-expanded'
+import {
+  groupRowSelected,
+  splitChildSelected
+} from '@/lib/sidebar-group-selection'
 import {
   filterSectionsToUnread,
   UNREAD_DOT_COLOR
@@ -248,6 +246,8 @@ export type SidebarSessionListProps = {
    * grupo. Cuando no estás en un grupo, es null.
    */
   activeGroupChildId?: string | null
+  /** Group whose route is open. Null on a solo chat. */
+  openGroupId?: string | null
   /**
    * Setea el chat activo dentro de un grupo. Se llama cuando el usuario
    * clickea un chat hijo desde el sidebar: en vez de navegar al chat como
@@ -303,6 +303,7 @@ function SidebarSessionListInner({
   activeProjectId,
   onGoToChatProject,
   activeGroupChildId,
+  openGroupId = null,
   setTabGroupActiveChat,
   unreadOnly = false,
   extraTopSection,
@@ -455,6 +456,7 @@ function SidebarSessionListInner({
                             selectedSessionIds={selectedSessionIds}
                             attentionIds={attentionIds}
                             activeChildId={activeGroupChildId ?? null}
+                            openGroupId={openGroupId}
                             onSelectGroup={onSelectTabGroup}
                             onRenameGroup={onRenameTabGroup}
                             onDissolveGroup={onDissolveTabGroup}
@@ -877,6 +879,7 @@ function SidebarGroupItem({
   children: groupChildren,
   activeId,
   activeChildId,
+  openGroupId = null,
   activityBySessionId,
   tabColors,
   selectedSessionIds,
@@ -908,6 +911,7 @@ function SidebarGroupItem({
   children: GroupChild[]
   activeId: string | null
   activeChildId: string | null
+  openGroupId?: string | null
   activityBySessionId: SessionActivityMap
   tabColors: Record<string, string>
   selectedSessionIds: Set<string>
@@ -968,9 +972,12 @@ function SidebarGroupItem({
   // tras rename). El badge con la cuenta de chats vive aparte, al lado.
   const label = group.name || `Group`
   const memberCount = group.itemIds.length
-  const groupActive = group.id === activeId
-  // Any child (chat or terminal) with focus lights up the group chip.
-  const activeInside = groupChildren.some(child => child.id === activeId)
+  const groupActive = groupRowSelected({
+    groupId: group.id,
+    activeId,
+    openGroupId,
+    childIds: groupChildren.map(child => child.id)
+  })
   // FAS-107 · Fase 1a · attention unificado: cualquier hijo (chat o
   // terminal) con atención pendiente enciende el dot azul del grupo.
   // Antes se filtraba solo `chat` porque los terminales vivían en un
@@ -984,12 +991,12 @@ function SidebarGroupItem({
     <li>
       <div
         className={cn(
-          'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_2rem] items-center rounded-md px-2 py-1.5',
+          'hover:bg-sidebar-accent/45 group/gr grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-md px-2 py-1.5',
           // El chip del grupo se ilumina tanto cuando el grupo es la ruta
           // directa (`groupActive`) como cuando el foco está en cualquier
           // chat hijo (`activeInside`). Así el usuario siempre tiene un
           // ancla visual en el sidebar sobre "dónde estoy".
-          (groupActive || activeInside) && 'bg-sidebar-accent/55'
+          groupActive && 'bg-sidebar-accent/55'
         )}
         onContextMenu={event => {
           event.preventDefault()
@@ -1047,48 +1054,36 @@ function SidebarGroupItem({
             <SidebarMarqueeTitle text={label} />
           </button>
         </div>
-        <div className="relative h-6 w-8 justify-self-end">
+        <div className="flex h-6 items-center justify-end gap-1 justify-self-end">
           {groupUnread && !menuOpen ? (
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-end pr-0.5 group-hover/gr:opacity-0">
+            <span className="pointer-events-none flex items-center">
               <UnreadDot />
             </span>
           ) : null}
-        {/* FAS-107: chevron a la derecha, siempre visible. Click izquierdo
-            expande/colapsa el split. El menú de acciones ya no vive detrás
-            de un ellipsis — se abre con click derecho sobre todo el chip
-            (ver `onContextMenu` del contenedor). El chevron sirve además
-            como ancla del `Popover` para posicionar el menú. */}
+        {/* Chevron stays at the trailing edge so it stays clickable.
+            The unread dot sits just before it instead of underneath. */}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverAnchor asChild>
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    aria-label={
-                      expanded ? `Collapse ${label}` : `Expand ${label}`
-                    }
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted absolute right-0 inset-y-0 my-auto inline-flex items-center justify-center rounded-md p-0.5"
-                    onClick={event => {
-                      event.stopPropagation()
-                      setExpanded(v => !v)
-                    }}
-                  >
-                    <ChevronDown
-                      className={cn(
-                        'size-3.5 transition-transform',
-                        !expanded && '-rotate-90'
-                      )}
-                    />
-                  </button>
-                </PopoverAnchor>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {expanded ? 'Collapse split' : 'Expand split'}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* No tooltip here: Radix tooltips also open on focus, and each
+              list click moved focus through this anchor, so "Expand split"
+              popped and closed on every click. The title attribute keeps
+              the hint without the flash. */}
+          <PopoverAnchor asChild>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+              title={expanded ? 'Collapse split' : 'Expand split'}
+              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center justify-center rounded-md p-0.5"
+              onClick={event => {
+                event.stopPropagation()
+                setExpanded(v => !v)
+              }}
+            >
+              <ChevronDown
+                className={cn('size-3.5', !expanded && '-rotate-90')}
+              />
+            </button>
+          </PopoverAnchor>
           <PopoverContent align="end" className="w-52 p-1">
             {onRenameGroup ? (
               <>
@@ -1192,8 +1187,13 @@ function SidebarGroupItem({
             // the chat child so the visual weight stays symmetric.
             if (child.kind === 'terminal') {
               const term = child.terminal
-              const active =
-                term.id === activeChildId || term.id === activeId
+              const active = splitChildSelected({
+                groupId: group.id,
+                openGroupId,
+                childId: term.id,
+                activeId,
+                activeChildId
+              })
               const tabColor = tabColors[term.id]
               return (
                 <SidebarSplitTerminalChild
@@ -1235,8 +1235,13 @@ function SidebarGroupItem({
             // (si estás en la ruta del grupo con foco en este chat) o el
             // `activeId` global si por alguna razón la ruta apunta al chat
             // suelto — ambos escenarios se marcan igual visualmente.
-            const active =
-              chat.id === activeChildId || chat.id === activeId
+            const active = splitChildSelected({
+              groupId: group.id,
+              openGroupId,
+              childId: chat.id,
+              activeId,
+              activeChildId
+            })
             const isSelected = selectedSessionIds.has(chat.id)
             const tabColor = tabColors[chat.id]
             const menuOpenForChat = openChildMenuId === chat.id
