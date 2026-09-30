@@ -6,6 +6,37 @@ export const FILES_PANEL_COLLAPSED_STORAGE_KEY =
   'agent-ide-v2-assistant-ui-base-files-panel-collapsed'
 export const SHELL_PANELS_AUTO_SAVE_ID = 'fastfold.shell-panels'
 export const SESSION_PANELS_AUTO_SAVE_ID = 'fastfold.session-panels'
+
+/**
+ * react-resizable-panels warns when a group's default or restored sizes
+ * don't add up to 100. Drop saved layouts that fail that check so an old
+ * 65/40 split doesn't print the warning on every boot.
+ */
+export function dropUnbalancedPanelLayouts(autoSaveId: string): void {
+  if (typeof localStorage === 'undefined') return
+  const key = `react-resizable-panels:${autoSaveId}`
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as Record<string, { layout?: unknown }>
+    if (!parsed || typeof parsed !== 'object') return
+    let changed = false
+    for (const entryKey of Object.keys(parsed)) {
+      const layout = parsed[entryKey]?.layout
+      if (!Array.isArray(layout) || layout.length === 0) continue
+      const total = layout.reduce<number>((sum, size) => sum + Number(size || 0), 0)
+      if (Math.abs(total - 100) > 0.5) {
+        delete parsed[entryKey]
+        changed = true
+      }
+    }
+    if (!changed) return
+    if (Object.keys(parsed).length === 0) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify(parsed))
+  } catch {
+    // Corrupt entry: leave it. The panel library ignores unreadable state.
+  }
+}
 export const TERMINAL_OPEN_STORAGE_KEY = 'fastfold.terminal-open'
 export const OPEN_SESSION_TABS_STORAGE_KEY = 'fastfold.open-session-tabs-by-project'
 export const OPEN_SESSION_TABS_LEGACY_KEY = 'fastfold.open-session-tabs'

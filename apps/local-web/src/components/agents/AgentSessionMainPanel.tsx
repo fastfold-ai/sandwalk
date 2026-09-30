@@ -37,18 +37,21 @@ import {
 } from '@/components/ui/resizable'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useAppTerminals } from '@/hooks/useAppTerminals'
-import { useStableHandlers } from '@/hooks/useStableHandlers'
-import { clearTerminalActivity } from '@/lib/terminal-attention'
-import { perfCount } from '@/lib/perf-probe'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
-import { SESSION_PANELS_AUTO_SAVE_ID } from '@/lib/app-storage'
+import { useStableHandlers } from '@/hooks/useStableHandlers'
+import {
+  dropUnbalancedPanelLayouts,
+  SESSION_PANELS_AUTO_SAVE_ID
+} from '@/lib/app-storage'
 import {
   HOST_TERMINAL_SESSION_ID,
   isDraftAgentSessionId
 } from '@/lib/draft-agent'
+import { perfCount } from '@/lib/perf-probe'
 import { planCardFromPath, startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
+import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { cn } from '@/lib/utils'
 
 import { SessionChatBody } from './session-main/session-chat-body'
@@ -459,6 +462,22 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   // collapses on the next session change — which reflows every pane in a
   // split (and refits every terminal) on the first pane click.
   const filesPanelMounted = showWorkspaceFiles && !asSheet
+  // Default sizes must sum to 100. 65 + 40 (chat + draft terminal) made
+  // react-resizable-panels warn "Invalid layout total size" on every boot.
+  const filesDefaultSize = !filesPanelMounted
+    ? 0
+    : filesPanelCollapsed
+      ? 0
+      : showDraftTerminal
+        ? 25
+        : 35
+  const terminalDefaultSize = !showDraftTerminal
+    ? 0
+    : filesPanelMounted && !filesPanelCollapsed
+      ? 25
+      : 40
+  const chatDefaultSize = 100 - filesDefaultSize - terminalDefaultSize
+  dropUnbalancedPanelLayouts(SESSION_PANELS_AUTO_SAVE_ID)
   useLayoutEffect(() => {
     if (!filesPanelMounted) return
     const panel = filesPanelRef.current
@@ -701,7 +720,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         <ResizablePanel
           id="chat"
           order={1}
-          defaultSize={65}
+          defaultSize={chatDefaultSize}
           minSize={30}
           className="min-w-0"
         >
@@ -877,7 +896,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             // Mount collapsed when state says so; otherwise the first paint
             // is open and the collapse effect costs a second layout pass
             // over every pane in the split.
-            defaultSize={filesPanelCollapsed ? 0 : 35}
+            defaultSize={filesDefaultSize}
             minSize={20}
             maxSize={55}
             onCollapse={() => setFilesPanelCollapsed(true)}
@@ -942,7 +961,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           <ResizablePanel
             id="draft-terminal"
             order={3}
-            defaultSize={40}
+            defaultSize={terminalDefaultSize}
             minSize={25}
             maxSize={70}
             className="min-w-0"
