@@ -35,7 +35,11 @@ def register_usage_routes(app: FastAPI, deps: AppDeps) -> None:
             return ttl_cache.cached(
                 _cache_key(scoped),
                 _USAGE_OVERVIEW_TTL_S,
-                lambda: build_usage_overview(store, project_id=scoped),
+                lambda: build_usage_overview(
+                    store,
+                    project_id=scoped,
+                    bench_store=deps.bench_store,
+                ),
             )
 
         return await asyncio.to_thread(_build)

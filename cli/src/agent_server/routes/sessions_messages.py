@@ -23,11 +23,12 @@ def register_message_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/v1/sessions/{session_id}/messages", response_model=MessageList)
     async def list_messages(session_id: str) -> MessageList:
-        if await asyncio.to_thread(store.get_session, session_id) is None:
+        owner = await asyncio.to_thread(deps.store_for_session, session_id)
+        if await asyncio.to_thread(owner.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
         return MessageList(
-            data=await asyncio.to_thread(store.list_messages, session_id),
-            feedback=await asyncio.to_thread(store.get_session_feedback, session_id),
+            data=await asyncio.to_thread(owner.list_messages, session_id),
+            feedback=await asyncio.to_thread(owner.get_session_feedback, session_id),
         )
 
     @app.post(

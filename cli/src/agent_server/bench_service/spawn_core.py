@@ -34,7 +34,9 @@ from agent_server.settings_service import SettingsService
 
 logger = logging.getLogger(__name__)
 
-CHECKPOINT_EVERY = 10
+# Persist after every finished question so the Results detail and usage
+# column update while the suite is still running. Batching this (every 10)
+# left a 5-question sample at 0/0 correct and 0 tokens until the very end.
 # Hard cap per question. A hung provider/tool used to sit here for an hour.
 CELL_WAIT_S = 25 * 60
 # No new events / messages — treat as stalled (disconnect or wedged tool).
@@ -267,6 +269,10 @@ def run_agent_suite(
             pinned=True,
         )
         project_id = project.id
+        # Sessions stay on the bench database. The project row is what the
+        # sidebar lists, and that list comes from the chat database.
+        if workers_store is not deps.store:
+            deps.store.insert_project_copy(project)
     else:
         project = (
             project
@@ -570,8 +576,7 @@ def run_agent_suite(
                 completed_ids.add(str(cell.question_id))
                 n = len(completed_ids)
                 flying = len(in_flight)
-            if n % CHECKPOINT_EVERY == 0:
-                _persist_partial("running")
+            _persist_partial("running")
             _progress(
                 phase="grading",
                 message=f"Completed {cell.question_id} ({n}/{total})",
@@ -642,6 +647,11 @@ def run_agent_suite(
     delete_checkpoint(run_id)
     if cleanup_sessions:
         delete_bench_project_data(workers_store, project_id)
+        if workers_store is not deps.store:
+            try:
+                deps.store.delete_project(project_id)
+            except Exception:  # noqa: BLE001
+                logger.warning("delete mirrored bench project %s failed", project_id)
         result["project_id"] = None
         result["sessions_cleaned"] = True
         save_result(result)

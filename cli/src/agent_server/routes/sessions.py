@@ -47,7 +47,7 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
             found = await asyncio.to_thread(store.get_session_by_source, "capy")
             return SessionList(data=[found] if found else [])
         return SessionList(
-            data=await asyncio.to_thread(store.list_sessions, project_id=project_id)
+            data=await asyncio.to_thread(deps.list_visible_sessions, project_id)
         )
 
     @app.get("/v1/sessions/revision", response_model=SessionRevision)
@@ -92,7 +92,8 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
 
     @app.get("/v1/sessions/{session_id}", response_model=AgentSession)
     async def get_session(session_id: str) -> AgentSession:
-        session = await asyncio.to_thread(store.get_session, session_id)
+        owner = await asyncio.to_thread(deps.store_for_session, session_id)
+        session = await asyncio.to_thread(owner.get_session, session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
         return session

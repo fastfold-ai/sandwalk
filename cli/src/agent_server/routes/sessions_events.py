@@ -21,9 +21,10 @@ def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.get("/v1/sessions/{session_id}/events/history", response_model=EventList)
     async def list_event_history(session_id: str) -> EventList:
         """One-shot replay of persisted session events (for export / debugging)."""
-        if await asyncio.to_thread(store.get_session, session_id) is None:
+        owner = await asyncio.to_thread(deps.store_for_session, session_id)
+        if await asyncio.to_thread(owner.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
-        events = await asyncio.to_thread(store.list_events, session_id, after_sequence=0)
+        events = await asyncio.to_thread(owner.list_events, session_id, after_sequence=0)
         return EventList(data=events)
 
     @app.get("/v1/sessions/{session_id}/events")
@@ -32,7 +33,8 @@ def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
         session_id: str,
         after_sequence: int = Query(default=0, ge=0),
     ) -> StreamingResponse:
-        if await asyncio.to_thread(store.get_session, session_id) is None:
+        owner = await asyncio.to_thread(deps.store_for_session, session_id)
+        if await asyncio.to_thread(owner.get_session, session_id) is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
         header_sequence = request.headers.get("last-event-id", "").strip()
@@ -55,7 +57,7 @@ def register_session_event_routes(app: FastAPI, deps: AppDeps) -> None:
                     # appended between the query and the wait wakes us instantly.
                     generation = EVENT_NOTIFIER.generation(session_id)
                     events = await asyncio.to_thread(
-                        store.list_events,
+                        owner.list_events,
                         session_id,
                         after_sequence=cursor,
                     )

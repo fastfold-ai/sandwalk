@@ -201,11 +201,20 @@ def _build_model_chart(
 
 
 def build_usage_overview(
-    store: AgentStore, *, project_id: str | None = None
+    store: AgentStore,
+    *,
+    project_id: str | None = None,
+    bench_store: AgentStore | None = None,
 ) -> UsageOverview:
     backfilled = ensure_backfill(store)
     scoped = (project_id or "").strip() or None
     rows = store.list_usage_runs(project_id=scoped)
+    # Cell token rows live on the bench database, keyed by the same project.
+    if scoped and bench_store is not None and bench_store is not store:
+        seen = {str(row.get("run_id") or "") for row in rows}
+        for row in bench_store.list_usage_runs(project_id=scoped):
+            if str(row.get("run_id") or "") not in seen:
+                rows.append(row)
     if not rows:
         return UsageOverview(
             days=[], top_models=[], model_days=[], chart_models=[], backfilled=backfilled
