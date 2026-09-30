@@ -362,6 +362,9 @@ export function useSessionActionsCrudSessions({
   const deleteSession = async (target: AgentSession) => {
     await client.deleteSession(target.id)
     clearSessionAttention(target.id)
+    // Drop the row now. The list refresh that follows preserves chats it
+    // hydrated for split groups, and it decides that from the cache.
+    setSessions(current => current.filter(item => item.id !== target.id))
     let neighbor: string | null = null
     let scopeEmpty = false
     // FAS-107 X4.4-hotfix: SOLO quitar el target.id de cada scope.

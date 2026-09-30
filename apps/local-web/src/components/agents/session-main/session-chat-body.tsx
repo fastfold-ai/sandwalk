@@ -8,6 +8,7 @@ import {
   type SetStateAction,
   Suspense,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -22,8 +23,8 @@ import { DetailPageSkeleton } from '@/components/agents/PageSkeletons'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
-import { startPlanBuild } from '@/lib/plan-build'
 import { perfCount } from '@/lib/perf-probe'
+import { startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
@@ -239,16 +240,26 @@ export function SessionChatBody({
   const showTranscript = hasConversation || !messagesLoaded
   const showEmptyChrome = messagesLoaded && !hasConversation
 
-  // Skip flex morph for one paint when the route session changes.
+  // Skip the flex/opacity morph while a different session settles in.
+  //
+  // This must be decided during render. Setting it from an effect after
+  // paint let the first frame of the new session go out with the 500 ms
+  // transition still attached, so an empty pane faded/grew into place on
+  // every switch — visible as a flash along the sidebar edge. The flag
+  // stays on until the new session's history has loaded, then the next
+  // frame re-enables transitions for real state changes.
   const prevSessionRef = useRef(sessionId)
-  const [layoutInstant, setLayoutInstant] = useState(false)
-  useLayoutEffect(() => {
-    if (prevSessionRef.current === sessionId) return
+  const [instantUntilLoaded, setInstantUntilLoaded] = useState(false)
+  if (prevSessionRef.current !== sessionId) {
     prevSessionRef.current = sessionId
-    setLayoutInstant(true)
-    const frame = window.requestAnimationFrame(() => setLayoutInstant(false))
+    if (!instantUntilLoaded) setInstantUntilLoaded(true)
+  }
+  useEffect(() => {
+    if (!instantUntilLoaded || !messagesLoaded) return
+    const frame = window.requestAnimationFrame(() => setInstantUntilLoaded(false))
     return () => window.cancelAnimationFrame(frame)
-  }, [sessionId])
+  }, [instantUntilLoaded, messagesLoaded])
+  const layoutInstant = instantUntilLoaded
 
   return (
     <>

@@ -13,6 +13,7 @@ import {
   ChatSplitPanelHeader,
   type ChatSplitPanelHeaderProps
 } from '@/components/agents/ChatSplitPanelHeader'
+import { GridArrangeControl } from '@/components/agents/GridArrangeControl'
 import {
   SessionChatMount,
   type SessionChatMountProps
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/resizable'
 import {
   buildDefaultTree,
+  buildGridTree,
   extractChatIds,
   isLeafPane,
   leafItemId,
@@ -329,6 +331,12 @@ export function ChatTilingContainer({
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden p-2">
+      <GridArrangeControl
+        count={chatIds.length}
+        onArrange={(rows, cols) =>
+          onLayoutChange(fingerprint, buildGridTree(chatIds, rows, cols))
+        }
+      />
       <PaneRenderer
         node={renderTree}
         path={[]}

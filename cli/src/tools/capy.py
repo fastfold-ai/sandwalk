@@ -11,16 +11,39 @@ def _deps():
     return capy_deps()
 
 
-def _emit_open_split(session_ids: list[str]) -> None:
+def _parse_grid(rows: int = 0, cols: int = 0, grid: str = "") -> dict[str, int] | None:
+    """Return ``{rows, cols}`` or None.
+
+    ``grid`` is columns × rows, the way a picture is described: ``4x2`` is
+    4 panes across and 2 down. Explicit ``rows`` / ``cols`` override it.
+    ``rows`` is horizontal bands, ``cols`` is panes in each band.
+    """
+    import re
+
+    rows_n = int(rows or 0)
+    cols_n = int(cols or 0)
+    text = str(grid or "").strip().lower().replace("×", "x")
+    match = re.fullmatch(r"(\d+)\s*x\s*(\d+)", text)
+    if match and rows_n < 1 and cols_n < 1:
+        cols_n = int(match.group(1))
+        rows_n = int(match.group(2))
+    if rows_n < 1 or cols_n < 1:
+        return None
+    if rows_n > 8 or cols_n > 8:
+        return None
+    return {"rows": rows_n, "cols": cols_n}
+
+
+def _emit_open_split(session_ids: list[str], layout: dict[str, int] | None = None) -> None:
     from agent_server.session_event_bus import session_event_bus
 
     cleaned = [sid for sid in session_ids if sid]
     if len(cleaned) < 2:
         return
-    session_event_bus.publish(
-        "ui.command",
-        {"action": "open_split", "sessionIds": cleaned},
-    )
+    payload: dict = {"action": "open_split", "sessionIds": cleaned}
+    if layout:
+        payload["layout"] = {"rows": layout["rows"], "cols": layout["cols"]}
+    session_event_bus.publish("ui.command", payload)
 
 
 def _resolve_project_id(store, spec: str = "current") -> dict:
@@ -148,14 +171,17 @@ def capy_send_message(session_id: str = "", content: str = "", **kwargs) -> dict
 
 @registry.register(
     name="capy.spawn_sessions",
-    description="Create N worker chats, optionally send a first message, open split if N>=2. Defaults to the current UI project (All if none selected).",
+    description="Create worker chats, optionally send a first message, and open them as a grid. Defaults to the current UI project (All if none selected).",
     category="capy",
-    usage_guide="Use to start one or more new worker chats, optionally in the current project.",
+    usage_guide="For a picture that is 4 panes across and 2 down, pass grid='4x2' (columns x rows) or cols=4 and rows=2. Do not leave layout empty — without it every chat sits in one row.",
     parameters={
-        "count": "How many chats to create (1-8).",
+        "count": "How many chats (1-16). Ignored when rows and cols (or grid) are set; then count is rows*cols.",
         "message": "Optional first user message for each chat.",
         "title_prefix": "Optional title prefix.",
         "project_id": "current (default), all, or a project id/name.",
+        "rows": "Horizontal bands. 2 for a picture that is two panes tall.",
+        "cols": "Panes across each band. 4 for a picture that is four panes wide.",
+        "grid": "columns x rows, e.g. 4x2 means 4 across and 2 down.",
     },
 )
 def capy_spawn_sessions(
@@ -163,9 +189,16 @@ def capy_spawn_sessions(
     message: str = "",
     title_prefix: str = "",
     project_id: str = "current",
+    rows: int = 0,
+    cols: int = 0,
+    grid: str = "",
     **kwargs,
 ) -> dict:
-    n = max(1, min(8, int(count or 1)))
+    layout = _parse_grid(rows, cols, grid)
+    if layout:
+        n = max(1, min(16, layout["rows"] * layout["cols"]))
+    else:
+        n = max(1, min(16, int(count or 1)))
     text = str(message or "").strip()
     prefix = str(title_prefix or "Chat").strip() or "Chat"
     deps = _deps()
@@ -188,13 +221,17 @@ def capy_spawn_sessions(
                 deps.service.submit_message(session_id=session.id, content=text)
             except Exception:  # noqa: BLE001
                 pass
-    _emit_open_split(ids)
+    _emit_open_split(ids, layout)
     where = resolved.get("projectName") or "All"
+    shape = ""
+    if layout:
+        shape = f" as {layout['cols']} across × {layout['rows']} down"
     return {
         "ok": True,
-        "summary": f"Created {n} chat(s) in {where}.",
+        "summary": f"Created {n} chat(s) in {where}{shape}.",
         "sessionIds": ids,
         "projectId": pid,
+        "layout": layout,
     }
 
 
@@ -259,18 +296,38 @@ def capy_seed_session(
 
 @registry.register(
     name="capy.open_split",
-    description="Ask the UI to open the given worker chats as a split view (needs 2+ ids).",
+    description="Ask the UI to open the given worker chats as a rows-by-columns grid (needs 2+ ids).",
     category="capy",
-    usage_guide="Use after creating 2+ chats when the user should see them side by side.",
-    parameters={"session_ids": "Comma-separated chat ids."},
+    usage_guide="Pass grid='4x2' or cols=4 and rows=2 for 4 panes across and 2 down. Without rows/cols the UI puts every chat in a single row.",
+    parameters={
+        "session_ids": "Comma-separated chat ids.",
+        "rows": "Horizontal bands (how many panes tall).",
+        "cols": "Panes across each band.",
+        "grid": "columns x rows, e.g. 4x2.",
+    },
 )
-def capy_open_split(session_ids: str = "", **kwargs) -> dict:
+def capy_open_split(
+    session_ids: str = "",
+    rows: int = 0,
+    cols: int = 0,
+    grid: str = "",
+    **kwargs,
+) -> dict:
     raw = session_ids if isinstance(session_ids, str) else ",".join(session_ids or [])
     ids = [part.strip() for part in str(raw).split(",") if part.strip()]
     if len(ids) < 2:
         return {"ok": False, "summary": "Need at least two session ids."}
-    _emit_open_split(ids)
-    return {"ok": True, "summary": f"Opening split of {len(ids)} chats.", "sessionIds": ids}
+    layout = _parse_grid(rows, cols, grid)
+    _emit_open_split(ids, layout)
+    shape = (
+        f" ({layout['cols']} across × {layout['rows']} down)" if layout else ""
+    )
+    return {
+        "ok": True,
+        "summary": f"Opening split of {len(ids)} chats{shape}.",
+        "sessionIds": ids,
+        "layout": layout,
+    }
 
 
 @registry.register(

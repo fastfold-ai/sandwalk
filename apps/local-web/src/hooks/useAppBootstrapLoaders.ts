@@ -15,13 +15,13 @@ import type { Dispatch, SetStateAction } from 'react'
 import { useCallback, useRef, useState } from 'react'
 
 import { applyChatDateBoosts } from '@/lib/chat-date-boost'
-import { sameArrayBy } from '@/lib/stable-equal'
 import {
   type ComposerModelOption,
   toComposerModelOptions
 } from '@/lib/composer-models'
 import { dedupeAsync, invalidateDedupe } from '@/lib/dedupe-async'
 import type { SessionChatState } from '@/lib/sessions'
+import { sameArrayBy } from '@/lib/stable-equal'
 
 /** Short client TTL so remounts / StrictMode don't re-hit the API. */
 const LIST_TTL_MS = 20_000
@@ -125,6 +125,12 @@ export function useAppBootstrapLoaders({
   // without adding `sessions` as a callback dep (which would rebuild the
   // resolver on every render).
   const foreignInFlightRef = useRef(new Set<string>())
+  // Ids that `loadForeignSessions` pulled in for a split group. A list
+  // refresh keeps these even when the fresh payload omits them: the
+  // global list excludes bench chats and the scoped list excludes other
+  // projects, so without this the group vanished for a frame on every
+  // click and came back once the foreign fetch re-ran.
+  const foreignHydratedRef = useRef(new Set<string>())
   const sessionsRef = useRef<AgentSession[]>([])
   sessionsRef.current = sessions
 
@@ -182,14 +188,20 @@ export function useAppBootstrapLoaders({
       // active scope still disappear (they had matching projectId).
       setSessions(current => {
         const scopedIds = new Set(nextSessions.map(s => s.id))
-        const preservedForeign = projectId
-          ? current.filter(
-              s =>
-                !scopedIds.has(s.id) &&
-                s.projectId !== projectId &&
-                s.source !== 'bench'
-            )
-          : []
+        const hydrated = foreignHydratedRef.current
+        // A hydrated chat that is no longer in the cache was deleted;
+        // forget it so it cannot be preserved back in.
+        const cached = new Set(current.map(s => s.id))
+        for (const id of Array.from(hydrated)) {
+          if (!cached.has(id)) hydrated.delete(id)
+        }
+        const preservedForeign = current.filter(s => {
+          if (scopedIds.has(s.id)) return false
+          if (hydrated.has(s.id)) return true
+          // Scoped list: also keep chats from other projects that were
+          // merged in earlier (cross-project splits), minus bench cells.
+          return Boolean(projectId) && s.projectId !== projectId && s.source !== 'bench'
+        })
         const merged =
           preservedForeign.length > 0
             ? [...nextSessions, ...preservedForeign]
@@ -235,6 +247,7 @@ export function useAppBootstrapLoaders({
       try {
         const fetched = await client.listSessionsByIds(missing)
         if (fetched.length === 0) return
+        for (const item of fetched) foreignHydratedRef.current.add(item.id)
         setSessions(current => {
           const byId = new Map(current.map(s => [s.id, s]))
           let changed = false

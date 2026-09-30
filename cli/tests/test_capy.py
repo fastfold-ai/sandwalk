@@ -144,6 +144,27 @@ def test_spawn_sessions_emits_open_split(tmp_path: Path, monkeypatch):
     assert typ == "ui.command"
     assert payload["action"] == "open_split"
     assert payload["sessionIds"] == result["sessionIds"]
+    assert "layout" not in payload
+
+
+def test_spawn_sessions_grid_is_columns_by_rows(tmp_path: Path, monkeypatch):
+    """'4x2' is the picture: 4 across, 2 down — not one row of 8."""
+    monkeypatch.setattr("agent_server.service.CONFIG_DIR", tmp_path / "cfg")
+    store = AgentStore(tmp_path / "agent.db")
+    svc = AgentService(store)
+    bind_capy_deps(SimpleNamespace(store=store, service=svc))
+    published = []
+    monkeypatch.setattr(
+        "agent_server.session_event_bus.session_event_bus.publish",
+        lambda typ, payload: published.append((typ, payload)),
+    )
+    result = capy_tools.capy_spawn_sessions(grid="4x2", message="")
+    assert result["ok"] is True
+    assert result["layout"] == {"rows": 2, "cols": 4}
+    assert len(result["sessionIds"]) == 8
+    payload = next(item[1] for item in published if item[0] == "ui.command")
+    assert payload["layout"] == {"rows": 2, "cols": 4}
+    assert payload["sessionIds"] == result["sessionIds"]
 
 
 def test_reset_capy_keeps_same_session(tmp_path: Path, monkeypatch):

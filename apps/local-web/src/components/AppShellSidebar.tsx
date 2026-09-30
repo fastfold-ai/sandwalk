@@ -75,6 +75,7 @@ export type AppShellSidebarProps = {
   onSetTabGroupPinned?: (groupId: string, pinned: boolean) => void
   onGoToChatProject?: (chat: AgentSession) => void
   activeGroupChildId?: string | null
+  openGroupId?: string | null
   setTabGroupActiveChat?: (groupId: string, chatId: string) => void
   setCollapsedSidebarSections: (
     value:
@@ -167,6 +168,7 @@ export function AppShellSidebar({
   onSetTabGroupPinned,
   onGoToChatProject,
   activeGroupChildId,
+  openGroupId,
   setTabGroupActiveChat,
   setCollapsedSidebarSections,
   selectSessionRange,
@@ -275,6 +277,7 @@ export function AppShellSidebar({
             onSetTabGroupPinned={onSetTabGroupPinned}
             onGoToChatProject={onGoToChatProject}
             activeGroupChildId={activeGroupChildId}
+            openGroupId={openGroupId}
             setTabGroupActiveChat={setTabGroupActiveChat}
             setCollapsedSidebarSections={setCollapsedSidebarSections}
             selectSessionRange={selectSessionRange}
