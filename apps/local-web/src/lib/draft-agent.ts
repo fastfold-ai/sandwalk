@@ -1,6 +1,9 @@
 /** Client-only sentinel for /agents/new before a real session exists. */
 export const DRAFT_AGENT_SESSION_ID = 'new'
 
+/** Route with no open chat: centered mark, no composer. */
+export const BLANK_CANVAS_SESSION_ID = 'blank'
+
 export type DraftSessionSeed = {
   composer?: string
   composerSkills?: string[]
@@ -23,6 +26,12 @@ export function isDraftAgentSessionId(
   return id === DRAFT_AGENT_SESSION_ID
 }
 
+export function isBlankCanvasSessionId(
+  id: string | null | undefined
+): boolean {
+  return id === BLANK_CANVAS_SESSION_ID
+}
+
 export function isHostTerminalSessionId(
   id: string | null | undefined
 ): boolean {
@@ -39,6 +48,7 @@ export function isReservedAgentRouteId(
     id === 'integrations' ||
     isHostTerminalSessionId(id) ||
     isDraftAgentSessionId(id) ||
+    isBlankCanvasSessionId(id) ||
     // FAS-107 X3 Fase 6a: los terminales tienen su propia ruta
     // `/terminals/:id`. Un `term_*` que caiga en `/agents/:id` es un
     // error de navegación — el router debe descartarlo. `navigateToSession`

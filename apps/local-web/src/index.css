@@ -152,9 +152,9 @@
 
 /*
  * macOS desktop glass shell — window is transparent; native liquid glass /
- * vibrancy shows through the sidebar while focused. On blur, the sidebar
- * paints solid (native glass stays installed so traffic lights remain).
- * Main stays opaque either way.
+ * vibrancy shows through the sidebar and the main column while focused.
+ * On blur, both paint solid (native glass stays installed so traffic
+ * lights remain).
  */
 html.sandwalk-mac-glass,
 html.sandwalk-mac-glass body,
@@ -184,6 +184,69 @@ html.sandwalk-mac-glass .sandwalk-shell {
 
 html.sandwalk-mac-glass .sandwalk-shell-main {
   background-color: hsl(var(--background));
+}
+
+/* Focused main: dense frost. A hint of the desktop tint comes through,
+ * not a readable view of whatever is behind the window. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main {
+  background-color: rgb(246 246 247 / 0.88) !important;
+  border-left-color: transparent;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main {
+  background-color: rgb(24 24 26 / 0.88) !important;
+  border-left-color: transparent;
+}
+
+/* Tab strip sits on the same frost. The 6px floor under the tabs was a
+ * solid background stripe. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-session-tab-strip {
+  background-color: transparent !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-session-tab-strip::after {
+  background-color: transparent !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-chrome-tabs,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-chrome-tabs {
+  background: transparent !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark
+  .sandwalk-chrome-tabs
+  .chrome-tab[data-active='true'] {
+  --tab-fill: rgb(255 255 255 / 0.1);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark)
+  .sandwalk-chrome-tabs
+  .chrome-tab[data-active='true'] {
+  --tab-fill: rgb(255 255 255 / 0.72);
+}
+
+/* Split panes: a lighter frost than the main, so the grid isn't a stack
+ * of solid cards. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) [data-pane-kind] {
+  background-color: rgb(255 255 255 / 0.55) !important;
+  border-color: rgb(0 0 0 / 0.08);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark [data-pane-kind] {
+  background-color: rgb(32 32 34 / 0.55) !important;
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+/* Scroll edge fades are a solid --background wash. On glass they read as
+ * a hard line above the composer. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-chat-edge-fade {
+  display: none;
+}
+
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-main,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-main {
+  background-color: hsl(var(--background)) !important;
 }
 
 /* Continuous glass column — nav strip is not a separate painted bar. */
@@ -1464,6 +1527,13 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
   z-index: 10;
 }
 
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-chrome-tabs .chrome-tabs-bottom-bar,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .chrome-tabs-bottom-bar {
+  display: none !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
 /*
  * Inactive: strip gray by default; subtle wash only on hover.
  * Active: chat --background (merge with pane below).
@@ -1585,19 +1655,18 @@ html.sandwalk-mac-glass[data-accent='orange'].dark {
 }
 
 /*
- * Session tab strip = same chrome gray as .sandwalk-chrome-tabs
- * (light #dee1e6 / dark #202124). Beats mac-glass transparent nav.
+ * Session tab strip = chrome gray in the browser. On the desktop, focused
+ * liquid glass leaves the strip clear so the main frost shows through.
  */
 .sandwalk-session-tab-strip,
-html.sandwalk-mac-glass .sandwalk-session-tab-strip,
-html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-session-tab-strip {
+html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-session-tab-strip {
   background-color: #dee1e6 !important;
 }
 
-.dark .sandwalk-session-tab-strip,
-html.sandwalk-mac-glass.dark .sandwalk-session-tab-strip,
-html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark
-  .sandwalk-session-tab-strip {
+html.dark:not(.sandwalk-mac-glass-active) .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.dark:not(.sandwalk-mac-glass-active) .sandwalk-session-tab-strip,
+html.sandwalk-mac-glass.sandwalk-liquid-glass-off.dark .sandwalk-session-tab-strip {
   background-color: #202124 !important;
 }
 

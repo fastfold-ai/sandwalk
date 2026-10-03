@@ -29,6 +29,7 @@ import {
   Columns2,
   Download,
   Folder,
+  LayoutGrid,
   MessageSquare,
   Pencil,
   Pin,
@@ -68,18 +69,26 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
+import {
+  DRAFT_AGENT_SESSION_ID,
+  isDraftAgentSessionId
+} from '@/lib/draft-agent'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
+import { gridLayoutChoices } from './GridArrangeControl'
 import { ProjectPicker } from './ProjectPicker'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionStatusIcon } from './SessionStatusIcon'
 import { SessionTab } from './SessionTab'
+import { SplitMenuBlock } from './split-menu'
 import {
   TabContextItem,
   TabContextMenuShell,
   TabContextSeparator,
+  TabContextSubmenu,
   TabInlineColorRow
 } from './tab-context-menu'
 
@@ -111,10 +120,12 @@ export function SessionTabs({
   groups,
   openTabIds,
   onSplitWith,
+  onSplitPane,
   onDissolveGroup,
   onRenameGroup,
   onSetGroupColor,
   onSetGroupPinned,
+  onArrangeGroup,
   onCloseGroup,
   selectedChatIds,
   onToggleSelectChat,
@@ -155,6 +166,12 @@ export function SessionTabs({
   groups?: SessionGroup[]
   /** Creates a new split-view group from `sourceId` + the next open tab. */
   onSplitWith?: (sourceId: string) => void
+  /** Split this tab into a new pane of the chosen kind. */
+  onSplitPane?: (
+    sourceId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
   onDissolveGroup?: (groupId: string) => void
   onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
@@ -164,6 +181,8 @@ export function SessionTabs({
    * exponía — asimetría §3.2 con chats y terminales.
    */
   onSetGroupPinned?: (groupId: string, pinned: boolean) => void
+  /** Relayout this group's panes into equal rows and columns. */
+  onArrangeGroup?: (groupId: string, rows: number, cols: number) => void
   onCloseGroup?: (groupId: string) => void
   selectedChatIds?: Set<string>
   onToggleSelectChat?: (id: string) => void
@@ -260,6 +279,27 @@ export function SessionTabs({
     // frame between `setOpenTabIds([])` and the router settling on `/`,
     // making every split group visually reappear.
     const items: TabItem[] = []
+    if (isDraftAgentSessionId(activeId)) {
+      items.push({
+        kind: 'chat',
+        id: DRAFT_AGENT_SESSION_ID,
+        pinned: false,
+        session: {
+          id: DRAFT_AGENT_SESSION_ID,
+          title: 'New Agent',
+          status: 'idle',
+          projectId: null,
+          organizeLabel: null,
+          createdAt: '',
+          updatedAt: '',
+          lastMessageAt: null,
+          workspacePath: null,
+          titleSource: 'pending',
+          source: null,
+          sourceLabel: null
+        } as unknown as AgentSession
+      })
+    }
     if (openTabIds) {
       for (const id of openTabIds) {
         const group = groupsById.get(id)
@@ -312,7 +352,7 @@ export function SessionTabs({
     const pinned = items.filter(item => item.pinned)
     const rest = items.filter(item => !item.pinned)
     return [...pinned, ...rest]
-  }, [openTabIds, tabs, tabsById, groupsById, groups, terminalsById])
+  }, [activeId, openTabIds, tabs, tabsById, groupsById, groups, terminalsById])
 
   const orderedTabs = useMemo(
     () =>
@@ -922,12 +962,45 @@ export function SessionTabs({
         </Popover>
       </div>
 
+      {menu && isDraftAgentSessionId(menu.sessionId) ? (
+        <TabContextMenuShell
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+        >
+          {onSplitPane ? (
+            <SplitMenuBlock
+              sourceId={menu.sessionId}
+              trailingSeparator={false}
+              onSplitPane={(id, direction, target) =>
+                runAction(() => onSplitPane(id, direction, target))
+              }
+            />
+          ) : (
+            <TabContextItem
+              icon={<SquareTerminal className="size-3.5" />}
+              label="New terminal"
+              disabled={!onCreateTerminal}
+              onClick={() => runAction(() => onCreateTerminal?.())}
+            />
+          )}
+        </TabContextMenuShell>
+      ) : null}
+
       {menu && menuSession ? (
         <TabContextMenuShell
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
         >
+          {onSplitPane ? (
+            <SplitMenuBlock
+              sourceId={menuSession.id}
+              onSplitPane={(id, direction, target) =>
+                runAction(() => onSplitPane(id, direction, target))
+              }
+            />
+          ) : null}
           <TabContextItem
             icon={<Pencil className="size-3.5" />}
             label="Rename chat…"
@@ -992,16 +1065,6 @@ export function SessionTabs({
             }
             onClick={() => runAction(() => onArchive(menuSession))}
           />
-          {onSplitWith ? (
-            <>
-              <TabContextSeparator />
-              <TabContextItem
-                icon={<Columns2 className="size-3.5" />}
-                label="Create split view"
-                onClick={() => runAction(() => onSplitWith(menuSession.id))}
-              />
-            </>
-          ) : null}
           <TabContextSeparator />
           <TabContextItem
             icon={<X className="size-3.5" />}
@@ -1029,6 +1092,14 @@ export function SessionTabs({
           y={menu.y}
           onClose={() => setMenu(null)}
         >
+          {onSplitPane ? (
+            <SplitMenuBlock
+              sourceId={menuGroup.activeChatId || menuGroup.itemIds[0]}
+              onSplitPane={(id, direction, target) =>
+                runAction(() => onSplitPane(id, direction, target))
+              }
+            />
+          ) : null}
           {onRenameGroup ? (
             <>
               <TabContextItem
@@ -1047,7 +1118,33 @@ export function SessionTabs({
               }
             />
           ) : null}
-          {onRenameGroup || onSetGroupPinned ? <TabContextSeparator /> : null}
+          {onArrangeGroup && menuGroup.itemIds.length >= 2 ? (
+            <TabContextSubmenu
+              icon={<LayoutGrid className="size-3.5 text-muted-foreground" />}
+              label="Grid"
+            >
+              {gridLayoutChoices(menuGroup.itemIds.length).map(choice => (
+                <TabContextItem
+                  key={choice.label}
+                  icon={<LayoutGrid className="size-3.5 text-muted-foreground" />}
+                  label={choice.label}
+                  trailing={
+                    <span className="text-muted-foreground text-[11px] tabular-nums">
+                      {choice.cols}×{choice.rows}
+                    </span>
+                  }
+                  onClick={() =>
+                    runAction(() =>
+                      onArrangeGroup(menuGroup.id, choice.rows, choice.cols)
+                    )
+                  }
+                />
+              ))}
+            </TabContextSubmenu>
+          ) : null}
+          {onRenameGroup || onSetGroupPinned || onArrangeGroup ? (
+            <TabContextSeparator />
+          ) : null}
           {onSetGroupColor ? (
             <>
               <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">

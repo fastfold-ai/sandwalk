@@ -13,7 +13,6 @@ import {
   ChatSplitPanelHeader,
   type ChatSplitPanelHeaderProps
 } from '@/components/agents/ChatSplitPanelHeader'
-import { GridArrangeControl } from '@/components/agents/GridArrangeControl'
 import {
   SessionChatMount,
   type SessionChatMountProps
@@ -27,7 +26,6 @@ import {
 } from '@/components/ui/resizable'
 import {
   buildDefaultTree,
-  buildGridTree,
   extractChatIds,
   isLeafPane,
   leafItemId,
@@ -38,6 +36,7 @@ import {
 } from '@/hooks/useChatTiling'
 import { useStableHandlers } from '@/hooks/useStableHandlers'
 import { useMonitorFingerprint } from '@/lib/monitor-fingerprint'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
@@ -87,6 +86,11 @@ export type ChatTilingContainerProps = {
     onPickTerminal?: () => Promise<string | null>
   }
   onLayoutChange: (fingerprint: string, tree: PaneNode) => void
+  onSplitPane?: (
+    sourceId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
   onCloseChat: (chatId: string) => void
   /**
    * Terminal-as-first-class-item support (FAS-107). Populate to enable
@@ -129,6 +133,7 @@ export function ChatTilingContainer({
   projects,
   pickerContext,
   onLayoutChange,
+  onSplitPane,
   onCloseChat,
   terminals,
   terminalClient,
@@ -212,18 +217,6 @@ export function ChatTilingContainer({
     [fingerprint, onLayoutChange]
   )
 
-  const handleSplit = useCallback(
-    (
-      chatId: string,
-      direction: SplitDirection,
-      side: 'before' | 'after' = 'after'
-    ) => {
-      if (!pickerContext) return
-      setPickerRequest({ targetChatId: chatId, direction, side })
-    },
-    [pickerContext]
-  )
-
   const handleClose = useCallback(
     (chatId: string) => {
       // Before removing the pane, move focus to a surviving sibling so
@@ -303,20 +296,14 @@ export function ChatTilingContainer({
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey
       if (!meta) return
-      // The embedded xterm terminal binds its own ⌘W/⌘D — if the user is
+      // The embedded xterm terminal binds its own ⌘W — if the user is
       // typing in a terminal pane the shortcut belongs to that widget,
-      // not to the split view. Never fight over an event that already
-      // has an owner.
+      // not to the split view.
       const active = document.activeElement
       if (active && active.closest('.xterm')) return
       const key = e.key.toLowerCase()
-      if (key === 'd') {
-        e.preventDefault()
-        const target = activeChatId
-        if (!target) return
-        const direction: SplitDirection = e.shiftKey ? 'vertical' : 'horizontal'
-        setPickerRequest({ targetChatId: target, direction, side: 'after' })
-      } else if (key === 'w' && chatIds.length > 1) {
+      // ⌘D / ⇧⌘D are handled in App (they create a pane of the same kind).
+      if (key === 'w' && chatIds.length > 1) {
         // Never close the last chat with the shortcut — the user should
         // dissolve the group explicitly to avoid accidents.
         e.preventDefault()
@@ -331,12 +318,6 @@ export function ChatTilingContainer({
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden p-2">
-      <GridArrangeControl
-        count={chatIds.length}
-        onArrange={(rows, cols) =>
-          onLayoutChange(fingerprint, buildGridTree(chatIds, rows, cols))
-        }
-      />
       <PaneRenderer
         node={renderTree}
         path={[]}
@@ -369,7 +350,7 @@ export function ChatTilingContainer({
                 focusPanel={focusPanel}
                 client={terminalClient}
                 terminals={terminals ?? []}
-                onSplit={handleSplit}
+                onSplitPane={onSplitPane}
                 onClose={onCloseTerminal}
                 canClose={chatIds.length > 1}
                 projects={projects}
@@ -398,7 +379,7 @@ export function ChatTilingContainer({
               sessions={sessions}
               buildMountProps={buildMountProps}
               buildHeaderProps={buildHeaderProps}
-              onSplit={handleSplit}
+              onSplitPane={onSplitPane}
               onClose={handleClose}
               canClose={chatIds.length > 1}
             />
@@ -413,7 +394,7 @@ export function ChatTilingContainer({
                   focusPanel={focusPanel}
                   client={terminalClient}
                   terminals={terminals ?? []}
-                  onSplit={handleSplit}
+                  onSplitPane={onSplitPane}
                   onClose={onCloseTerminal}
                   canClose={chatIds.length > 1}
                   projects={projects}
@@ -506,7 +487,9 @@ function PaneRenderer({
     return (
       <div
         className="h-full w-full"
-        onMouseDownCapture={() => onFocus(node.chatId)}
+        onMouseDownCapture={event =>
+          focusUnlessPaneAction(event, () => onFocus(node.chatId))
+        }
         onFocusCapture={() => onFocus(node.chatId)}
       >
         {renderLeaf(node.chatId, focused, () => onFocus(node.chatId))}
@@ -522,7 +505,9 @@ function PaneRenderer({
     return (
       <div
         className="h-full w-full"
-        onMouseDownCapture={() => onFocus(node.terminalId)}
+        onMouseDownCapture={event =>
+          focusUnlessPaneAction(event, () => onFocus(node.terminalId))
+        }
         onFocusCapture={() => onFocus(node.terminalId)}
       >
         {renderTerminalLeaf(node.terminalId, focused, () =>
@@ -539,7 +524,9 @@ function PaneRenderer({
       return (
         <div
           className="h-full w-full"
-          onMouseDownCapture={() => onFocus(id)}
+          onMouseDownCapture={event =>
+            focusUnlessPaneAction(event, () => onFocus(id))
+          }
           onFocusCapture={() => onFocus(id)}
         >
           {renderTerminalLeaf(id, focused, () => onFocus(id))}
@@ -549,7 +536,9 @@ function PaneRenderer({
     return (
       <div
         className="h-full w-full"
-        onMouseDownCapture={() => onFocus(id)}
+        onMouseDownCapture={event =>
+          focusUnlessPaneAction(event, () => onFocus(id))
+        }
         onFocusCapture={() => onFocus(id)}
       >
         {renderLeaf(id, focused, () => onFocus(id))}
@@ -713,6 +702,18 @@ function ratiosAreClose(a: number[], b: number[], epsilon = 0.001): boolean {
 
 const EMPTY_WORKSPACE_FILES: WorkspaceFile[] = []
 
+/** Header actions decide open vs switch themselves. Focusing on the way
+ * down would make an already-open panel look like it belongs to this
+ * pane, so the click closes it instead of replacing the contents. */
+function focusUnlessPaneAction(
+  event: { target: EventTarget | null },
+  focus: () => void
+) {
+  const target = event.target
+  if (target instanceof Element && target.closest('[data-pane-action]')) return
+  focus()
+}
+
 function ChatLeaf({
   chatId,
   focused,
@@ -720,7 +721,7 @@ function ChatLeaf({
   sessions,
   buildMountProps,
   buildHeaderProps,
-  onSplit,
+  onSplitPane,
   onClose,
   canClose
 }: {
@@ -730,11 +731,7 @@ function ChatLeaf({
   sessions: AgentSession[]
   buildMountProps: ChatTilingContainerProps['buildMountProps']
   buildHeaderProps: ChatTilingContainerProps['buildHeaderProps']
-  onSplit: (
-    chatId: string,
-    direction: SplitDirection,
-    side: 'before' | 'after'
-  ) => void
+  onSplitPane?: ChatTilingContainerProps['onSplitPane']
   onClose: (chatId: string) => void
   canClose: boolean
 }) {
@@ -753,25 +750,14 @@ function ChatLeaf({
         }
       }
   const chatSession = sessions.find(s => s.id === chatId) || null
-  // The parent-built header props don't know about the tiling tree, so
-  // we inject the four split handlers here — they mirror the right-click
-  // context menu entries and let ellipsis-menu users add panes without
-  // discovering the right-click gesture. `onRemoveFromSplit` already
-  // handles "Close pane" in that menu, so we don't duplicate it here.
-  //
-  // INVARIANT: this override is what makes `Split left/right/up/down`
-  // appear in the ellipsis menu. The parent `buildSplitHeaderProps`
-  // documents the same invariant — DO NOT drop this override without
-  // also lifting the split handlers into the builder.
+  // The parent header doesn't know which pane this is, so the leaf
+  // attaches the same Split Down / Split Right menu as the tab strip.
   const baseHeaderProps = buildHeaderProps(chatId, focused, focusPanel)
   // Handlers are rebuilt by the parent every render; pin their identity so
   // `memo(ChatSplitPanelHeader)` only re-renders on data changes.
   const headerProps: ChatSplitPanelHeaderProps = useStableHandlers({
     ...baseHeaderProps,
-    onSplitLeft: (id: string) => onSplit(id, 'horizontal', 'before'),
-    onSplitRight: (id: string) => onSplit(id, 'horizontal', 'after'),
-    onSplitUp: (id: string) => onSplit(id, 'vertical', 'before'),
-    onSplitDown: (id: string) => onSplit(id, 'vertical', 'after')
+    onSplitPane
   })
   return (
     <div
@@ -795,10 +781,8 @@ function ChatLeaf({
         e.preventDefault()
         e.stopPropagation()
         openPaneContextMenu(chatId, e, {
-          onSplitLeft: () => onSplit(chatId, 'horizontal', 'before'),
-          onSplitRight: () => onSplit(chatId, 'horizontal', 'after'),
-          onSplitUp: () => onSplit(chatId, 'vertical', 'before'),
-          onSplitDown: () => onSplit(chatId, 'vertical', 'after'),
+          onSplitPane: (id, direction, target) =>
+            onSplitPane?.(id, direction, target),
           onClose: canClose ? () => onClose(chatId) : null
         })
       }}
@@ -904,10 +888,11 @@ function openPaneContextMenu(
 }
 
 export type PaneContextMenuHandlers = {
-  onSplitLeft: () => void
-  onSplitRight: () => void
-  onSplitUp: () => void
-  onSplitDown: () => void
+  onSplitPane: (
+    sourceId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
   onClose: (() => void) | null
 }
 

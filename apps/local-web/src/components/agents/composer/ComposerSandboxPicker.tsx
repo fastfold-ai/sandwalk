@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils'
 export function ComposerSandboxPicker({
   sandboxStatus = null,
   sandboxPhase = 'idle',
+  embedded = false,
+  onRequestClose,
   onSandboxBackendSelect,
   onSandboxComputeChange,
   onSandboxStart,
@@ -38,6 +40,9 @@ export function ComposerSandboxPicker({
 }: {
   sandboxStatus?: SessionSandboxStatus | null
   sandboxPhase?: SandboxActionPhase
+  /** Render only the panel, for a parent menu flyout. */
+  embedded?: boolean
+  onRequestClose?: () => void
   onSandboxBackendSelect: (
     backend: 'builtin' | 'modal'
   ) => void | Promise<void>
@@ -51,7 +56,7 @@ export function ComposerSandboxPicker({
   /** Re-fetch sandbox status when the picker opens (picks up Modal setup done elsewhere). */
   onRefreshSandbox?: () => void | Promise<void>
 }) {
-  const [sandboxPickerOpen, setSandboxPickerOpen] = useState(false)
+  const [sandboxPickerOpen, setSandboxPickerOpen] = useState(embedded)
   const [sandboxDraft, setSandboxDraft] = useState(() =>
     draftFromSandboxStatus(sandboxStatus)
   )
@@ -61,7 +66,7 @@ export function ComposerSandboxPicker({
   const refreshedOpenRef = useRef(false)
 
   useEffect(() => {
-    if (!sandboxPickerOpen) {
+    if (!embedded && !sandboxPickerOpen) {
       refreshedOpenRef.current = false
       return
     }
@@ -91,7 +96,7 @@ export function ComposerSandboxPicker({
     return () => {
       cancelled = true
     }
-  }, [sandboxPickerOpen, onLoadLocalSystem, onRefreshSandbox, sandboxStatus])
+  }, [embedded, sandboxPickerOpen, onLoadLocalSystem, onRefreshSandbox, sandboxStatus])
 
   const appliedSandboxBackend =
     sandboxStatus?.backend === 'modal' ? 'modal' : 'builtin'
@@ -137,10 +142,35 @@ export function ComposerSandboxPicker({
         await onSandboxBackendSelect(sandboxDraft.backend)
       }
       setSandboxPickerOpen(false)
+      onRequestClose?.()
     } finally {
       setSandboxConfirming(false)
     }
   }
+
+  const panel = (
+    <ComposerSandboxPopoverContent
+      sandboxStatus={sandboxStatus}
+      sandboxPhase={sandboxPhase}
+      sandboxDraft={sandboxDraft}
+      sandboxDraftDirty={sandboxDraftDirty}
+      sandboxConfirming={sandboxConfirming}
+      appliedSandboxBackend={appliedSandboxBackend}
+      localSystem={localSystem}
+      localSystemLoading={localSystemLoading}
+      onClose={() => {
+        setSandboxPickerOpen(false)
+        onRequestClose?.()
+      }}
+      onDraftChange={setSandboxDraft}
+      onConfirm={confirmSandboxDraft}
+      onSandboxStart={onSandboxStart}
+      onSandboxStop={onSandboxStop}
+      onSandboxRestart={onSandboxRestart}
+    />
+  )
+
+  if (embedded) return <div className="w-[16.5rem]">{panel}</div>
 
   return (
     <Popover open={sandboxPickerOpen} onOpenChange={setSandboxPickerOpen}>
@@ -180,22 +210,7 @@ export function ComposerSandboxPicker({
         onOpenAutoFocus={event => event.preventDefault()}
         onCloseAutoFocus={event => event.preventDefault()}
       >
-        <ComposerSandboxPopoverContent
-          sandboxStatus={sandboxStatus}
-          sandboxPhase={sandboxPhase}
-          sandboxDraft={sandboxDraft}
-          sandboxDraftDirty={sandboxDraftDirty}
-          sandboxConfirming={sandboxConfirming}
-          appliedSandboxBackend={appliedSandboxBackend}
-          localSystem={localSystem}
-          localSystemLoading={localSystemLoading}
-          onClose={() => setSandboxPickerOpen(false)}
-          onDraftChange={setSandboxDraft}
-          onConfirm={confirmSandboxDraft}
-          onSandboxStart={onSandboxStart}
-          onSandboxStop={onSandboxStop}
-          onSandboxRestart={onSandboxRestart}
-        />
+        {panel}
       </PopoverContent>
     </Popover>
   )

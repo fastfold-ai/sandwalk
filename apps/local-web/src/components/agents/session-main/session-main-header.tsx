@@ -40,6 +40,7 @@ import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
 import { copyText } from '@/lib/clipboard'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { navigateToSession } from '@/lib/navigate-session'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { cn } from '@/lib/utils'
 
 export type SessionMainHeaderProps = {
@@ -97,10 +98,16 @@ export type SessionMainHeaderProps = {
   ) => void | Promise<void>
   groups?: import('@sandwalk/agent-ui-core').SessionGroup[]
   onSplitWith?: (sourceId: string) => void
+  onSplitPane?: (
+    sourceId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
   onDissolveGroup?: (groupId: string) => void
   onRenameGroup?: (group: SessionGroup) => void
   onSetGroupColor?: (groupId: string, color: string | null) => void
   onSetGroupPinned?: (groupId: string, pinned: boolean) => void
+  onArrangeGroup?: (groupId: string, rows: number, cols: number) => void
   onCloseGroup?: (groupId: string) => void
   /**
    * Cuando la ruta activa apunta a un grupo, el shell oculta su fila de
@@ -169,10 +176,12 @@ export function SessionMainHeader({
   onMoveTerminalToProject,
   groups,
   onSplitWith,
+  onSplitPane,
   onDissolveGroup,
   onRenameGroup,
   onSetGroupColor,
   onSetGroupPinned,
+  onArrangeGroup,
   onCloseGroup,
   selectedChatIds,
   onToggleSelectChat,
@@ -292,10 +301,7 @@ export function SessionMainHeader({
       <DesktopDragRegion
         asTitleBar={padForTrafficLights}
         className={cn(
-          /* Full-bleed gray strip (beats mac-glass transparent nav rule) */
           'sandwalk-shell-nav-strip sandwalk-session-tab-strip relative z-20 flex items-end gap-0',
-          /* Full-width black floor under tabs + overflow slot (same as bottom-bar) */
-          '-mb-[2px] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-[1] after:h-[6px] after:bg-background',
           padForTrafficLights ? 'sandwalk-shell-nav-strip-mac' : null
         )}
       >
@@ -378,10 +384,12 @@ export function SessionMainHeader({
           onMoveTerminalToProject={onMoveTerminalToProject}
           groups={groups}
           onSplitWith={onSplitWith}
+          onSplitPane={onSplitPane}
           onDissolveGroup={onDissolveGroup}
           onRenameGroup={onRenameGroup}
           onSetGroupColor={onSetGroupColor}
           onSetGroupPinned={onSetGroupPinned}
+          onArrangeGroup={onArrangeGroup}
           onCloseGroup={onCloseGroup}
           selectedChatIds={selectedChatIds}
           onToggleSelectChat={onToggleSelectChat}

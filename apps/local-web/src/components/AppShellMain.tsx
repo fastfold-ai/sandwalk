@@ -23,7 +23,7 @@ import {
 } from '@/components/ShellNavStrip'
 import { ResizablePanel } from '@/components/ui/resizable'
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
-import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { isBlankCanvasSessionId, isDraftAgentSessionId } from '@/lib/draft-agent'
 import { perfCount } from '@/lib/perf-probe'
 
 export type { AppShellMainProps } from '@/components/app/app-shell-main-props'
@@ -35,6 +35,7 @@ export function AppShellMain(props: AppShellMainProps) {
   const showSimpleTitleBar =
     !props.showSessionTabs &&
     !isDraftAgentSessionId(props.sessionId) &&
+    !isBlankCanvasSessionId(props.sessionId) &&
     !(
       props.isHome ||
       props.isLibrary ||
@@ -191,6 +192,7 @@ export function AppShellMain(props: AppShellMainProps) {
             setTabGroupLayoutForMonitor={props.setTabGroupLayoutForMonitor}
             tabGroups={props.tabGroups}
             onSplitWithNextTab={props.onSplitWithNextTab}
+            onSplitPane={props.onSplitPane}
             onPickSplitPartner={props.onPickSplitPartner}
             onCancelPendingSplit={props.onCancelPendingSplit}
             onAddChatToSplit={props.onAddChatToSplit}

@@ -54,6 +54,17 @@ export function createChipInserters({
     })
   }
 
+  const appendChip = (token: string) => {
+    const base = draft.replace(/\s+$/u, '')
+    const nextValue = spaceAroundChips(base ? `${base} ${token}` : token)
+    const caret = caretAfterInsertedToken(nextValue, token)
+    pendingCaretRef.current = caret
+    flushSync(() => {
+      commitDraft(nextValue)
+    })
+    focusAfterChipInsert(caret)
+  }
+
   const insertSkillChip = (skill: AgentSkill) => {
     if (!slash) return
     const before = draft.slice(0, slash.start)
@@ -171,7 +182,11 @@ export function createChipInserters({
 
   return {
     insertSkillChip,
+    appendSkillChip: (skill: AgentSkill) =>
+      appendChip(skillChipToken(skill.name)),
     insertMcpChip,
+    appendMcpChip: (server: McpServer) =>
+      appendChip(mcpChipToken(server.id, server.name)),
     insertFileChip,
     insertChatChip,
     appendFileChips,

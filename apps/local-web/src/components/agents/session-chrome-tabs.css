@@ -60,6 +60,11 @@
   background: #202124;
 }
 
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-chrome-tabs,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-chrome-tabs {
+  background: transparent !important;
+}
+
 /* ── Single tab ───────────────────────────────────────────────────────── */
 .sandwalk-chrome-tabs .chrome-tab {
   position: relative;
@@ -295,6 +300,10 @@
   background: hsl(var(--background));
   pointer-events: none;
   z-index: 0;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-tab-overflow-slot::after {
+  background: transparent;
 }
 
 .sandwalk-tab-overflow-btn {

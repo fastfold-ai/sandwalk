@@ -185,7 +185,7 @@ export function ChatTranscript({
       <div
         aria-hidden
         className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 z-10 h-5 bg-gradient-to-b from-background to-transparent transition-opacity duration-150',
+          'sandwalk-chat-edge-fade pointer-events-none absolute inset-x-0 top-0 z-10 h-5 bg-gradient-to-b from-background to-transparent transition-opacity duration-150',
           atTop ? 'opacity-0' : 'opacity-100'
         )}
       />
@@ -193,7 +193,7 @@ export function ChatTranscript({
       <div
         aria-hidden
         className={cn(
-          'pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5 bg-gradient-to-t from-background to-transparent transition-opacity duration-150',
+          'sandwalk-chat-edge-fade pointer-events-none absolute inset-x-0 bottom-0 z-10 h-5 bg-gradient-to-t from-background to-transparent transition-opacity duration-150',
           atBottom ? 'opacity-0' : 'opacity-100'
         )}
       />

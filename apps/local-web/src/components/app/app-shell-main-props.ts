@@ -237,6 +237,11 @@ export type AppShellMainProps = {
   ) => void
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
+  onSplitPane: (
+    sourceId: string,
+    direction: import('@/lib/pane-split').PaneSplitDirection,
+    target: import('@/lib/pane-split').PaneSplitTarget
+  ) => void
   onPickSplitPartner: (partnerId: string) => void
   onCancelPendingSplit: () => void
   onAddChatToSplit: (chatId: string) => void

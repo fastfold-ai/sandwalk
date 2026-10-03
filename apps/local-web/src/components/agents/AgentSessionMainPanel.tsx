@@ -5,7 +5,6 @@ import type {
   AgentSession,
   SessionGroup
 } from '@sandwalk/agent-ui-core'
-import { MessageSquare, SquareTerminal } from 'lucide-react'
 import {
   type ComponentProps,
   type Dispatch,
@@ -25,11 +24,10 @@ import { ChatTilingContainer } from '@/components/agents/ChatTilingContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
-import { TerminalPanel } from '@/components/agents/TerminalPanel'
-import { TerminalSplitPanelHeader } from '@/components/agents/TerminalSplitPanelHeader'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { WorkspacePanel } from '@/components/agents/WorkspacePanel'
+import { SandwalkMark } from '@/components/SandwalkMark'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -37,6 +35,7 @@ import {
 } from '@/components/ui/resizable'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useAppTerminals } from '@/hooks/useAppTerminals'
+import { buildGridTree } from '@/hooks/useChatTiling'
 import { useIsNarrowWindow } from '@/hooks/useIsNarrowWindow'
 import type { PerSessionChatStateArgs } from '@/hooks/usePerSessionChatState'
 import { useStableHandlers } from '@/hooks/useStableHandlers'
@@ -44,16 +43,21 @@ import {
   dropUnbalancedPanelLayouts,
   SESSION_PANELS_AUTO_SAVE_ID
 } from '@/lib/app-storage'
-import {
-  HOST_TERMINAL_SESSION_ID,
-  isDraftAgentSessionId
-} from '@/lib/draft-agent'
+import { isBlankCanvasSessionId, isDraftAgentSessionId } from '@/lib/draft-agent'
+import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { planCardFromPath, startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
 import { cn } from '@/lib/utils'
 
+import {
+  EmptyStartActions,
+  EmptyStartTip,
+  openPlusMenu,
+  requestPlanMode
+} from './empty-start'
 import { SessionChatBody } from './session-main/session-chat-body'
 import { SessionMainHeader } from './session-main/session-main-header'
 
@@ -151,6 +155,11 @@ export type AgentSessionMainPanelProps = {
   ) => void
   tabGroups: SessionGroup[]
   onSplitWithNextTab: (sourceId: string) => void
+  onSplitPane?: (
+    sourceId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
   onPickSplitPartner: (partnerId: string) => void
   onCancelPendingSplit: () => void
   onAddChatToSplit: (chatId: string) => void
@@ -277,6 +286,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     setTabGroupLayoutForMonitor,
     tabGroups,
     onSplitWithNextTab,
+    onSplitPane,
     onPickSplitPartner,
     onCancelPendingSplit,
     onAddChatToSplit,
@@ -453,7 +463,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
 
   const workspaceSessionId = isDraft ? draftWorkspaceSessionId : sessionId
   // Host terminal only when draft is outside a project.
-  const showDraftTerminal = isDraft && !inProject && terminalOpen
   const showWorkspaceFiles =
     canShowFilesPanel && Boolean(workspaceSessionId) && (!isDraft || inProject)
   // The Files panel mounts after `workspaceSessionId` resolves, i.e. after
@@ -462,21 +471,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   // collapses on the next session change — which reflows every pane in a
   // split (and refits every terminal) on the first pane click.
   const filesPanelMounted = showWorkspaceFiles && !asSheet
-  // Default sizes must sum to 100. 65 + 40 (chat + draft terminal) made
-  // react-resizable-panels warn "Invalid layout total size" on every boot.
-  const filesDefaultSize = !filesPanelMounted
-    ? 0
-    : filesPanelCollapsed
-      ? 0
-      : showDraftTerminal
-        ? 25
-        : 35
-  const terminalDefaultSize = !showDraftTerminal
-    ? 0
-    : filesPanelMounted && !filesPanelCollapsed
-      ? 25
-      : 40
-  const chatDefaultSize = 100 - filesDefaultSize - terminalDefaultSize
+  // Default sizes must sum to 100 or react-resizable-panels warns.
+  const filesDefaultSize =
+    filesPanelMounted && !filesPanelCollapsed ? 35 : 0
+  const chatDefaultSize = filesDefaultSize === 0 ? 100 : 65
   dropUnbalancedPanelLayouts(SESSION_PANELS_AUTO_SAVE_ID)
   useLayoutEffect(() => {
     if (!filesPanelMounted) return
@@ -502,14 +500,8 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
    * garantiza que Chat A se vea idéntico en ambos casos (mismo header,
    * mismo composer embebido, mismos toggles smart).
    *
-   * INVARIANT: `onSplitLeft/Right/Up/Down` are NOT populated here. They
-   * live inside `ChatTilingContainer.ChatLeaf` where the tree ops are
-   * in scope; the leaf spreads this builder's result then overrides
-   * those four keys. If you add another consumer of this builder outside
-   * the tiling container, either re-inject the four handlers there or
-   * lift them into this builder (in that case pass the tree helpers as
-   * dependencies). Without either, the ellipsis menu silently loses the
-   * four split entries — no compile error, no runtime error.
+   * Split Down / Split Right are injected on the leaf via `onSplitPane`,
+   * the same choices as the tab menu.
    */
   const buildSplitHeaderProps = useCallback(
     (chatId: string, focused: boolean, onFocusPanel: () => void) => {
@@ -633,6 +625,46 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     [allSessions, perSessionBaseArgs, sharedGlobals]
   )
 
+  if (isBlankCanvasSessionId(sessionId)) {
+    return (
+      <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-8 px-6">
+        <div className="flex w-full max-w-[44rem] flex-col items-start gap-8 px-5">
+        <SandwalkMark className="text-foreground/80 h-16 w-16 self-center" />
+        <EmptyStartActions
+          onPlan={() => {
+            requestPlanMode(true)
+            navigate('/agents/new')
+          }}
+          onNewAgent={() => navigate('/agents/new')}
+          onTerminal={() => {
+            void (async () => {
+              try {
+                const term = await client.createTerminal({
+                  projectId: activeProjectId ?? null
+                })
+                addTerminalOptimistic(term)
+                openSessionTab(term.id)
+                navigate(`/terminals/${term.id}`)
+              } catch (err) {
+                console.error('createTerminal (blank) failed', err)
+              }
+            })()
+          }}
+          onSkills={() => {
+            openPlusMenu('skills')
+            navigate('/agents/new')
+          }}
+          onSandbox={() => {
+            openPlusMenu('sandbox')
+            navigate('/agents/new')
+          }}
+        />
+        </div>
+        <EmptyStartTip className="absolute inset-x-0 bottom-8" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/*
@@ -698,10 +730,20 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         onMoveTerminalToProject={handleMoveTerminalToProjectLocal}
         groups={tabGroups}
         onSplitWith={onSplitWithNextTab}
+        onSplitPane={onSplitPane}
         onDissolveGroup={dissolveTabGroup}
         onRenameGroup={renameTabGroup}
         onSetGroupColor={setTabGroupColor}
         onSetGroupPinned={setTabGroupPinned}
+        onArrangeGroup={(groupId, rows, cols) => {
+          const group = tabGroups.find(item => item.id === groupId)
+          if (!group || group.itemIds.length < 2) return
+          setTabGroupLayoutForMonitor(
+            groupId,
+            getMonitorFingerprint(),
+            buildGridTree(group.itemIds, rows, cols)
+          )
+        }}
         onCloseGroup={closeTabGroup}
         selectedChatIds={selectedChatIds}
         onToggleSelectChat={toggleSelectChat}
@@ -725,36 +767,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           className="min-w-0"
         >
           {terminalId ? (
-            // FAS-107 GF3 + W1: Terminal-as-main-pane. Ruta
-            // `/terminals/:id` — el main slot entero es un terminal. El
-            // xterm vive en el portal layer (ver terminal-layer/) y el
-            // TerminalPlaceholder solo reserva el hueco donde el layer
-            // se posiciona.
-            //
-            // X3 Fase 7: header con paridad al del pane del split
-            // (rename / move to project / pin / color / archive /
-            // split). `focused` fijo en true porque un terminal solo
-            // siempre tiene el foco de su ruta.
+            // Terminal-as-main-pane. The chrome tab already names it, so
+            // the pane itself is just the shell.
             <main className="relative flex h-full min-w-0 flex-col">
-              <TerminalSplitPanelHeader
-                terminal={
-                  terminals.find(t => t.id === terminalId) ?? null
-                }
-                focused
-                onFocusPanel={() => {}}
-                projects={projects}
-                onRename={handleRenameTerminal}
-                onTogglePin={id =>
-                  void handleToggleTerminalOrganizeLabel(id, 'pinned')
-                }
-                onToggleArchive={id =>
-                  void handleToggleTerminalOrganizeLabel(id, 'archive')
-                }
-                onMoveToProject={handleMoveTerminalToProjectLocal}
-              />
-              <div className="min-h-0 min-w-0 flex-1">
-                <TerminalPlaceholder terminalId={terminalId} />
-              </div>
+              <TerminalPlaceholder terminalId={terminalId} />
             </main>
           ) : activeGroup ? (
             <ChatTilingContainer
@@ -776,6 +792,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 onPickNewChat: handlePickNewChat,
                 onPickTerminal: handlePickTerminal
               }}
+              onSplitPane={onSplitPane}
               onLayoutChange={(fingerprint, tree) => {
                 setTabGroupLayoutForMonitor(activeGroup.id, fingerprint, tree)
               }}
@@ -797,40 +814,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             />
           ) : (
           <main className="relative flex h-full min-w-0 flex-col">
-            {isDraft ? (
-              // FAS-107 GF4: mini switcher at the top of a fresh draft
-              // pane so the user can start as Agent (default) or spawn a
-              // new Terminal from the same place.
-              <div className="border-border/40 flex shrink-0 items-center justify-center gap-1 border-b px-2 py-1">
-                <button
-                  type="button"
-                  className="text-foreground border-sky-500 inline-flex h-7 items-center gap-1.5 rounded-md border-b-2 px-3 text-[12px] font-medium"
-                  aria-current="page"
-                >
-                  <MessageSquare className="size-3.5 text-sky-500" />
-                  <span>Agent</span>
-                </button>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground hover:border-orange-500/50 inline-flex h-7 items-center gap-1.5 rounded-md border-b-2 border-transparent px-3 text-[12px]"
-                  onClick={async () => {
-                    try {
-                      const term = await client.createTerminal({
-                        projectId: activeProjectId ?? null
-                      })
-                      addTerminalOptimistic(term)
-                      openSessionTab(term.id)
-                      navigate(`/terminals/${term.id}`)
-                    } catch (err) {
-                      console.error('draft → terminal failed', err)
-                    }
-                  }}
-                >
-                  <SquareTerminal className="size-3.5 text-orange-500" />
-                  <span>Terminal</span>
-                </button>
-              </div>
-            ) : null}
             <SessionChatBody
             client={client}
             navigate={navigate}
@@ -952,30 +935,6 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                 onOpenTerminal={() => setTerminalOpen(true)}
               />
             ) : null}
-          </ResizablePanel>
-        </>
-      ) : null}
-      {showDraftTerminal ? (
-        <>
-          <ResizableHandle className="w-px" />
-          <ResizablePanel
-            id="draft-terminal"
-            order={3}
-            defaultSize={terminalDefaultSize}
-            minSize={25}
-            maxSize={70}
-            className="min-w-0"
-          >
-            <aside className="bg-card relative z-20 flex h-full min-h-0 w-full min-w-0 flex-col">
-              <TerminalPanel
-                client={client}
-                sessionId={HOST_TERMINAL_SESSION_ID}
-                visible={terminalOpen}
-                autoCreateOnEmpty
-                onClose={() => setTerminalOpen(false)}
-                className="border-t-0"
-              />
-            </aside>
           </ResizablePanel>
         </>
       ) : null}

@@ -277,6 +277,7 @@ export function AppShell(props: AppShellProps) {
           setTabGroupLayoutForMonitor={props.setTabGroupLayoutForMonitor}
           tabGroups={props.tabGroups}
           onSplitWithNextTab={props.onSplitWithNextTab}
+          onSplitPane={props.onSplitPane}
           onPickSplitPartner={props.onPickSplitPartner}
           onCancelPendingSplit={props.onCancelPendingSplit}
           onAddChatToSplit={props.onAddChatToSplit}

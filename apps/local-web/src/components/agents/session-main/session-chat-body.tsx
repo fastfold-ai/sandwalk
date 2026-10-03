@@ -19,6 +19,12 @@ import type { NavigateFunction } from 'react-router-dom'
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
+import {
+  EmptyStartActions,
+  EmptyStartTip,
+  openPlusMenu,
+  requestPlanMode
+} from '@/components/agents/empty-start'
 import { DetailPageSkeleton } from '@/components/agents/PageSkeletons'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -402,7 +408,7 @@ export function SessionChatBody({
         ) : (
           <div
             className={cn(
-              'bg-background mx-auto flex w-full max-w-[44rem] flex-col px-5',
+              'mx-auto flex w-full max-w-[44rem] flex-col px-5',
               !layoutInstant &&
                 'transition-[flex-grow,padding] duration-500 ease-out',
               showEmptyChrome ? 'justify-center' : 'justify-end'
@@ -444,8 +450,23 @@ export function SessionChatBody({
               </div>
             </div>
             <AgentComposerSlot {...agentComposerSlotProps} />
+            {showEmptyChrome ? (
+              <EmptyStartActions
+                className="mt-4"
+                onPlan={
+                  agentComposerSlotProps.runtimeSettings?.planMode
+                    ? undefined
+                    : () => requestPlanMode(true)
+                }
+                onSkills={() => openPlusMenu('skills')}
+                onSandbox={() => openPlusMenu('sandbox')}
+              />
+            ) : null}
           </div>
         )}
+        {showEmptyChrome && !isSplit ? (
+          <EmptyStartTip className="absolute inset-x-6 bottom-6" />
+        ) : null}
       </div>
       {error ? (
         <div className="bg-destructive text-destructive-foreground absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md px-3 py-1.5 text-xs">

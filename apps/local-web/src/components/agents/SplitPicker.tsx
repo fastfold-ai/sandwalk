@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
  * "Split right/left/up/down" (FAS-107).
  *
  * Step 1 — What to add?
- *   Side-by-side cards: [New terminal] (orange accent) | [New agent chat] (blue accent)
+ *   Compact tiles: Terminal | Agent.
  *
  * Step 2 (only when step 1 = "New agent chat") — Which chat?
  *   Existing `SplitChatPickerPanel` behind a "← Back" button, with
@@ -101,25 +101,16 @@ function TypeStep({
   onGoToChatStep: () => void
 }) {
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 flex h-full min-h-0 min-w-0 flex-col items-center justify-center gap-6 overflow-hidden p-6 duration-[180ms]">
-      <h2 className="text-foreground text-center text-[14px] font-medium">
-        What do you want to add here?
-      </h2>
-      <div className="flex w-full max-w-md flex-wrap items-stretch justify-center gap-4">
+    <div className="flex h-full min-h-0 min-w-0 items-center justify-center overflow-hidden p-6">
+      <div className="grid grid-cols-2 gap-3">
         <TypeCard
-          label="New terminal"
-          hint="Interactive shell"
-          icon={<SquareTerminal className="size-8" />}
-          accentClass="border-b-orange-500 hover:border-orange-500/60 hover:bg-orange-500/5"
-          iconClass="text-orange-500"
+          label="Terminal"
+          icon={<SquareTerminal className="size-4" strokeWidth={1.75} />}
           onClick={onPickTerminal}
         />
         <TypeCard
-          label="New agent chat"
-          hint="Chat session"
-          icon={<MessageSquare className="size-8" />}
-          accentClass="border-b-sky-500 hover:border-sky-500/60 hover:bg-sky-500/5"
-          iconClass="text-sky-500"
+          label="Agent"
+          icon={<MessageSquare className="size-4" strokeWidth={1.75} />}
           onClick={onGoToChatStep}
         />
       </div>
@@ -129,17 +120,11 @@ function TypeStep({
 
 function TypeCard({
   label,
-  hint,
   icon,
-  accentClass,
-  iconClass,
   onClick
 }: {
   label: string
-  hint: string
   icon: React.ReactNode
-  accentClass: string
-  iconClass: string
   onClick: () => void
 }) {
   return (
@@ -147,15 +132,12 @@ function TypeCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'group border-border/60 bg-background text-foreground relative flex w-40 min-w-[10rem] shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-b-[3px] px-4 py-6 transition-[background-color,border-color] duration-150',
-        accentClass
+        'text-muted-foreground hover:bg-muted hover:text-foreground flex size-[5.5rem] flex-col items-center justify-center gap-2 rounded-xl border border-black/[0.08] bg-background transition-colors',
+        'dark:border-white/[0.1]'
       )}
     >
-      <span className={cn('inline-flex items-center justify-center', iconClass)}>
-        {icon}
-      </span>
-      <span className="text-[13px] font-medium">{label}</span>
-      <span className="text-muted-foreground text-[11px]">{hint}</span>
+      {icon}
+      <span className="text-[13px] font-medium leading-none">{label}</span>
     </button>
   )
 }

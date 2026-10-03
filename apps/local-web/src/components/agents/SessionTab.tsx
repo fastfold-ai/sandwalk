@@ -222,7 +222,7 @@ export function SessionTab({
 
   const pinned = tab.organizeLabel === 'pinned'
   const title = tab.title || 'Untitled'
-  const showClose = !pinned
+  const showClose = true
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -263,11 +263,10 @@ export function SessionTab({
       <div className="chrome-tab-content">
         {/* T2: pin PRIMERO — antes de cualquier icon del tipo — para
             leerse como tag del tab. Aplica a chat, terminal y grupo
-            por igual. Paridad con R3/R5 en la fila del sidebar. Blanco
-            absoluto con fill=currentColor para máxima legibilidad. */}
+            por igual. Paridad con R3/R5 en la fila del sidebar. */}
         {pinned ? (
           <Pin
-            className="text-white size-3 shrink-0"
+            className="text-zinc-400 size-3 shrink-0"
             fill="currentColor"
             aria-hidden
           />

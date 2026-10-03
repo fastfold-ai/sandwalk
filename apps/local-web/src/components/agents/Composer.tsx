@@ -398,6 +398,10 @@ export function Composer({
                 sendDisabled={isUploading || (!hasDraft && !running)}
                 modelOptions={modelOptions}
                 runtimeSettings={runtimeSettings}
+                skills={skills}
+                mcpServers={mcpServers}
+                onPickSkill={draftState.chipInserters.appendSkillChip}
+                onPickMcp={draftState.chipInserters.appendMcpChip}
                 specialists={specialists}
                 selectedSpecialistId={selectedSpecialistId ?? null}
                 sandboxStatus={sandboxStatus ?? null}

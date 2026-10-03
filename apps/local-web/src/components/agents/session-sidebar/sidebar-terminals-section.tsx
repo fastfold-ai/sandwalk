@@ -206,8 +206,7 @@ function TerminalRowInner({
           className="flex min-w-0 items-center gap-1.5 text-left"
           onClick={onOpen}
         >
-          {/* Q7: pin PRIMERO, blanco absoluto — mismo tratamiento que
-              en la fila chat de la sección Pinned. Sólo se renderiza
+          {/* Q7: pin PRIMERO, mismo gris que la fila de chat. Sólo se renderiza
               cuando el terminal está pinneado (y por tanto aparece en
               la sección Pinned del sidebar).
               FAS-107: pin e icono de tipo viven en slots uniformes
@@ -220,7 +219,7 @@ function TerminalRowInner({
             >
               <Pin
                 aria-label="Pinned"
-                className="text-white size-3"
+                className="text-zinc-400 size-3"
                 fill="currentColor"
               />
             </span>

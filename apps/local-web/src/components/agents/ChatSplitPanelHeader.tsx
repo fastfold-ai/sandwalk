@@ -1,10 +1,6 @@
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
-  ArrowDownToLine,
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  ArrowUpToLine,
   ChevronDown,
   Download,
   Folder,
@@ -18,6 +14,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 
 import { ProjectMark } from '@/components/agents/ProjectMark'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
+import { SplitMenuDropdown } from '@/components/agents/split-menu'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +34,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { copyText } from '@/lib/clipboard'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
@@ -107,16 +105,14 @@ export type ChatSplitPanelHeaderProps = {
     projectId: string | null
   ) => void | Promise<void>
   /**
-   * Split actions — parallel to the right-click context menu, so users
-   * who reach for the header ellipsis get the same power without needing
-   * to know about the right-click. `Close pane` is intentionally NOT
-   * repeated here because the ellipsis already exposes `Close` via
-   * `onRemoveFromSplit`.
+   * Same Split Down / Split Right choices as the tab menu. `Close pane`
+   * stays on `onRemoveFromSplit`.
    */
-  onSplitLeft?: (sessionId: string) => void
-  onSplitRight?: (sessionId: string) => void
-  onSplitUp?: (sessionId: string) => void
-  onSplitDown?: (sessionId: string) => void
+  onSplitPane?: (
+    sessionId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
 }
 
 function ChatSplitPanelHeaderInner({
@@ -142,10 +138,7 @@ function ChatSplitPanelHeaderInner({
   onArchive,
   onRemoveFromSplit,
   onDelete: _onDelete,
-  onSplitLeft,
-  onSplitRight,
-  onSplitUp,
-  onSplitDown
+  onSplitPane
 }: ChatSplitPanelHeaderProps) {
   perfCount('render.ChatSplitPanelHeader')
   const { tabColors, setTabColor } = useSessionTabColors()
@@ -201,8 +194,12 @@ function ChatSplitPanelHeaderInner({
         <div className="flex shrink-0 items-center gap-0.5">
           {showFiles ? (
             <IconBtn
-              label={filesPanelCollapsed ? 'Show files' : 'Hide files'}
-              active={!filesPanelCollapsed && panelView === 'files'}
+              label={
+                focused && !filesPanelCollapsed && panelView === 'files'
+                  ? 'Hide files'
+                  : 'Show files'
+              }
+              active={focused && !filesPanelCollapsed && panelView === 'files'}
               onClick={withFocus(onToggleFiles)}
             >
               <FilesIcon />
@@ -211,7 +208,9 @@ function ChatSplitPanelHeaderInner({
           {showPreview ? (
             <IconBtn
               label="Site preview"
-              active={panelView === 'preview' && !filesPanelCollapsed}
+              active={
+                focused && panelView === 'preview' && !filesPanelCollapsed
+              }
               onClick={withFocus(onOpenPreview)}
             >
               <PreviewIcon />
@@ -219,8 +218,10 @@ function ChatSplitPanelHeaderInner({
           ) : null}
           {showTerminal ? (
             <IconBtn
-              label={terminalOpen ? 'Hide terminal' : 'Show terminal'}
-              active={terminalOpen}
+              label={
+                focused && terminalOpen ? 'Hide terminal' : 'Show terminal'
+              }
+              active={focused && terminalOpen}
               onClick={withFocus(onToggleTerminal)}
             >
               <TerminalIcon />
@@ -382,45 +383,13 @@ function ChatSplitPanelHeaderInner({
                       : 'Archive'}
                   </DropdownMenuItem>
                 ) : null}
-                {onSplitLeft || onSplitRight || onSplitUp || onSplitDown ? (
+                {onSplitPane ? (
                   <>
                     <DropdownMenuSeparator />
-                    {onSplitLeft ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitLeft(session.id)}
-                      >
-                        <ArrowLeftToLine className="size-3.5" />
-                        Split left
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onSplitRight ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitRight(session.id)}
-                      >
-                        <ArrowRightToLine className="size-3.5" />
-                        Split right
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onSplitUp ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitUp(session.id)}
-                      >
-                        <ArrowUpToLine className="size-3.5" />
-                        Split up
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onSplitDown ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitDown(session.id)}
-                      >
-                        <ArrowDownToLine className="size-3.5" />
-                        Split down
-                      </DropdownMenuItem>
-                    ) : null}
+                    <SplitMenuDropdown
+                      sourceId={session.id}
+                      onSplitPane={onSplitPane}
+                    />
                   </>
                 ) : null}
                 {onRemoveFromSplit ? (
@@ -779,6 +748,7 @@ function IconBtn({
       <TooltipTrigger asChild>
         <button
           type="button"
+          data-pane-action=""
           onClick={onClick}
           className={cn(
             'inline-flex size-7 items-center justify-center rounded-md hover:bg-black/[0.06] dark:hover:bg-white/[0.08]',
