@@ -601,7 +601,7 @@ function SidebarSessionListInner({
                                 >
                                   <Pin
                                     aria-label="Pinned"
-                                    className="text-white size-3"
+                                    className="text-zinc-400 size-3"
                                     fill="currentColor"
                                   />
                                 </span>
@@ -1014,7 +1014,7 @@ function SidebarGroupItem({
             >
               <Pin
                 aria-label="Pinned"
-                className="text-white size-3"
+                className="text-zinc-400 size-3"
                 fill="currentColor"
               />
             </span>
@@ -1593,7 +1593,7 @@ function SidebarSplitTerminalChild({
           {isPinned ? (
             <Pin
               aria-label="Pinned"
-              className="text-muted-foreground/60 size-3 shrink-0"
+              className="text-zinc-400 size-3 shrink-0"
             />
           ) : null}
         </button>

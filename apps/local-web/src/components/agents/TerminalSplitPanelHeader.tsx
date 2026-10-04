@@ -1,10 +1,6 @@
 import type { AgentProject, TerminalSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
-  ArrowDownToLine,
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  ArrowUpToLine,
   Folder,
   MoreVertical,
   Pencil,
@@ -17,6 +13,7 @@ import { useState } from 'react'
 import { ProjectMetaHover } from '@/components/agents/ChatSplitPanelHeader'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
+import { SplitMenuDropdown } from '@/components/agents/split-menu'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
 import {
   DropdownMenu,
@@ -31,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { cn } from '@/lib/utils'
 
 /**
@@ -57,10 +55,11 @@ export type TerminalSplitPanelHeaderProps = {
   ) => void | Promise<void>
   /** Removes the terminal from the split (close pane, not delete). */
   onRemoveFromSplit?: (terminalId: string) => void
-  onSplitLeft?: (terminalId: string) => void
-  onSplitRight?: (terminalId: string) => void
-  onSplitUp?: (terminalId: string) => void
-  onSplitDown?: (terminalId: string) => void
+  onSplitPane?: (
+    terminalId: string,
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
+  ) => void
 }
 
 export function TerminalSplitPanelHeader({
@@ -73,10 +72,7 @@ export function TerminalSplitPanelHeader({
   onToggleArchive,
   onMoveToProject,
   onRemoveFromSplit,
-  onSplitLeft,
-  onSplitRight,
-  onSplitUp,
-  onSplitDown
+  onSplitPane
 }: TerminalSplitPanelHeaderProps) {
   const { tabColors, setTabColor } = useSessionTabColors()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -211,45 +207,13 @@ export function TerminalSplitPanelHeader({
                     </DropdownMenuItem>
                   </>
                 ) : null}
-                {onSplitLeft || onSplitRight || onSplitUp || onSplitDown ? (
+                {onSplitPane ? (
                   <>
                     <DropdownMenuSeparator />
-                    {onSplitLeft ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitLeft(terminal.id)}
-                      >
-                        <ArrowLeftToLine className="size-3.5" />
-                        Split left
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onSplitRight ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitRight(terminal.id)}
-                      >
-                        <ArrowRightToLine className="size-3.5" />
-                        Split right
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onSplitUp ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitUp(terminal.id)}
-                      >
-                        <ArrowUpToLine className="size-3.5" />
-                        Split up
-                      </DropdownMenuItem>
-                    ) : null}
-                    {onSplitDown ? (
-                      <DropdownMenuItem
-                        className="gap-2 text-[13px]"
-                        onSelect={() => onSplitDown(terminal.id)}
-                      >
-                        <ArrowDownToLine className="size-3.5" />
-                        Split down
-                      </DropdownMenuItem>
-                    ) : null}
+                    <SplitMenuDropdown
+                      sourceId={terminal.id}
+                      onSplitPane={onSplitPane}
+                    />
                   </>
                 ) : null}
                 {onRemoveFromSplit ? (

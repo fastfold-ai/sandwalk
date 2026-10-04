@@ -1,19 +1,16 @@
 import type {
+  AgentSkill,
+  McpServer,
   RuntimeSettings,
   ServerSystemInfo,
   SessionSandboxStatus,
   Specialist
 } from '@sandwalk/agent-ui-core'
-import { ArrowUp, Mic, Plus, Square } from 'lucide-react'
-import { useRef } from 'react'
+import { ArrowUp, ListChecks, Mic, Square, X } from 'lucide-react'
 
 import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
-import {
-  ComposerModeMenu,
-  planModeAccent
-} from '@/components/agents/composer/ComposerModeMenu'
-import { ComposerSandboxPicker } from '@/components/agents/composer/ComposerSandboxPicker'
-import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
+import { planModeAccent } from '@/components/agents/composer/ComposerModeMenu'
+import { ComposerPlusMenu } from '@/components/agents/composer/ComposerPlusMenu'
 import { ComposerTokenUsage } from '@/components/agents/composer/ComposerTokenUsage'
 import {
   type SandboxActionPhase,
@@ -33,6 +30,10 @@ export function ComposerToolbar({
   sendDisabled = false,
   modelOptions,
   runtimeSettings,
+  skills = [],
+  mcpServers = [],
+  onPickSkill,
+  onPickMcp,
   specialists,
   selectedSpecialistId,
   sandboxStatus,
@@ -70,6 +71,10 @@ export function ComposerToolbar({
   sendDisabled?: boolean
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
+  skills?: AgentSkill[]
+  mcpServers?: McpServer[]
+  onPickSkill?: (skill: AgentSkill) => void
+  onPickMcp?: (server: McpServer) => void
   specialists: Specialist[]
   selectedSpecialistId: string | null
   sandboxStatus: SessionSandboxStatus | null
@@ -124,7 +129,6 @@ export function ComposerToolbar({
    */
   embedded?: boolean
 }) {
-  const uploadRef = useRef<HTMLInputElement | null>(null)
   const planMode = Boolean(runtimeSettings?.planMode)
 
   return (
@@ -134,31 +138,48 @@ export function ComposerToolbar({
         embedded && 'mt-4'
       )}
     >
-      <div className="flex h-7 min-w-0 flex-1 items-center gap-1 overflow-hidden">
-        <input
-          ref={uploadRef}
-          type="file"
-          multiple
-          hidden
-          onChange={event => {
-            if (event.target.files) onUpload(event.target.files)
-            event.target.value = ''
-          }}
+      <div className="flex h-7 min-w-0 flex-1 items-center gap-2">
+        <ComposerPlusMenu
+          runtimeSettings={runtimeSettings}
+          skills={skills}
+          mcpServers={mcpServers}
+          specialists={specialists}
+          selectedSpecialistId={selectedSpecialistId}
+          sandboxStatus={sandboxStatus}
+          sandboxPhase={sandboxPhase}
+          onUpload={onUpload}
+          onPlanModeChange={onPlanModeChange}
+          onPickSkill={onPickSkill}
+          onPickMcp={onPickMcp}
+          onSpecialistSelect={onSpecialistSelect}
+          onCreateSpecialist={onCreateSpecialist}
+          onManageSpecialists={onManageSpecialists}
+          onSandboxBackendSelect={onSandboxBackendSelect}
+          onSandboxComputeChange={onSandboxComputeChange}
+          onSandboxStart={onSandboxStart}
+          onSandboxStop={onSandboxStop}
+          onSandboxRestart={onSandboxRestart}
+          onLoadLocalSystem={onLoadLocalSystem}
+          onRefreshSandbox={onRefreshSandbox}
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7 shrink-0 rounded-full"
-          type="button"
-          onClick={() => uploadRef.current?.click()}
-        >
-          <Plus className="size-4" />
-        </Button>
-        {onPlanModeChange ? (
-          <ComposerModeMenu
-            runtimeSettings={runtimeSettings}
-            onPlanModeChange={onPlanModeChange}
-          />
+        {planMode && onPlanModeChange ? (
+          <span
+            className={cn(
+              'inline-flex h-7 shrink-0 items-center gap-1 rounded-full pl-2.5 pr-1 text-xs font-medium',
+              planModeAccent.chip
+            )}
+          >
+            <ListChecks className="size-3.5" />
+            Plan
+            <button
+              type="button"
+              aria-label="Turn off plan mode"
+              className="hover:bg-black/10 inline-flex size-4 items-center justify-center rounded-full dark:hover:bg-white/10"
+              onClick={() => void onPlanModeChange(false)}
+            >
+              <X className="size-3" />
+            </button>
+          </span>
         ) : null}
         <ComposerModelPicker
           modelOptions={modelOptions}
@@ -170,30 +191,8 @@ export function ComposerToolbar({
           onToggleModelFavorite={onToggleModelFavorite}
           onFocusComposer={onFocusComposer}
         />
-        {onSpecialistSelect ? (
-          <ComposerSpecialistPicker
-            specialists={specialists}
-            selectedSpecialistId={selectedSpecialistId}
-            onSpecialistSelect={onSpecialistSelect}
-            onCreateSpecialist={onCreateSpecialist}
-            onManageSpecialists={onManageSpecialists}
-          />
-        ) : null}
-        {onSandboxBackendSelect ? (
-          <ComposerSandboxPicker
-            sandboxStatus={sandboxStatus}
-            sandboxPhase={sandboxPhase}
-            onSandboxBackendSelect={onSandboxBackendSelect}
-            onSandboxComputeChange={onSandboxComputeChange}
-            onSandboxStart={onSandboxStart}
-            onSandboxStop={onSandboxStop}
-            onSandboxRestart={onSandboxRestart}
-            onLoadLocalSystem={onLoadLocalSystem}
-            onRefreshSandbox={onRefreshSandbox}
-          />
-        ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1">
         <ComposerTokenUsage
           tokenUsage={tokenUsage}
           contextWindow={

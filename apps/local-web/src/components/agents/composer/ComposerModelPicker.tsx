@@ -1,8 +1,7 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
-import { ChevronDown, Plus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Check, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ComposerModelPickerOption } from '@/components/agents/composer/ComposerModelPickerOption'
 import {
   composerModelOptionKey,
   useComposerModelPickerNav
@@ -17,12 +16,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   type ComposerModelOption,
   type ComposerModelPreferences,
-  composerModelPrefKey,
-  formatModelEffortBadge,
-  formatPickerContextBadge,
+  formatContextWindow,
+  formatReasoningEffortLabel,
+  isComposerModelSelected,
   rankComposerModelOptions,
   resolveComposerModelOption
 } from '@/lib/composer-models'
+import { cn } from '@/lib/utils'
 
 export function ComposerModelPicker({
   modelOptions,
@@ -31,7 +31,7 @@ export function ComposerModelPicker({
   onReasoningSettingsChange,
   onAddModels,
   onLoadModelPreferences,
-  onToggleModelFavorite,
+  onToggleModelFavorite: _onToggleModelFavorite,
   onFocusComposer,
   triggerLabel
 }: {
@@ -59,9 +59,11 @@ export function ComposerModelPicker({
   /** Override the trigger label (e.g. Bench “Compare”). */
   triggerLabel?: string
 }) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
+  const [sideOffset, setSideOffset] = useState(8)
   const [modelSearch, setModelSearch] = useState('')
-  const [effortMenuOpen, setEffortMenuOpen] = useState(false)
+  const [flyout, setFlyout] = useState<'model' | 'effort' | null>(null)
   const [preferences, setPreferences] = useState<ComposerModelPreferences>({
     favorites: [],
     recent: []
@@ -90,8 +92,6 @@ export function ComposerModelPicker({
       (selectedModel.reasoningEffortOptions &&
         selectedModel.reasoningEffortOptions.length > 0)
   )
-  // Prefer live runtime settings so effort changes paint immediately without
-  // waiting for a full model-catalog reload (Bench never reloads the catalog).
   const selectedEffort = String(
     runtimeSettings?.reasoningEffort ?? selectedModel.reasoningEffort ?? 'medium'
   )
@@ -100,22 +100,16 @@ export function ComposerModelPicker({
   const selectedFast = Boolean(
     runtimeSettings?.reasoningFast ?? selectedModel.reasoningFast
   )
-  const reasoningBadge = supportsReasoningEffort
-    ? formatModelEffortBadge({
-        reasoningEffort: selectedEffort,
-        reasoningFast: selectedFast
-      })
-    : null
-  const contextBadge = formatPickerContextBadge(selectedModel.contextWindow)
+  const contextLabel = formatContextWindow(selectedModel.contextWindow)?.replace(/k$/, 'K')
+  const effortOptions =
+    selectedModel.reasoningEffortOptions &&
+    selectedModel.reasoningEffortOptions.length > 0
+      ? selectedModel.reasoningEffortOptions
+      : ['low', 'medium', 'high']
 
   const sections = useMemo(
     () => rankComposerModelOptions(modelOptions, modelSearch, preferences),
     [modelOptions, modelSearch, preferences]
-  )
-
-  const favoriteSet = useMemo(
-    () => new Set(preferences.favorites),
-    [preferences.favorites]
   )
 
   const nav = useComposerModelPickerNav({
@@ -123,7 +117,7 @@ export function ComposerModelPicker({
     search: modelSearch,
     sections,
     selected: selectedModel,
-    effortMenuOpen
+    effortMenuOpen: flyout === 'effort'
   })
 
   useEffect(() => {
@@ -144,7 +138,7 @@ export function ComposerModelPicker({
   const closePicker = () => {
     setModelPickerOpen(false)
     setModelSearch('')
-    setEffortMenuOpen(false)
+    setFlyout(null)
   }
 
   const focusComposerSoon = () => {
@@ -163,140 +157,222 @@ export function ComposerModelPicker({
     <Popover
       open={modelPickerOpen}
       onOpenChange={open => {
+        if (open) {
+          const button = triggerRef.current
+          const form = button?.closest('form')
+          if (button && form) {
+            const buttonBox = button.getBoundingClientRect()
+            const formBox = form.getBoundingClientRect()
+            setSideOffset(Math.max(8, buttonBox.top - formBox.top + 8))
+          }
+        }
         setModelPickerOpen(open)
         if (!open) {
           setModelSearch('')
-          setEffortMenuOpen(false)
+          setFlyout(null)
         }
       }}
     >
       <PopoverTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
-          title={`${selectedModel.label}${selectedModel.speed ? ` · ${selectedModel.speed}` : ''}${contextBadge ? ` ${contextBadge}` : ''}${reasoningBadge ? ` · ${reasoningBadge}` : ''}`}
-          className="text-muted-foreground hover:text-foreground inline-flex min-w-0 max-w-[min(100%,20rem)] items-center gap-1 rounded-md px-1.5 py-1 text-xs hover:bg-transparent"
+          title={selectedModel.label}
+          className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 rounded-md py-1 text-[13px]"
         >
-          <span className="min-w-0 truncate font-medium">
+          <span className="whitespace-nowrap">
             {triggerLabel || selectedModel.label}
           </span>
-          {!triggerLabel && contextBadge ? (
-            <span className="text-muted-foreground shrink-0 text-[11px]">
-              {contextBadge}
-            </span>
-          ) : null}
-          {!triggerLabel && reasoningBadge ? (
-            <span className="text-muted-foreground shrink-0 text-[11px]">
-              {reasoningBadge}
-            </span>
-          ) : null}
-          <ChevronDown className="text-muted-foreground size-3.5 shrink-0" />
+          <ChevronDown className="size-3.5 shrink-0 opacity-60" />
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
         side="top"
-        className="z-[90] w-[min(18rem,calc(100vw-2rem))] overflow-visible p-0"
+        sideOffset={sideOffset}
+        collisionPadding={12}
+        className="z-[90] w-auto overflow-visible border-0 bg-transparent p-0 shadow-none"
         onCloseAutoFocus={event => event.preventDefault()}
-        onInteractOutside={event => {
-          if (effortMenuOpen) event.preventDefault()
-        }}
-        onFocusOutside={event => {
-          if (effortMenuOpen) event.preventDefault()
-        }}
-        onPointerDownOutside={event => {
-          if (effortMenuOpen) event.preventDefault()
-        }}
       >
-        <div className="bg-popover overflow-hidden rounded-md border-0">
-          <div className="bg-popover border-b px-3 py-2">
-            <Input
-              value={modelSearch}
-              onChange={event => setModelSearch(event.target.value)}
-              onKeyDown={event => {
-                nav.onSearchKeyDown(event, selectModelAndClose)
-              }}
-              placeholder="Search models"
-              className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-              autoFocus
-            />
-          </div>
-          <ScrollArea className="h-72 w-full">
-            <div className="w-full py-1">
-              {modelOptions.length === 0 ? (
-                <div className="text-muted-foreground px-3 py-3 text-sm">
-                  No enabled models. Turn models on in Dashboard → Models.
-                </div>
-              ) : sections.length === 0 ? (
-                <div className="text-muted-foreground px-3 py-3 text-sm">
-                  No models match “{modelSearch.trim()}”.
-                </div>
-              ) : (
-                sections.map(section => (
-                  <div key={section.title || 'all'}>
-                    {section.title ? (
-                      <div className="text-muted-foreground px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide uppercase">
-                        {section.title}
-                      </div>
-                    ) : null}
-                    {section.options.map(option => {
-                      const optionKey = composerModelOptionKey(option)
-                      return (
-                        <div
-                          key={optionKey}
-                          onMouseEnter={() => nav.setActiveKey(optionKey)}
-                        >
-                          <ComposerModelPickerOption
-                            option={option}
-                            optionKey={optionKey}
-                            modelOptions={modelOptions}
-                            runtimeSettings={runtimeSettings}
-                            favorite={favoriteSet.has(
-                              composerModelPrefKey(option)
-                            )}
-                            active={nav.activeKey === optionKey}
-                            effortMenuOpen={effortMenuOpen}
-                            onEffortMenuOpenChange={setEffortMenuOpen}
-                            onModelSelect={onModelSelect}
-                            onReasoningSettingsChange={onReasoningSettingsChange}
-                            onModelSearchClear={() => setModelSearch('')}
-                            onClosePicker={() => {
-                              closePicker()
-                              focusComposerSoon()
-                            }}
-                            onToggleFavorite={
-                              onToggleModelFavorite
-                                ? async () => {
-                                    const result =
-                                      await onToggleModelFavorite(option)
-                                    setPreferences(prev => ({
-                                      ...prev,
-                                      favorites: result.favorites
-                                    }))
-                                  }
-                                : undefined
-                            }
-                          />
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-          {onAddModels ? (
-            <div className="border-t p-1">
+        <div className="relative">
+          <div className="bg-popover w-60 rounded-2xl border p-1 text-[13px] shadow-lg">
+            {supportsReasoningEffort &&
+            selectedModel.supportsReasoningFast !== false &&
+            onReasoningSettingsChange ? (
+              <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5">
+                <span>Fast</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={selectedFast}
+                  aria-label="Fast"
+                  className={cn(
+                    'relative h-4 w-7 shrink-0 rounded-full transition-colors',
+                    selectedFast ? 'bg-foreground' : 'bg-muted'
+                  )}
+                  onClick={() => {
+                    void onReasoningSettingsChange({
+                      provider: selectedModel.provider,
+                      model: selectedModel.model,
+                      reasoningFast: !selectedFast
+                    })
+                  }}
+                >
+                  <span
+                    className={cn(
+                      'bg-background absolute top-0.5 size-3 rounded-full transition-[left]',
+                      selectedFast ? 'left-3.5' : 'left-0.5'
+                    )}
+                  />
+                </button>
+              </div>
+            ) : null}
+            {contextLabel ? (
+              <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5">
+                <span>Context</span>
+                <span className="text-muted-foreground flex items-center gap-1">
+                  {contextLabel}
+                  <ChevronRight className="size-3.5 opacity-70" />
+                </span>
+              </div>
+            ) : null}
+            {supportsReasoningEffort && onReasoningSettingsChange ? (
               <button
                 type="button"
-                className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
-                onClick={() => {
-                  closePicker()
-                  onAddModels()
-                }}
+                className={cn(
+                  'hover:bg-muted flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left',
+                  flyout === 'effort' && 'bg-muted'
+                )}
+                onMouseEnter={() => setFlyout('effort')}
+                onClick={() => setFlyout('effort')}
               >
-                <Plus className="size-3.5 shrink-0" />
-                Add Models
+                <span>Effort</span>
+                <span className="text-muted-foreground flex items-center gap-1">
+                  {formatReasoningEffortLabel(selectedEffort)}
+                  <ChevronRight className="size-3.5 opacity-70" />
+                </span>
               </button>
+            ) : null}
+            <button
+              type="button"
+              className={cn(
+                'hover:bg-muted flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left',
+                flyout === 'model' && 'bg-muted'
+              )}
+              onMouseEnter={() => setFlyout('model')}
+              onClick={() => setFlyout('model')}
+            >
+              <span>Model</span>
+              <span className="text-muted-foreground flex min-w-0 items-center gap-1">
+                <span className="truncate">
+                  {triggerLabel || selectedModel.label}
+                </span>
+                <ChevronRight className="size-3.5 shrink-0 opacity-70" />
+              </span>
+            </button>
+          </div>
+          {flyout === 'effort' && supportsReasoningEffort ? (
+            <div className="bg-popover absolute top-14 left-full z-10 ml-1.5 w-40 rounded-2xl border p-1 shadow-lg">
+              {effortOptions.map(level => {
+                const active = selectedEffort === level
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    className="hover:bg-muted flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-[13px]"
+                    onClick={() => {
+                      void onReasoningSettingsChange?.({
+                        provider: selectedModel.provider,
+                        model: selectedModel.model,
+                        reasoningEffort: level
+                      })
+                    }}
+                  >
+                    <span>{formatReasoningEffortLabel(level)}</span>
+                    {active ? <Check className="size-3.5" /> : null}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+          {flyout === 'model' ? (
+            <div className="bg-popover absolute top-0 left-full z-10 ml-1.5 flex w-64 flex-col overflow-hidden rounded-2xl border shadow-lg">
+              <div className="border-b px-3 py-1.5">
+                <Input
+                  value={modelSearch}
+                  onChange={event => setModelSearch(event.target.value)}
+                  onKeyDown={event => {
+                    nav.onSearchKeyDown(event, selectModelAndClose)
+                  }}
+                  placeholder="Search models"
+                  className="h-7 border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
+                  autoFocus
+                />
+              </div>
+              <ScrollArea className="h-52">
+                <div className="py-1">
+                  {modelOptions.length === 0 ? (
+                    <div className="text-muted-foreground px-3 py-3 text-[13px]">
+                      No enabled models.
+                    </div>
+                  ) : sections.length === 0 ? (
+                    <div className="text-muted-foreground px-3 py-3 text-[13px]">
+                      No models match “{modelSearch.trim()}”.
+                    </div>
+                  ) : (
+                    sections.map(section => (
+                      <div key={section.title || 'all'}>
+                        {section.title ? (
+                          <div className="text-muted-foreground px-3 pt-2 pb-1 text-xs">
+                            {section.title}
+                          </div>
+                        ) : null}
+                        {section.options.map(option => {
+                          const optionKey = composerModelOptionKey(option)
+                          const selected = isComposerModelSelected(
+                            option,
+                            runtimeSettings,
+                            modelOptions
+                          )
+                          return (
+                            <button
+                              key={optionKey}
+                              type="button"
+                              data-composer-model-option={optionKey}
+                              className={cn(
+                                'hover:bg-muted mx-1 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[13px]',
+                                nav.activeKey === optionKey && 'bg-muted'
+                              )}
+                              onMouseEnter={() => nav.setActiveKey(optionKey)}
+                              onClick={() => selectModelAndClose(option)}
+                            >
+                              <span className="min-w-0 truncate">
+                                {option.label}
+                              </span>
+                              {selected ? (
+                                <Check className="size-3.5 shrink-0" />
+                              ) : null}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+              {onAddModels ? (
+                <button
+                  type="button"
+                  className="hover:bg-muted flex items-center gap-2 border-t px-3 py-2 text-left text-[13px]"
+                  onClick={() => {
+                    closePicker()
+                    onAddModels()
+                  }}
+                >
+                  <Plus className="size-3.5 shrink-0" />
+                  Add models
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

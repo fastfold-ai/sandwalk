@@ -176,7 +176,8 @@ export function useAppRouting(location: Location) {
         !isProjectHome &&
         routeSessionId &&
         (!isReservedAgentRouteId(routeSessionId) ||
-          isDraftAgentSessionId(routeSessionId))
+          isDraftAgentSessionId(routeSessionId) ||
+          routeSessionId === 'blank')
       ? routeSessionId
       : null
 

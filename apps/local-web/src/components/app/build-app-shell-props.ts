@@ -74,6 +74,7 @@ type AppShellBridgeInput = {
   perSessionBaseArgs: AppShellProps['perSessionBaseArgs']
   allSessions: AppShellProps['allSessions']
   onSplitWithNextTab: AppShellProps['onSplitWithNextTab']
+  onSplitPane: AppShellProps['onSplitPane']
   onPickSplitPartner: AppShellProps['onPickSplitPartner']
   onCancelPendingSplit: AppShellProps['onCancelPendingSplit']
   onAddChatToSplit: AppShellProps['onAddChatToSplit']
@@ -321,6 +322,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     perSessionBaseArgs: input.perSessionBaseArgs,
     allSessions: input.allSessions,
     onSplitWithNextTab: input.onSplitWithNextTab,
+    onSplitPane: input.onSplitPane,
     onPickSplitPartner: input.onPickSplitPartner,
     onCancelPendingSplit: input.onCancelPendingSplit,
     onAddChatToSplit: input.onAddChatToSplit,

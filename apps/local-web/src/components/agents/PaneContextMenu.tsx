@@ -1,10 +1,4 @@
-import {
-  ArrowDownToLine,
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  ArrowUpToLine,
-  X
-} from 'lucide-react'
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import {
@@ -17,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 import type { PaneContextMenuDetail } from './ChatTilingContainer'
+import { SplitMenuDropdown } from './split-menu'
 
 /**
  * Global listener + floating menu triggered by a right-click on any
@@ -69,51 +64,15 @@ export function PaneContextMenu() {
         // Popper flip handles the axis, this padding prevents flush-cut
         // edges once flipped.
         collisionPadding={{ bottom: 8, right: 8, top: 8, left: 8 }}
-        className="w-52"
+        className="w-56"
       >
-        <DropdownMenuItem
-          className="gap-2 text-[13px]"
-          onSelect={() => {
-            state.handlers.onSplitLeft()
+        <SplitMenuDropdown
+          sourceId={state.chatId}
+          onSplitPane={(id, direction, target) => {
+            state.handlers.onSplitPane(id, direction, target)
             setState(null)
           }}
-        >
-          <ArrowLeftToLine className="size-3.5" />
-          Split left
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2 text-[13px]"
-          onSelect={() => {
-            state.handlers.onSplitRight()
-            setState(null)
-          }}
-        >
-          <ArrowRightToLine className="size-3.5" />
-          Split right
-          <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="gap-2 text-[13px]"
-          onSelect={() => {
-            state.handlers.onSplitUp()
-            setState(null)
-          }}
-        >
-          <ArrowUpToLine className="size-3.5" />
-          Split up
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2 text-[13px]"
-          onSelect={() => {
-            state.handlers.onSplitDown()
-            setState(null)
-          }}
-        >
-          <ArrowDownToLine className="size-3.5" />
-          Split down
-          <DropdownMenuShortcut>⇧⌘D</DropdownMenuShortcut>
-        </DropdownMenuItem>
+        />
         {state.handlers.onClose ? (
           <>
             <DropdownMenuSeparator />

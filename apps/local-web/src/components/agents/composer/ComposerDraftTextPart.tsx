@@ -60,7 +60,7 @@ export function ComposerDraftTextPart({
     isLastText && !part.text && !hasInlineChips
       ? running
         ? 'Add a follow-up'
-        : placeholder || 'Ask Agent, @ for context, / for skills & MCPs'
+        : placeholder || 'Ask Agent'
       : undefined
 
   const emptyLastText = isLastText && !part.text

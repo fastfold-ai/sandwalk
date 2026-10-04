@@ -15,12 +15,13 @@ import { getFocusedItemId } from '@/lib/focused-item'
 import { getTerminalLongRunningThresholdMs } from '@/lib/notification-settings'
 import { perfCount, perfTrackTerminal } from '@/lib/perf-probe'
 import { markTerminalActivity } from '@/lib/terminal-attention'
-import { useTerminalsStore } from '@/lib/terminals-store'
+import { takeTerminalStartup } from '@/lib/terminal-startup'
 import {
   buildTerminalTheme,
   isDocumentDark,
   watchTerminalTheme
 } from '@/lib/terminal-theme'
+import { useTerminalsStore } from '@/lib/terminals-store'
 
 import { useTerminalLayer } from './terminal-layer-registry'
 
@@ -410,6 +411,13 @@ export function TerminalPortalHost({
             for (const chunk of pendingInput) ws.send(chunk)
             pendingInput.length = 0
             pendingInputBytes = 0
+          }
+          const startup = takeTerminalStartup(terminalId)
+          if (startup) {
+            window.setTimeout(() => {
+              if (cancelled || socketRef.current !== ws) return
+              ws.send(`${startup}\r`)
+            }, 400)
           }
           try {
             const dims = fit.proposeDimensions()

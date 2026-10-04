@@ -1,5 +1,5 @@
-import { Ban } from 'lucide-react'
-import { type ReactNode, useEffect, useRef } from 'react'
+import { Ban, ChevronRight } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { cn } from '@/lib/utils'
@@ -115,6 +115,40 @@ export function TabContextItem({
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {trailing}
     </button>
+  )
+}
+
+/** Flyout opened by hovering a row. Used for Split down / Split right. */
+export function TabContextSubmenu({
+  icon,
+  label,
+  trailing,
+  children
+}: {
+  icon: ReactNode
+  label: string
+  trailing?: ReactNode
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <div className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3.5">
+        {icon}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {trailing}
+        <ChevronRight className="size-3 shrink-0 opacity-60" />
+      </div>
+      {open ? (
+        <div className="bg-popover text-popover-foreground absolute top-0 left-full z-50 ml-1 min-w-[11rem] rounded-md border p-1 shadow-md">
+          {children}
+        </div>
+      ) : null}
+    </div>
   )
 }
 

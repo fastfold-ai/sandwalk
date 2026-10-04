@@ -27,7 +27,7 @@ import { useAppShellEffects } from '@/hooks/useAppShellEffects'
 import { useAppTabGroups } from '@/hooks/useAppTabGroups'
 import { useAppTerminals } from '@/hooks/useAppTerminals'
 import { useAppUiState } from '@/hooks/useAppUiState'
-import { buildGridTree } from '@/hooks/useChatTiling'
+import { buildGridTree, splitPane } from '@/hooks/useChatTiling'
 import { useDesktopNavigate } from '@/hooks/useDesktopNavigate'
 import { useDesktopWindowMenu } from '@/hooks/useDesktopWindowMenu'
 import { useEventsMux } from '@/hooks/useEventsMux'
@@ -42,6 +42,11 @@ import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
 import { setFocusedItemId } from '@/lib/focused-item'
 import { setItemOpener } from '@/lib/item-opener'
 import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
+import {
+  cliHarnessPreset,
+  type PaneSplitDirection,
+  type PaneSplitTarget
+} from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { resolveItemLocation } from '@/lib/resolve-item-location'
 import { useChatActivity } from '@/lib/session-activity'
@@ -52,6 +57,7 @@ import {
 import { visibleSessionIds } from '@/lib/sessions'
 import { resolveStripActiveId } from '@/lib/strip-active'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
+import { queueTerminalStartup } from '@/lib/terminal-startup'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
 /** Stable empty list so the sidebar-only model never sees a new array. */
@@ -559,6 +565,106 @@ export default function App() {
     },
     [tabGroupsStore, navigate]
   )
+
+  const handleSplitPane = useCallback(
+    (sourceId: string, direction: PaneSplitDirection, target: PaneSplitTarget) => {
+      void (async () => {
+        const source = isDraftAgentSessionId(sourceId)
+          ? await layer.actions.ensureAgentSession(undefined, { navigate: false })
+          : sourceId
+        if (!source) return
+        const projectId =
+          bootstrap.sessions.find(item => item.id === source)?.projectId ??
+          context.activeProjectId
+        let partnerId: string
+        if (target === 'agent') {
+          const created = await bootstrap.client.createSession({
+            title: 'New Agent',
+            projectId,
+            clientSurface: 'ui'
+          })
+          bootstrap.setSessions(current =>
+            current.some(item => item.id === created.id)
+              ? current
+              : [created, ...current]
+          )
+          partnerId = created.id
+        } else {
+          const preset = cliHarnessPreset(target)
+          const term = await bootstrap.client.createTerminal({
+            title: preset?.title ?? 'Terminal',
+            projectId
+          })
+          useTerminalsStore.getState().addOptimistic(term)
+          if (preset) queueTerminalStartup(term.id, preset.command)
+          partnerId = term.id
+        }
+        const existing = tabGroupsStore.allTabGroups.find(
+          group => !group.isPending && group.itemIds.includes(source)
+        )
+        const fingerprint = getMonitorFingerprint()
+        const sourceLeaf = source.startsWith('term_')
+          ? { type: 'terminal' as const, terminalId: source }
+          : { type: 'chat' as const, chatId: source }
+        if (existing) {
+          const base =
+            existing.layout?.perMonitor?.[fingerprint] ??
+            buildGridTree(existing.itemIds, 1, Math.max(1, existing.itemIds.length))
+          tabGroupsStore.addToGroup(existing.id, partnerId)
+          tabGroupsStore.setGroupLayoutForMonitor(
+            existing.id,
+            fingerprint,
+            splitPane(base, source, direction, partnerId, 'after')
+          )
+          navigate(`/agents/${existing.id}`)
+          return
+        }
+        const groupId = tabGroupsStore.createGroup([source, partnerId])
+        if (!groupId) return
+        tabGroupsStore.setGroupLayoutForMonitor(
+          groupId,
+          fingerprint,
+          splitPane(sourceLeaf, source, direction, partnerId, 'after')
+        )
+        navigate(`/agents/${groupId}`)
+      })().catch(err => console.error('split pane failed', err))
+    },
+    [
+      bootstrap,
+      context.activeProjectId,
+      layer.actions,
+      navigate,
+      tabGroupsStore
+    ]
+  )
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const meta = event.metaKey || event.ctrlKey
+      if (!meta || event.altKey || event.key.toLowerCase() !== 'd') return
+      const active = document.activeElement
+      if (
+        active instanceof HTMLElement &&
+        active.closest(
+          '.xterm, input, textarea, select, [contenteditable="true"]'
+        )
+      ) {
+        return
+      }
+      const source =
+        route.terminalId ??
+        (activeGroup ? activeGroup.activeChatId : route.sessionId)
+      if (!source) return
+      event.preventDefault()
+      handleSplitPane(
+        source,
+        event.shiftKey ? 'vertical' : 'horizontal',
+        source.startsWith('term_') ? 'terminal' : 'agent'
+      )
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [activeGroup, handleSplitPane, route.sessionId, route.terminalId])
 
   const handlePickSplitPartner = useCallback(
     (partnerId: string) => {
@@ -1233,6 +1339,7 @@ export default function App() {
           perSessionBaseArgs,
           allSessions: bootstrap.sessions,
           onSplitWithNextTab: handleCreateSplitFromChat,
+          onSplitPane: handleSplitPane,
           onPickSplitPartner: handlePickSplitPartner,
           onCancelPendingSplit: handleCancelPendingSplit,
           onAddChatToSplit: handleAddChatToSplit,

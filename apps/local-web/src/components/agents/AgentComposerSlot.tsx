@@ -11,7 +11,7 @@ import type {
   WorkspaceFile
 } from '@sandwalk/agent-ui-core'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -20,6 +20,11 @@ import {
   type SandboxActionPhase
 } from '@/components/agents/Composer'
 import { type SandboxComputeChange } from '@/components/agents/composer/sandbox-utils'
+import {
+  PLAN_MODE_EVENT,
+  requestPlanMode,
+  takeQueuedPlanMode
+} from '@/components/agents/empty-start'
 import { QueuedMessages } from '@/components/agents/QueuedMessages'
 import {
   contentTypeFromPath,
@@ -177,6 +182,36 @@ export function AgentComposerSlot({
         session.openaiProfileId ?? runtimeSettings.openaiProfileId ?? null
     }
   }, [isDraftSession, runtimeSettings, session])
+
+  useEffect(() => {
+    const apply = (enabled: boolean) => {
+      void client
+        .updateRuntimeSettings({ planMode: enabled })
+        .then(setRuntimeSettings)
+        .catch(err => console.error('plan mode failed', err))
+    }
+    const queued = takeQueuedPlanMode()
+    if (queued !== null) apply(queued)
+    const onPlan = () => {
+      const next = takeQueuedPlanMode()
+      if (next !== null) apply(next)
+    }
+    window.addEventListener(PLAN_MODE_EVENT, onPlan)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !event.shiftKey) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target
+      if (!(target instanceof Element) || !target.closest('form')) return
+      event.preventDefault()
+      requestPlanMode(!runtimeSettings?.planMode)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener(PLAN_MODE_EVENT, onPlan)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [client, runtimeSettings?.planMode, setRuntimeSettings])
+
   return (
     <>
       <QueuedMessages

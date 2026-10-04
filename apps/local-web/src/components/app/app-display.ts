@@ -98,6 +98,9 @@ export function computeShowSessionTabs(input: {
   const realSession = Boolean(
     input.sessionId && !isDraftAgentSessionId(input.sessionId)
   )
+  // A blank New Agent is still a tab: same chrome strip as an open chat.
+  const draft = isDraftAgentSessionId(input.sessionId)
+  const blank = input.sessionId === 'blank'
   return (
     !input.isDashboard &&
     !input.isHome &&
@@ -106,7 +109,8 @@ export function computeShowSessionTabs(input: {
     !input.isProjectHome &&
     !input.isSkills &&
     !input.isIntegrations &&
-    (realSession || input.openTabsLength > 0)
+    !blank &&
+    (realSession || draft || input.openTabsLength > 0)
   )
 }
 

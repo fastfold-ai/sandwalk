@@ -314,6 +314,22 @@ describe('computeShowSessionTabs · invariantes de decisión visual', () => {
     )
   })
 
+  it('a blank New Agent still shows the tab strip', () => {
+    expect(
+      computeShowSessionTabs({
+        isDashboard: false,
+        isHome: false,
+        isLibrary: false,
+        isSites: false,
+        isProjectHome: false,
+        isSkills: false,
+        isIntegrations: false,
+        sessionId: 'new',
+        openTabsLength: 0
+      })
+    ).toBe(true)
+  })
+
   it('con sesión real activa, showSessionTabs es true aunque openTabsLength = 0', () => {
     fc.assert(
       fc.property(

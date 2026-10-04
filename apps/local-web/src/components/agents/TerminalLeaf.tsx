@@ -4,13 +4,13 @@ import { type MouseEvent, useCallback } from 'react'
 
 import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
 import { TerminalSplitPanelHeader } from '@/components/agents/TerminalSplitPanelHeader'
+import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { cn } from '@/lib/utils'
 
 import type {
   PaneContextMenuDetail,
   PaneContextMenuHandlers
 } from './ChatTilingContainer'
-import type { SplitDirection } from '@/hooks/useChatTiling'
 
 type TerminalLeafProps = {
   terminalId: string
@@ -18,10 +18,10 @@ type TerminalLeafProps = {
   focusPanel: () => void
   client: LocalAgentClient
   terminals: TerminalSession[]
-  onSplit: (
+  onSplitPane?: (
     terminalId: string,
-    direction: SplitDirection,
-    side: 'before' | 'after'
+    direction: PaneSplitDirection,
+    target: PaneSplitTarget
   ) => void
   onClose: (terminalId: string) => void
   canClose: boolean
@@ -62,7 +62,7 @@ export function TerminalLeaf({
   // que la prop se mantiene en la firma sólo por compat con callers.
   client: _client,
   terminals,
-  onSplit,
+  onSplitPane,
   onClose,
   canClose,
   projects,
@@ -78,10 +78,8 @@ export function TerminalLeaf({
       event.preventDefault()
       if ('stopPropagation' in event) event.stopPropagation()
       const handlers: PaneContextMenuHandlers = {
-        onSplitLeft: () => onSplit(terminalId, 'horizontal', 'before'),
-        onSplitRight: () => onSplit(terminalId, 'horizontal', 'after'),
-        onSplitUp: () => onSplit(terminalId, 'vertical', 'before'),
-        onSplitDown: () => onSplit(terminalId, 'vertical', 'after'),
+        onSplitPane: (id, direction, target) =>
+          onSplitPane?.(id, direction, target),
         onClose: canClose ? () => onClose(terminalId) : null
       }
       window.dispatchEvent(
@@ -95,7 +93,7 @@ export function TerminalLeaf({
         })
       )
     },
-    [terminalId, onSplit, onClose, canClose]
+    [terminalId, onSplitPane, onClose, canClose]
   )
 
   return (
@@ -112,7 +110,13 @@ export function TerminalLeaf({
           : 'border-border/50 hover:after:border-muted-foreground/40'
       )}
       onContextMenu={onContextMenu}
-      onMouseDownCapture={focusPanel}
+      onMouseDownCapture={event => {
+        const target = event.target
+        if (target instanceof Element && target.closest('[data-pane-action]')) {
+          return
+        }
+        focusPanel()
+      }}
       onFocusCapture={focusPanel}
       aria-label={`Terminal pane: ${terminal?.title ?? 'Terminal'}`}
       data-pane-id={terminalId}
@@ -129,10 +133,7 @@ export function TerminalLeaf({
         onToggleArchive={onToggleArchive}
         onMoveToProject={onMoveToProject}
         onRemoveFromSplit={canClose ? id => onClose(id) : undefined}
-        onSplitLeft={id => onSplit(id, 'horizontal', 'before')}
-        onSplitRight={id => onSplit(id, 'horizontal', 'after')}
-        onSplitUp={id => onSplit(id, 'vertical', 'before')}
-        onSplitDown={id => onSplit(id, 'vertical', 'after')}
+        onSplitPane={onSplitPane}
       />
       {/* FAS-107 W1: el xterm ya no vive acá. Vive en un layer flotante
           (via portal) que se posiciona sobre este placeholder. Así el

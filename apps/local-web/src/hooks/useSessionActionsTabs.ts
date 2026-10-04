@@ -5,7 +5,12 @@ import {
   writeLastSessionByScope,
   writeRecentProjectIds
 } from '@/lib/app-storage'
-import { DRAFT_AGENT_SESSION_ID, sessionRoutePath } from '@/lib/draft-agent'
+import {
+  BLANK_CANVAS_SESSION_ID,
+  DRAFT_AGENT_SESSION_ID,
+  isDraftAgentSessionId,
+  sessionRoutePath
+} from '@/lib/draft-agent'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
 import type { UseSessionActionsArgs } from './useSessionActionsTypes'
@@ -43,6 +48,15 @@ export function useSessionActionsTabs({
   tabGroupsRef
 }: UseSessionActionsTabsArgs) {
   const closeSessionTab = (id: string) => {
+    if (isDraftAgentSessionId(id)) {
+      const rest = openTabIds.filter(tabId => tabId !== id)
+      if (rest.length > 0) {
+        navigate(sessionRoutePath(rest[rest.length - 1]))
+        return
+      }
+      navigate(`/agents/${BLANK_CANVAS_SESSION_ID}`)
+      return
+    }
     const scopeProjectId = activeProjectId
     const tabIsInScope = (tabId: string) => {
       // Los `grp_xxx` no son sesiones; se conservan siempre en el filtro
