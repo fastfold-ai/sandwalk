@@ -186,16 +186,61 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
   background-color: hsl(var(--background));
 }
 
-/* Focused main: dense frost. A hint of the desktop tint comes through,
- * not a readable view of whatever is behind the window. */
+/* Focused main: same frost on chat, dashboard, and settings. Dense enough
+ * that text stays readable, open enough that the desktop tint shows on
+ * full-page screens (overview, skills, MCP) and not only the sidebar. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main {
-  background-color: rgb(246 246 247 / 0.88) !important;
+  background-color: rgb(246 246 247 / 0.74) !important;
   border-left-color: transparent;
 }
 
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main {
-  background-color: rgb(24 24 26 / 0.88) !important;
+  background-color: rgb(24 24 26 / 0.74) !important;
   border-left-color: transparent;
+}
+
+/* Cards, list shells, and sticky toolbars paint opaque white over that
+ * frost, so settings pages look like a solid slab. Keep them in the glass. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main :is(
+  .bg-card,
+  .bg-background,
+  .bg-background\/60,
+  .bg-background\/70,
+  .bg-background\/80,
+  .bg-background\/95,
+  .supports-\[backdrop-filter\]\:bg-background\/80
+) {
+  background-color: rgb(255 255 255 / 0.72) !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main :is(
+  .bg-card,
+  .bg-background,
+  .bg-background\/60,
+  .bg-background\/70,
+  .bg-background\/80,
+  .bg-background\/95,
+  .supports-\[backdrop-filter\]\:bg-background\/80
+) {
+  background-color: rgb(40 40 44 / 0.72) !important;
+}
+
+/* Sticky search strips blur the desktop into a color stain. The page frost
+ * is already the surface, so the strip stays clear and the field stays solid. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-shell-main .sticky.backdrop-blur {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main input,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main input.bg-background\/70 {
+  background-color: rgb(255 255 255 / 0.96) !important;
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main input,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main input.bg-background\/70 {
+  background-color: rgb(44 44 48 / 0.96) !important;
 }
 
 /* Tab strip sits on the same frost. The 6px floor under the tabs was a
