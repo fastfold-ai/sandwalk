@@ -631,6 +631,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
         <div className="flex w-full max-w-[44rem] flex-col items-start gap-8 px-5">
         <SandwalkMark className="text-foreground/80 h-16 w-16 self-center" />
         <EmptyStartActions
+          className="justify-center"
           onPlan={() => {
             requestPlanMode(true)
             navigate('/agents/new')
