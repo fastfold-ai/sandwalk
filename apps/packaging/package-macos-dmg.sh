@@ -11,6 +11,7 @@
 # Env:
 #   CONFIG=release|debug   (default: release) - Swift helper build
 #   SKIP_TAURI=1           skip pnpm tauri build (reuse existing bundle)
+#   SKIP_HELPER=1          reuse apps/sandwalk-mac/.build/Sandwalk Server.app
 #   SKIP_AGENT_RUNTIME=1   skip embedding CPython + sandwalk into the helper
 #   INSTALL=1              also copy assembled app to ~/Applications
 #   OUT_DIR=...            output directory (default: apps/packaging/dist)
@@ -96,12 +97,16 @@ fi
 echo "    client: ${TAURI_BUNDLE}"
 
 # --- 2. Menubar helper -------------------------------------------------------
-echo "==> Building Sandwalk Server helper..."
-cd "${MAC_APP}"
-CONFIG="${CONFIG}" SKIP_INSTALL=1 APP_NAME="Sandwalk Server.app" \
-  CODESIGN_IDENTITY="${CODESIGN_IDENTITY}" \
-  ./scripts/package-app.sh
 HELPER_APP="${MAC_APP}/.build/Sandwalk Server.app"
+if [[ "${SKIP_HELPER:-0}" != "1" ]]; then
+  echo "==> Building Sandwalk Server helper..."
+  cd "${MAC_APP}"
+  CONFIG="${CONFIG}" SKIP_INSTALL=1 APP_NAME="Sandwalk Server.app" \
+    CODESIGN_IDENTITY="${CODESIGN_IDENTITY}" \
+    ./scripts/package-app.sh
+else
+  echo "==> Reusing Sandwalk Server helper..."
+fi
 if [[ ! -d "${HELPER_APP}" ]]; then
   echo "error: helper missing at ${HELPER_APP}"
   exit 1
@@ -156,6 +161,41 @@ mkdir -p "${APP_STAGE}/Contents/Helpers"
 rm -rf "${APP_STAGE}/Contents/Helpers/Sandwalk Server.app"
 cp -R "${HELPER_APP}" "${APP_STAGE}/Contents/Helpers/Sandwalk Server.app"
 
+# SwiftPM resource bundles have no Contents/Info.plist. codesign rejects
+# that layout ("bundle format unrecognized") when signing the helper.
+normalize_resource_bundle() {
+  local nested="$1"
+  [[ -d "${nested}" ]] || return 0
+  if [[ -f "${nested}/Contents/Info.plist" ]]; then
+    return 0
+  fi
+  mkdir -p "${nested}/Contents/Resources"
+  cat > "${nested}/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>ai.fastfold.sandwalk.core.resources</string>
+  <key>CFBundleName</key>
+  <string>SandwalkCore</string>
+  <key>CFBundlePackageType</key>
+  <string>BNDL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+</dict>
+</plist>
+PLIST
+  local item name
+  for item in "${nested}"/*; do
+    name="$(basename "${item}")"
+    [[ "${name}" == "Contents" ]] && continue
+    mv "${item}" "${nested}/Contents/Resources/"
+  done
+}
+
 echo "==> Codesign nested app (identity: ${CODESIGN_IDENTITY})..."
 CLIENT_ENTS="${LOCAL_WEB}/src-tauri/entitlements.plist"
 HELPER_ENTS="${MAC_APP}/Resources/entitlements.plist"
@@ -174,6 +214,23 @@ sign_bundle() {
   codesign "${args[@]}" "${bundle}"
 }
 
+normalize_resource_bundle "${HELPER_STAGE}/Contents/MacOS/Sandwalk_SandwalkCore.bundle"
+
+# Sign nested Mach-O (Python runtime, resource bundle) before the app seal.
+# Hardened runtime is applied on the .app below, with library validation off.
+if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
+  echo "==> Signing nested helper binaries..."
+  while IFS= read -r -d '' bin; do
+    # The helper executable is sealed with the .app. Signing it first fails
+    # while the resource bundle next to it is still unsigned.
+    [[ "${bin}" == "${HELPER_STAGE}/Contents/MacOS/Sandwalk" ]] && continue
+    if file -b "${bin}" | grep -q 'Mach-O'; then
+      codesign --force --sign "${CODESIGN_IDENTITY}" --timestamp "${bin}"
+    fi
+  done < <(find "${HELPER_STAGE}" -type f -print0)
+fi
+sign_bundle "${HELPER_STAGE}/Contents/MacOS/Sandwalk_SandwalkCore.bundle" ""
+
 # Nested helper first, then the outer client (do not use --deep).
 sign_bundle "${HELPER_STAGE}" "${HELPER_ENTS}"
 sign_bundle "${APP_STAGE}" "${CLIENT_ENTS}"
@@ -187,12 +244,28 @@ ln -sf /Applications "${STAGE}/Applications"
 echo "==> Creating ${DMG_PATH}..."
 mkdir -p "${OUT_DIR}"
 rm -f "${DMG_PATH}"
+RW_DMG="${OUT_DIR}/Sandwalk-rw.dmg"
+rm -f "${RW_DMG}"
 hdiutil create \
   -volname "Sandwalk" \
   -srcfolder "${STAGE}" \
   -ov \
-  -format UDZO \
-  "${DMG_PATH}"
+  -format UDRW \
+  "${RW_DMG}"
+
+chmod +x "${SCRIPT_DIR}/style-dmg-window.sh"
+if ! bash "${SCRIPT_DIR}/style-dmg-window.sh" "${RW_DMG}"; then
+  echo "    warning: install window layout failed; DMG will use the default Finder view" >&2
+fi
+
+hdiutil convert "${RW_DMG}" -format UDZO -ov -o "${DMG_PATH}" >/dev/null
+rm -f "${RW_DMG}"
+
+if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
+  echo "==> Signing DMG with ${CODESIGN_IDENTITY}..."
+  codesign --force --sign "${CODESIGN_IDENTITY}" --timestamp "${DMG_PATH}"
+  codesign --verify --verbose=2 "${DMG_PATH}"
+fi
 
 if [[ "${INSTALL:-0}" == "1" ]]; then
   DEST="${HOME}/Applications/Sandwalk.app"
