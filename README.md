@@ -24,12 +24,6 @@
 
 > Sandwalk is an open, self-hosted agent you run on your own compute. Direct it toward hard scientific research, or any ambitious work. Chat, CLI, and the macOS app share the same sessions. Leave one running on a Mac Mini or a cluster and open it from wherever you are.
 
-The composer is the front door. One question can reach a model, a skill, an MCP server, a sandbox, and the files in the workspace — then a grid of agents can work the same problem side by side. Sandwalk is there so ambitious research is not stuck in a single chat.
-
-<p align="center">
-  <img alt="The Sandwalk composer: model, plan, skills, and sandbox on one pane" src="images/composer.png">
-</p>
-
 ## Get started
 
 Download the native Sandwalk app for your operating system:
@@ -50,10 +44,18 @@ curl -fsSL https://sandwalk.sh/install | bash
 
 ### Connect
 
-Launch Sandwalk from Applications. **Connect locally** uses the agent on this Mac. **Open remote** reaches one already running on another machine, by LAN scan or a pasted URL. Recent servers stay in the list.
+The first window asks where the agent runs. **Connect locally** uses this Mac. **Open remote** finds a Sandwalk server on the LAN or takes a pasted URL. Under that, Recent lists servers you have opened before — the MacBook, a Mac mini on `192.168.2.178`, a Linux box called `ai-server` — so getting back onto a machine is one click.
 
 <p align="center">
-  <img alt="Sandwalk welcome: connect locally or open a remote server" src="images/welcome.png">
+  <img alt="Welcome window: Connect locally, Open remote, and a list of recent servers" src="images/welcome.png">
+</p>
+
+### New agent
+
+A fresh agent is one composer on an empty pane. The project scope sits above it (here, All), the model is in the bar (GPT-6 Astra), and three chips wait underneath: **Plan** (Shift-Tab), **Skills**, and **Run in sandbox**. Type and send; the pane fills with the transcript.
+
+<p align="center">
+  <img alt="New agent: an empty pane with the composer, model picker, and Plan, Skills, and sandbox chips" src="images/new-agent.png">
 </p>
 
 ```bash
@@ -68,90 +70,90 @@ Agents run on your machine or in the cloud. Chat, CLI, and the Mac app share one
 
 ### Capy
 
-Capy is the overlay agent. It is not a row in the sidebar. Open it from the bottom of the sidebar, or press **Ctrl + Ctrl**. It starts chats, opens splits, and can reach Bench, skills, and MCP servers while a normal session stays on screen behind it.
+Capy is a floating panel over whatever session is open. In this shot the chat behind it just ran `nvidia-smi` in a Modal sandbox and printed a Tesla T4 table. Capy sits on top with its own model (DeepSeek V4 Flash) and four starter prompts: start a 4×2 research grid, run doctor, list bench suites, show the last bench results. Open it from the bottom of the sidebar or with **Ctrl + Ctrl**.
 
 <p align="center">
-  <img alt="Capy overlay in front of an agent session" src="images/capy.png">
+  <img alt="Capy panel floating over a chat that ran nvidia-smi in a Modal sandbox" src="images/capy.png">
 </p>
 
 ### Grid
 
-A group is a real grid, not a stack of tabs. Capy can open one for you — for example a 4×2 of chats each researching a slice of protein design — and every cell keeps its own composer, model, and stream. **⌘D** splits right, **⇧⌘D** splits down.
+Ask Capy for a grid and it spawns the chats and lays them out. Here it was told to start a 4×2 grid on the latest in protein design. The panel on the right shows the `capy.spawn_sessions` call and its reply: eight worker chats, four across by two down, each seeded with the same brief. Every cell is a full session with its own stream and composer; `Protein Design 2` is mid-search while others are already summarizing RFdiffusion, AlphaFold 3, and validation bottlenecks.
+
+<p align="center">
+  <img alt="Capy spawned a 4 by 2 grid of chats, each researching protein design" src="images/grid.png">
+</p>
 
 ### Plan mode
 
-Plan mode drafts before it edits. The Plan chip (Shift-Tab) switches the composer. The agent writes a plan with todos, then a Mermaid flowchart of the workflow sits in the file pane next to the chat. **Build** runs that plan.
+With the gold **Plan** chip on, the agent writes a plan before it does anything. The user asked for a small-molecule screening campaign in Boltz. On the left the chat shows the plan card, a to-do, and the agent asking which target and library to use. On the right the file pane holds `boltz_screening_campaign.md` with the step list and a Mermaid flowchart from User Query down to Done. **Build** at the top right runs the plan.
 
 <p align="center">
-  <img alt="Plan mode with a Boltz screening plan and its flowchart" src="images/plan-mode.png">
+  <img alt="Plan mode: a Boltz screening plan on the left, its markdown and Mermaid flowchart on the right with a Build button" src="images/plan-mode.png">
 </p>
 
 ### Skills and MCPs
 
-The **+** menu is how you attach what the turn can use: Agent or Plan, files, skills, MCP servers, a specialist, or a sandbox. Skills install from GitHub or [skills.sh](https://skills.sh). MCP config is `~/.sandwalk/mcp.json`.
+The **+** button opens one menu for everything a turn can use. Top rows switch between **Agent** and **Plan**. Below that: Files, Skills, MCP, Specialist, Sandbox. Skills is open here, and the flyout lists what is installed — boltz, convert-documents-to-markdown, diagrams_mermaid, fold, md_openmm_calvados. Pick one and it rides along with the message. Skills install from GitHub or [skills.sh](https://skills.sh); MCP config is `~/.sandwalk/mcp.json`.
 
 <p align="center">
-  <img alt="Composer plus menu with the skills list open" src="images/skills.png">
+  <img alt="The plus menu with Skills selected and the installed skills flyout open" src="images/skills.png">
 </p>
 
 ### CLI
 
-`sandwalk` is the same product in a terminal. `/help` lists the pickers: tools, datasets, skills, sandbox, specialist, models, and effort. `sandwalk serve` is the local API the Mac app talks to.
+The same agent runs in a terminal, including a terminal pane inside the app. The banner reports the model, 192 tools, and 307 skills. Typing `/` opens the command list: `/tools`, `/data`, `/skills`, `/skills-add`, `/specialist`, `/sandbox`, `/models`, `/effort`. The status line at the bottom shows the active model, provider, sandbox, and context use.
 
 <p align="center">
-  <img alt="Sandwalk CLI help inside a terminal pane" src="images/cli.png">
+  <img alt="Sandwalk CLI inside a terminal pane with the slash command list open" src="images/cli.png">
 </p>
 
 ### Benchmarking
 
-Bench runs question suites through real sessions. Filter by suite, status, and provider, then read the score, duration, and token use for each run. Compare models on the same suite. From the CLI: `sandwalk eval`.
+Bench runs suites through real agent sessions. The Results tab here has 128 runs, filterable by suite, status, and provider. The suite picker lists MMLU, MMLU-Pro, ARC-C, MBPP, LiveCodeBench, BixBench-Verified-50, and Bio-Capybara-full. Each row carries the model, score, duration, correct count, provider, token use, and date. **Compare** puts two runs side by side.
 
 <p align="center">
-  <img alt="Benchmarking results with scores across suites and providers" src="images/bench.png">
+  <img alt="Benchmarking results table with the suite filter open" src="images/bench.png">
 </p>
 
-### Projects and overview
+### Overview
 
-Dashboard Overview is the usage board: lifetime tokens, streaks, an activity heatmap, and which models you actually ran. Widgets can be rearranged. Projects group the chats underneath that.
+Dashboard Overview is the usage board. Big number at the top is lifetime tokens (649.4M). Cards cover the longest agent run, chat count, and streaks. The heatmap shows activity by day, with a tooltip on August 12. Lower cards track peak day, models used, messages, tokens in and out, and cache hit rate. A 30-day model chart sits at the bottom. **Add widget** rearranges the board.
 
 <p align="center">
-  <img alt="Dashboard overview with usage, activity heatmap, and model chart" src="images/overview.png">
+  <img alt="Dashboard overview: lifetime tokens, streak cards, an activity heatmap, and a models chart" src="images/overview.png">
 </p>
 
 ### Models
 
-Dashboard → Models is where provider keys live. Cloud models (OpenAI, Claude, Gemini, OpenRouter, and others) and local endpoints (Ollama, Unsloth, oMLX) show up in the composer once they connect. Keys stay on this computer.
+Dashboard → Models lists every provider in a grid with a Connected or Not set up badge. Cloud covers OpenAI, Claude, Gemini, xAI, Kimi, NVIDIA, OpenCode Zen, DeepSeek, MiniMax, Mistral, Qwen Cloud, Together AI, OpenRouter, Cerebras, Groq, Fireworks AI, and Amazon Bedrock. Local lists discovered endpoints such as Ollama, oMLX, and Unsloth, with their reachability. Keys stay on this computer, and connected providers show up in the composer picker.
 
 <p align="center">
-  <img alt="Models settings with connected cloud providers and local endpoints" src="images/models.png">
+  <img alt="Models settings: cloud providers with Connected badges and local endpoints below" src="images/models.png">
 </p>
 
 ### Files beside the chat
 
-The right pane is the workspace for the session: files the agent wrote, a preview, and artifacts. A structure, a metrics table, and the chat that produced them stay open together.
+The right pane is the session workspace. This chat ran a binder design and the agent wrote a Go/No-Go assessment with iPTM, pTM, and PAE in a table. On the right the Artifacts view shows what it produced: `workflow.yml`, `gfp_binder.yaml`, a rendered `1ema.cif` structure, a PowerPoint, and a CSV of lysozyme variants. The chat and its files stay open together.
 
 <p align="center">
-  <img alt="Chat with a protein structure and artifact files open beside it" src="images/artifacts.png">
+  <img alt="Binder design chat with its metrics table, and the Artifacts pane showing the files it produced" src="images/artifacts.png">
 </p>
 
 ### Plots
 
-Figures render in that same pane. A line chart, a sampling control, and the prompt that asked for it sit next to the transcript instead of in a separate viewer.
+A published page renders in that same pane. The user asked for the most-referenced open-weight model on arXiv since 2024, using the Paperclip MCP, with a line plot of the top five. The chat on the left shows the tool calls and the Result; the right side is the live page: a monthly line chart for Qwen, Llama, Gemma, GLM, and DeepSeek, with a sampling control and a family comparison table below.
 
 <p align="center">
-  <img alt="Research chat with a monthly evidence line chart beside the transcript" src="images/preview.png">
+  <img alt="Research chat on the left and the published model trends page with its line chart on the right" src="images/preview.png">
 </p>
 
 ### Structures
 
-CIF and PDB from a design run open as 3D in the artifact list. Ranked candidates, metrics, and the Go / No-Go note stay in the chat on the left.
+A BoltzGen GFP binder run. The chat ranks the designed sequences and links each candidate to its structure, then gives a Go/no-go: the workflow completed, but interface confidence is too weak for immediate biological interpretation. On the right the Artifacts pane renders `rank1_2.cif` and `rank2_0.cif` as 3D structures next to the metrics CSVs and a results overview PDF.
 
 <p align="center">
-  <img alt="BoltzGen binder run with ranked structures rendered beside the chat" src="images/structures.png">
-</p>
-
-<p align="center">
-  <img alt="Ranked binder structures and a Go or No-Go note beside the files pane" src="images/binder.png">
+  <img alt="BoltzGen binder chat with ranked candidates, and two rendered CIF structures in the Artifacts pane" src="images/structures.png">
 </p>
 
 ### Science toolkit
