@@ -41,6 +41,33 @@ def installed_agents() -> list[dict[str, Any]]:
     return rows
 
 
+def _ps_in_group(pgid: int) -> str | None:
+    """List processes in a process group.
+
+    GNU ``ps`` (Linux CI) treats ``-g`` as a session id; the process group
+    flag there is ``--pgrp``. BSD ``ps`` (macOS) has no ``--pgrp`` and uses
+    ``-g`` for the process group. Try GNU first and fall back.
+    """
+    attempts = (
+        ["ps", "-o", "pid=,comm=,args=", "--pgrp", str(pgid)],
+        ["ps", "-o", "pid=,comm=,args=", "-g", str(pgid)],
+    )
+    for argv in attempts:
+        try:
+            completed = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if completed.returncode == 0 and completed.stdout.strip():
+            return completed.stdout
+    return None
+
+
 def _argv_kind(argv: str) -> ExternalAgentKind | None:
     parts = argv.split()
     if not parts:
@@ -65,15 +92,8 @@ def foreground_agent(master_fd: int, shell_pid: int) -> tuple[ExternalAgentKind 
         return None, None
     if pgid <= 0 or pgid == shell_pid:
         return None, None
-    try:
-        out = subprocess.run(
-            ["ps", "-o", "pid=,comm=,args=", "-g", str(pgid)],
-            capture_output=True,
-            text=True,
-            timeout=1.0,
-            check=False,
-        ).stdout
-    except (OSError, subprocess.TimeoutExpired):
+    out = _ps_in_group(pgid)
+    if out is None:
         return None, None
     kind: ExternalAgentKind | None = None
     pid: int | None = None
