@@ -58,12 +58,6 @@ A fresh agent is one composer on an empty pane. The project scope sits above it 
   <img alt="New agent: an empty pane with the composer, model picker, and Plan, Skills, and sandbox chips" src="images/new-agent.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
-```bash
-sandwalk setup
-sandwalk
-sandwalk "What is known about KRAS G12C inhibitors?"
-```
-
 ## Features
 
 Agents run on your machine or in the cloud. Chat, CLI, and the Mac app share one session list.
