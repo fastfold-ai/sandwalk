@@ -78,16 +78,6 @@ A new agent is one composer on an empty pane. The project scope is above it, the
   <img alt="New agent: an empty pane with the composer, model picker, and Plan, Skills, and sandbox chips" src="images/new-agent.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
-### CLI
-
-```bash
-sandwalk                                            # interactive session
-sandwalk "What is known about KRAS G12C inhibitors?" # one question, then exit
-sandwalk serve                                      # the API the Mac app and remote clients talk to
-```
-
-Sessions started in the terminal show up in the Mac app, and the other way round. Both read `~/.sandwalk/`.
-
 ## Features
 
 ### Capy
