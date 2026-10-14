@@ -7,6 +7,7 @@ reads the developer's own ``~/.claude`` / ``~/.codex`` / OpenCode database.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
@@ -451,6 +452,15 @@ def test_native_writer_rejects_unsupported_and_empty(tmp_path: Path, monkeypatch
         write_native_session("opencode", cwd=str(tmp_path), title="x", messages=[_Msg("user", "hi")])
     with pytest.raises(ValueError, match="Nothing to export"):
         write_native_session("claude", cwd=str(tmp_path), title="x", messages=[_Msg("system", "hi")])
+
+
+def test_ps_in_group_lists_the_current_process() -> None:
+    from agent.external_agents.detect import _ps_in_group
+
+    out = _ps_in_group(os.getpgrp())
+    assert out is not None
+    pids = [line.split()[0] for line in out.splitlines() if line.split()]
+    assert str(os.getpid()) in pids
 
 
 def uuid_version(value: str) -> int:

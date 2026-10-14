@@ -41,31 +41,76 @@ def installed_agents() -> list[dict[str, Any]]:
     return rows
 
 
-def _ps_in_group(pgid: int) -> str | None:
-    """List processes in a process group.
+def _proc_in_group(pgid: int) -> str | None:
+    """Read ``/proc`` for every process whose pgrp is ``pgid``.
 
-    GNU ``ps`` (Linux CI) treats ``-g`` as a session id; the process group
-    flag there is ``--pgrp``. BSD ``ps`` (macOS) has no ``--pgrp`` and uses
-    ``-g`` for the process group. Try GNU first and fall back.
+    Linux ``ps`` is a poor fit here: ``-g`` selects a session, and
+    ``--pgrp`` combined with a ``-o`` format often exits with no rows.
+    ``stat`` field 5 (after the comm) is the process group.
     """
-    attempts = (
-        ["ps", "-o", "pid=,comm=,args=", "--pgrp", str(pgid)],
-        ["ps", "-o", "pid=,comm=,args=", "-g", str(pgid)],
-    )
-    for argv in attempts:
-        try:
-            completed = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-                timeout=1.0,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
+    root = Path("/proc")
+    if not root.is_dir():
+        return None
+    lines: list[str] = []
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        return None
+    for entry in entries:
+        if not entry.name.isdigit():
             continue
-        if completed.returncode == 0 and completed.stdout.strip():
-            return completed.stdout
-    return None
+        try:
+            stat = (entry / "stat").read_text(encoding="utf-8", errors="replace")
+            end = stat.rfind(")")
+            if end < 0:
+                continue
+            rest = stat[end + 2 :].split()
+            if len(rest) < 3 or int(rest[2]) != pgid:
+                continue
+            comm = stat[stat.find("(") + 1 : end]
+            cmdline = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+            lines.append(f"{entry.name} {comm} {cmdline}")
+        except (OSError, ValueError):
+            continue
+    return "\n".join(lines) if lines else None
+
+
+def _ps_in_group(pgid: int) -> str | None:
+    """List processes in a process group: ``pid comm args`` lines.
+
+    Prefer ``/proc`` on Linux. Elsewhere, list every process and keep the
+    rows whose ``pgid`` column matches — BSD and GNU ``ps`` both have that
+    column, and neither's group-selection flag means the same thing.
+    """
+    from_proc = _proc_in_group(pgid)
+    if from_proc:
+        return from_proc
+    try:
+        completed = subprocess.run(
+            ["ps", "-ax", "-o", "pid=,pgid=,comm=,args="],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0 or not completed.stdout.strip():
+        return None
+    lines: list[str] = []
+    for line in completed.stdout.splitlines():
+        fields = line.split(None, 3)
+        if len(fields) < 3:
+            continue
+        try:
+            row_pgid = int(fields[1])
+        except ValueError:
+            continue
+        if row_pgid != pgid:
+            continue
+        args = fields[3] if len(fields) > 3 else ""
+        lines.append(f"{fields[0]} {fields[2]} {args}".rstrip())
+    return "\n".join(lines) if lines else None
 
 
 def _argv_kind(argv: str) -> ExternalAgentKind | None:
@@ -90,7 +135,7 @@ def foreground_agent(master_fd: int, shell_pid: int) -> tuple[ExternalAgentKind 
         pgid = os.tcgetpgrp(master_fd)
     except OSError:
         return None, None
-    if pgid <= 0 or pgid == shell_pid:
+    if pgid <= 0:
         return None, None
     out = _ps_in_group(pgid)
     if out is None:
@@ -103,6 +148,10 @@ def foreground_agent(master_fd: int, shell_pid: int) -> tuple[ExternalAgentKind 
             continue
         comm = Path(fields[1]).name.lower()
         found = _PROC_NAMES.get(comm) or (_argv_kind(fields[2]) if len(fields) > 2 else None)
+        # The login shell shares this process group when job control is off.
+        # Its own pid must not count as the agent.
+        if found and fields[0] == str(shell_pid):
+            found = None
         if found:
             kind = found
             try:

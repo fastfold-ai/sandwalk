@@ -148,7 +148,9 @@ def _fake_binary(tmp_path: Path, name: str) -> Path:
     bindir = tmp_path / "bin"
     bindir.mkdir(exist_ok=True)
     script = bindir / name
-    script.write_text("#!/bin/sh\necho FAKE-$0 \"$@\"\nsleep 2\n", encoding="utf-8")
+    # Stay in the foreground longer than the probe interval. A 2s sleep
+    # exits before the next allowed probe on a slow CI shell startup.
+    script.write_text("#!/bin/sh\necho FAKE-$0 \"$@\"\nsleep 30\n", encoding="utf-8")
     script.chmod(script.stat().st_mode | stat.S_IEXEC)
     return script
 
