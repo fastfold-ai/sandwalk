@@ -57,6 +57,9 @@ def model_supports_reasoning_effort(
     # xAI Grok 4.3 / 4.5 / 4.20 support reasoning_effort (see xAI Reasoning docs).
     if provider_norm == "xai":
         return xai_model_supports_reasoning_effort(value)
+    # Meta Model API — Muse Wonder & Muse Spark accept reasoning_effort (low/medium/high; no none).
+    if provider_norm == "meta":
+        return value.startswith(("muse-wonder", "muse-spark"))
     # Moonshot Kimi — only models with a real thinking toggle.
     if provider_norm == "moonshot":
         return moonshot_model_supports_thinking_toggle(value)
@@ -121,10 +124,10 @@ def openrouter_model_supports_reasoning(model_id: str | None) -> bool:
             return True
         return anthropic_model_supports_effort(slug)
 
-    # Google — Gemini 2.5+ / 3+ expose OpenRouter reasoning (native Google
-    # only wires Gemini 3+ thinking_level).
+    # Google — Gemini 2.5+ / 3+ / 4+ expose OpenRouter reasoning (native Google
+    # only wires Gemini 3+ / 4+ thinking_level).
     if vendor == "google" or slug.startswith("gemini-"):
-        return slug.startswith("gemini-2.5") or slug.startswith("gemini-3")
+        return slug.startswith(("gemini-2.5", "gemini-3", "gemini-4"))
 
     # xAI Grok 4.x
     if vendor in {"x-ai", "xai"} or slug.startswith("grok-"):
@@ -195,8 +198,12 @@ def openrouter_model_reasoning_mandatory(model_id: str | None) -> bool:
         return True
     if "grok-4.5" in slug or "grok-4-5" in slug:
         return True
-    # Muse Spark requires thinking; Fast (effort none) is rejected by the API.
-    if "muse-spark" in slug or ("muse" in slug and "spark" in slug):
+    # Muse Wonder / Muse Spark require thinking; Fast (effort none) returns HTTP 400.
+    if (
+        "muse-spark" in slug
+        or "muse-wonder" in slug
+        or ("muse" in slug and ("spark" in slug or "wonder" in slug))
+    ):
         return True
     return False
 
@@ -217,7 +224,7 @@ def model_supports_reasoning_fast(
     ):
         return False
     prov = str(provider or "").strip().lower()
-    if prov == "openrouter" and openrouter_model_reasoning_mandatory(model_id):
+    if prov in {"openrouter", "meta"} and openrouter_model_reasoning_mandatory(model_id):
         return False
     return True
 
@@ -247,12 +254,12 @@ def xai_model_supports_reasoning_effort(model_id: str | None) -> bool:
 
 
 def google_model_supports_thinking_level(model_id: str | None) -> bool:
-    """Gemini 3+ models that accept LangChain ``thinking_level``."""
+    """Gemini 3+ / 4+ models that accept LangChain ``thinking_level``."""
     value = str(model_id or "").strip().lower()
     if not value.startswith("gemini-"):
         return False
-    # Gemini 3 / 3.1 / 3.5 families.
-    if value.startswith("gemini-3"):
+    # Gemini 3 / 3.1 / 3.5 and Gemini 4 (e.g. gemini-4-argon) families.
+    if value.startswith(("gemini-3", "gemini-4")):
         return True
     return False
 

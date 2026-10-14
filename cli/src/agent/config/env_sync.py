@@ -198,6 +198,8 @@ def env_var_mappings(api_keys: dict) -> dict[str, str]:
             "CEREBRAS_API_KEY": "llm.cerebras_api_key",
             "GROQ_API_KEY": "llm.groq_api_key",
             "FIREWORKS_API_KEY": "llm.fireworks_api_key",
+            "MODEL_API_KEY": "llm.meta_api_key",
+            "META_API_KEY": "llm.meta_api_key",
             "OPENCODE_API_KEY": "llm.opencode_api_key",
             "QWEN_API_KEY": "llm.qwen_api_key",
             "DASHSCOPE_API_KEY": "llm.qwen_api_key",

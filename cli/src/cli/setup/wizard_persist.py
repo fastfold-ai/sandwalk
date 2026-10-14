@@ -74,6 +74,7 @@ def _setup_persist_provider_choice(cfg, selection: dict, args: dict) -> None:
             "cerebras",
             "groq",
             "fireworks",
+            "meta",
         ):
             from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
@@ -126,6 +127,7 @@ def _apply_default_model(cfg, active_setup_provider, selected_providers, resolve
             "cerebras": "",
             "groq": "",
             "fireworks": "",
+            "meta": "muse-",
         }
         prefix = prefixes.get(active_setup_provider, "")
         if default_model and (not prefix or not current_model.startswith(prefix)):
@@ -181,6 +183,8 @@ def _setup_print_provider_summary(selected_providers: list[str], cloud_key: str 
             if p == "groq"
             else "Fireworks AI"
             if p == "fireworks"
+            else "Meta (Muse)"
+            if p == "meta"
             else "Amazon Bedrock"
             if p == "bedrock"
             else "Anthropic"

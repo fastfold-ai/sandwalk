@@ -134,7 +134,8 @@ def _google_multimodal(model_id: str) -> set[ModalityKind]:
     value = model_id.lower()
     if not value.startswith("gemini-"):
         return set()
-    # Gemini multimodal family — image/PDF widely; audio/video on many flash/pro.
+    # Gemini multimodal family (incl. gemini-4-argon, 3.x, 2.5): native
+    # Text, Image, PDF/file, Audio, and Video inputs.
     kinds: set[ModalityKind] = {"image", "file", "audio", "video"}
     return kinds
 
@@ -183,9 +184,9 @@ def _mistral_multimodal(model_id: str) -> set[ModalityKind]:
 
 
 def _meta_multimodal(model_id: str) -> set[ModalityKind]:
-    """Meta Muse Spark (OpenRouter: text+image+file+audio+video)."""
+    """Meta Muse Wonder / Muse Spark (text+image+file+audio+video)."""
     value = model_id.lower()
-    if "muse-spark" in value:
+    if "muse-wonder" in value or "muse-spark" in value:
         return {"image", "file", "audio", "video"}
     if "llama-4-scout" in value or "llama4-scout" in value:
         return {"image"}
@@ -330,6 +331,8 @@ def allowlist_modalities(
         return _mistral_multimodal(value)
     if provider_norm == "qwen":
         return _qwen_multimodal(value)
+    if provider_norm == "meta":
+        return _meta_multimodal(value)
     if provider_norm in {"bedrock", "groq", "cerebras", "fireworks"}:
         return _gateway_multimodal(value)
     # DeepSeek / MiniMax curated text flagships — no native image injection.

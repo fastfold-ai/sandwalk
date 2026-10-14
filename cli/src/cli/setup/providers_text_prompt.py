@@ -52,6 +52,9 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
         "fw": "fireworks",
         "fireworks": "fireworks",
         "fireworks-ai": "fireworks",
+        "mt": "meta",
+        "meta": "meta",
+        "muse": "meta",
         "bedrock": "bedrock",
         "aws": "bedrock",
         "amazon": "bedrock",
@@ -70,7 +73,7 @@ def _prompt_setup_providers_text(options: list[str]) -> list[str]:
             "kimi/moonshot (m), nvidia (n), opencode (oc), deepseek (ds), "
             "minimax (mm), mistral (mi), qwen (qw), together (tg), "
             "openrouter (or), cerebras (cb), groq (gq), fireworks (fw), "
-            "bedrock/aws, openai_compatible (k), all"
+            "meta/muse (mt), bedrock/aws, openai_compatible (k), all"
         )
         try:
             raw = input("  Providers: ").strip().lower()

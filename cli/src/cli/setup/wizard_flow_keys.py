@@ -53,6 +53,7 @@ def _resolve_all_provider_keys(
             "cerebras",
             "groq",
             "fireworks",
+            "meta",
             "bedrock",
         ):
             cli_key_for_provider = None

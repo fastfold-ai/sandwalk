@@ -63,6 +63,7 @@ export const CLOUD_PROVIDERS = [
   { value: 'cerebras', label: 'Cerebras' },
   { value: 'groq', label: 'Groq' },
   { value: 'fireworks', label: 'Fireworks AI' },
+  { value: 'meta', label: 'Meta (Muse)' },
   { value: 'bedrock', label: 'Amazon Bedrock' }
 ] as const
 
@@ -197,6 +198,7 @@ export const LLM_API_KEY_ORDER = [
   'cerebras',
   'groq',
   'fireworks',
+  'meta',
   'bedrock'
 ] as const
 
@@ -328,6 +330,14 @@ export const LLM_API_KEY_COPY: Record<
     description: 'Hosted open and proprietary models via Fireworks inference.',
     hostLabel: 'fireworks.ai',
     placeholderUnset: 'Enter your Fireworks API Key'
+  },
+  meta: {
+    cardTitle: 'Meta (Muse)',
+    title: 'Meta Model API Key',
+    description:
+      'Use your Meta Model API key (MODEL_API_KEY) for Muse Wonder and Muse Spark.',
+    hostLabel: 'dev.meta.ai',
+    placeholderUnset: 'Enter your Meta Model API Key'
   },
   bedrock: {
     cardTitle: 'Amazon Bedrock',

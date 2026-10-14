@@ -20,6 +20,7 @@ export const LLM_API_KEY_ORDER = [
   'cerebras',
   'groq',
   'fireworks',
+  'meta',
   'bedrock'
 ] as const
 

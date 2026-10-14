@@ -30,7 +30,10 @@ def test_openai_gpt5_family():
 
 
 def test_gemini_and_xai():
+    assert context_window_for_model("gemini-4-argon") == 1_048_576
     assert context_window_for_model("gemini-3.1-pro-preview") == 1_048_576
+    assert context_window_for_model("muse-wonder-1.0") == 1_048_576
+    assert context_window_for_model("muse-spark-1.3") == 1_048_576
     assert context_window_for_model("grok-4.3") == 1_000_000
     assert context_window_for_model("grok-4.5") == 256_000
     assert context_window_for_model("kimi-k3") == 1_000_000

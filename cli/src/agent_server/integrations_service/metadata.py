@@ -184,6 +184,11 @@ PROVIDER_METADATA = {
         "category": "AI Models",
         "description": "Fireworks AI hosted models (LangChain ChatFireworks).",
     },
+    "meta": {
+        "name": "Meta (Muse)",
+        "category": "AI Models",
+        "description": "Meta Model API for Muse Wonder and Muse Spark.",
+    },
     "bedrock": {
         "name": "Amazon Bedrock",
         "category": "AI Models",

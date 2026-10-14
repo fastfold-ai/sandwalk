@@ -63,4 +63,18 @@ describe('useComposerModelPickerNav', () => {
     })
     expect(picks).toEqual([b])
   })
+
+  it('produces distinct option keys for the same model id across cloud providers', () => {
+    const google = {
+      ...opt('google', 'gemini-4-argon', 'Gemini 4 Argon'),
+      source: 'cloud' as const
+    }
+    const opencode = {
+      ...opt('opencode', 'gemini-4-argon', 'Gemini 4 Argon'),
+      source: 'cloud' as const
+    }
+    expect(composerModelOptionKey(google)).not.toBe(
+      composerModelOptionKey(opencode)
+    )
+  })
 })

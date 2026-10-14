@@ -142,13 +142,38 @@ export function resolveMultimodalCapabilityFlags(model: {
       }
     : {}
 
+  // Google Gemini (incl. gemini-4-argon, 3.x, 2.5): native Image, PDF, Audio, Video.
+  const bareId = normalizeLocalModelName(String(model.id || model.model || ''))
+  const isGeminiOrMuse =
+    provider === 'google' ||
+    provider === 'meta' ||
+    bareId.startsWith('gemini-') ||
+    bareId.startsWith('muse-wonder') ||
+    bareId.startsWith('muse-spark') ||
+    String(model.id || model.model || '').trim().toLowerCase().startsWith('google/gemini-') ||
+    String(model.id || model.model || '').trim().toLowerCase().startsWith('meta/muse-')
+  const geminiFlags: MultimodalCapabilityFlags = isGeminiOrMuse
+    ? {
+        supportsImageInputs: true,
+        supportsPdfInputs: true,
+        supportsAudioInputs: true,
+        supportsVideoInputs: true
+      }
+    : {}
+
   return {
     supportsImageInputs:
-      Boolean(model.supportsImageInputs) || Boolean(inferred.supportsImageInputs),
-    supportsPdfInputs: Boolean(model.supportsPdfInputs),
-    supportsAudioInputs: Boolean(model.supportsAudioInputs),
+      Boolean(model.supportsImageInputs) ||
+      Boolean(inferred.supportsImageInputs) ||
+      Boolean(geminiFlags.supportsImageInputs),
+    supportsPdfInputs:
+      Boolean(model.supportsPdfInputs) || Boolean(geminiFlags.supportsPdfInputs),
+    supportsAudioInputs:
+      Boolean(model.supportsAudioInputs) || Boolean(geminiFlags.supportsAudioInputs),
     supportsVideoInputs:
-      Boolean(model.supportsVideoInputs) || Boolean(inferred.supportsVideoInputs)
+      Boolean(model.supportsVideoInputs) ||
+      Boolean(inferred.supportsVideoInputs) ||
+      Boolean(geminiFlags.supportsVideoInputs)
   }
 }
 

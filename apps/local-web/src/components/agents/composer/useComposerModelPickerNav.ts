@@ -7,7 +7,7 @@ import {
 } from '@/lib/composer-models'
 
 export function composerModelOptionKey(option: ComposerModelOption): string {
-  return `${option.source || option.provider}:${option.profileId || 'cloud'}:${option.model}`
+  return `${option.provider || option.source || 'cloud'}:${option.profileId || 'cloud'}:${option.model}`
 }
 
 export function useComposerModelPickerNav({

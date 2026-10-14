@@ -68,4 +68,19 @@ describe('resolveMultimodalCapabilityFlags', () => {
     })
     expect(flags.supportsImageInputs).toBe(true)
   })
+
+  it('marks Gemini 4 Argon and Meta Muse as supporting Image, PDF, Audio, and Video', () => {
+    for (const model of [
+      { provider: 'google', id: 'gemini-4-argon', label: 'Gemini 4 Argon' },
+      { provider: 'meta', id: 'muse-wonder-1.0', label: 'Muse Wonder 1.0' },
+      { provider: 'meta', id: 'muse-spark-1.3', label: 'Muse Spark 1.3' }
+    ]) {
+      expect(resolveMultimodalCapabilityFlags(model)).toEqual({
+        supportsImageInputs: true,
+        supportsPdfInputs: true,
+        supportsAudioInputs: true,
+        supportsVideoInputs: true
+      })
+    }
+  })
 })

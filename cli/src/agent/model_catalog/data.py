@@ -63,9 +63,14 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
     ],
     "google": [
         (
+            "gemini-4-argon",
+            "Gemini 4 Argon",
+            "Flagship Gemini reasoning model for complex coding, math, and science (1M context)",
+        ),
+        (
             "gemini-3.1-pro-preview",
             "Gemini 3.1 Pro",
-            "Most intelligent Gemini for multimodal reasoning",
+            "Most intelligent Gemini 3 for multimodal reasoning",
         ),
         ("gemini-3.5-flash", "Gemini 3.5 Flash", "Frontier-class Gemini at a fraction of the cost"),
         ("gemini-3.1-flash-lite", "Gemini 3.1 Flash-Lite", "High-volume, cost-sensitive Gemini model"),
@@ -484,6 +489,28 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "accounts/fireworks/models/llama-v3p1-8b-instruct",
             "Llama 3.1 8B",
             "Fast small Llama on Fireworks",
+        ),
+    ],
+    "meta": [
+        (
+            "muse-wonder-1.0",
+            "Muse Wonder 1.0",
+            "Meta's most capable model for complex coding and long-horizon agents (1M context)",
+        ),
+        (
+            "muse-spark-1.3",
+            "Muse Spark 1.3",
+            "Frontier Meta reasoning model with multimodal inputs and tool calling (1M context)",
+        ),
+        (
+            "muse-spark-1.2",
+            "Muse Spark 1.2",
+            "Multimodal Meta reasoning model with full audio, video, image, and PDF support (1M context)",
+        ),
+        (
+            "muse-spark-1.1",
+            "Muse Spark 1.1",
+            "Previous Muse Spark release on Meta Model API (1M context)",
         ),
     ],
 }

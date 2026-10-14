@@ -32,6 +32,7 @@ class LLMClient:
         "cerebras": "gpt-oss-120b",
         "groq": "llama-3.3-70b-versatile",
         "fireworks": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+        "meta": "muse-spark-1.3",
     }
 
     # First-party OpenAI-compatible providers: fixed base URL + env fallback.
@@ -56,6 +57,7 @@ class LLMClient:
         "cerebras": ("https://api.cerebras.ai/v1", "CEREBRAS_API_KEY"),
         "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),
         "fireworks": ("https://api.fireworks.ai/inference/v1", "FIREWORKS_API_KEY"),
+        "meta": ("https://api.meta.ai/v1", "MODEL_API_KEY"),
     }
 
     def __init__(self, provider: str = "openai", model: str = None,

@@ -26,6 +26,7 @@ export const INTEGRATION_ICONS: Record<
   cerebras: { src: '/cerebras-color.png', srcDark: '/cerebras-light.png' },
   groq: { src: '/groq.png' },
   fireworks: { src: '/fireworks.png' },
+  meta: { src: '/meta.svg' },
   bedrock: { src: '/aws.png' },
   'ibm-rxn': { src: '/ibm.png' },
   lens: { src: '/lens.png' },

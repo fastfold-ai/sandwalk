@@ -30,6 +30,7 @@ VALID_LLM_PROVIDERS = frozenset(
         "cerebras",
         "groq",
         "fireworks",
+        "meta",
     }
 )
 

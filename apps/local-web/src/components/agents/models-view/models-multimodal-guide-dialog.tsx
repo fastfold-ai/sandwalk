@@ -29,6 +29,7 @@ const PROVIDER_ORDER = [
   'cerebras',
   'groq',
   'fireworks',
+  'meta',
   'bedrock',
   'local'
 ] as const
@@ -50,6 +51,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   cerebras: 'Cerebras',
   groq: 'Groq',
   fireworks: 'Fireworks AI',
+  meta: 'Meta (Muse)',
   bedrock: 'Amazon Bedrock',
   local: 'Local'
 }

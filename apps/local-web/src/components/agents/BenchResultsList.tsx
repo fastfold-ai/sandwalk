@@ -374,6 +374,7 @@ function prettyProvider(id: string): string {
   if (key === 'cerebras') return 'Cerebras'
   if (key === 'groq') return 'Groq'
   if (key === 'fireworks') return 'Fireworks AI'
+  if (key === 'meta') return 'Meta (Muse)'
   if (key === 'bedrock') return 'Amazon Bedrock'
   if (key === 'deepseek') return 'DeepSeek'
   return raw.charAt(0).toUpperCase() + raw.slice(1)

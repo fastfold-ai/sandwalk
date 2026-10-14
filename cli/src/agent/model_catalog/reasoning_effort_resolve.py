@@ -21,8 +21,11 @@ def openai_reasoning_effort_floor(model_id: str | None) -> str:
         return "none"
     if "pro" in value:
         return "medium"
-    # GPT-6 Astra documents low/medium/high/xhigh/max — not none.
-    if value.startswith("gpt-6") or "astra" in value:
+    # GPT-6 Astra and Meta Muse Wonder/Spark reject ``none`` (return HTTP 400).
+    if (
+        value.startswith(("gpt-6", "muse-wonder", "muse-spark"))
+        or "astra" in value
+    ):
         return "low"
     # Bare gpt-5-mini / gpt-5-nano (not gpt-5.4-mini / gpt-5.4-nano).
     if value in {"gpt-5-mini", "gpt-5-nano"} or value.startswith(

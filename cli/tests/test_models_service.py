@@ -14,7 +14,11 @@ from agent.model_catalog import (
     cloud_catalog_models,
 )
 from agent_server.app import create_app
-from agent_server.models import CreateAgentModelRequest, UpdateAgentModelRequest, UpsertModelProfileRequest
+from agent_server.models import (
+    CreateAgentModelRequest,
+    UpdateAgentModelRequest,
+    UpsertModelProfileRequest,
+)
 from agent_server.models_service import ModelsService
 
 
@@ -441,8 +445,11 @@ def test_model_supports_reasoning_effort():
     assert model_supports_reasoning_effort("anthropic", "claude-fable-5-1") is True
     assert model_supports_reasoning_effort("anthropic", "claude-sonnet-4-6") is True
     assert model_supports_reasoning_effort("anthropic", "claude-haiku-4-5-20251001") is False
+    assert model_supports_reasoning_effort("google", "gemini-4-argon") is True
     assert model_supports_reasoning_effort("google", "gemini-3.5-flash") is True
     assert model_supports_reasoning_effort("google", "gemini-3.1-pro-preview") is True
+    assert model_supports_reasoning_effort("meta", "muse-wonder-1.0") is True
+    assert model_supports_reasoning_effort("meta", "muse-spark-1.3") is True
     assert model_supports_reasoning_effort("xai", "grok-4.5") is True
     assert model_supports_reasoning_effort("xai", "grok-4.3") is True
     assert model_supports_reasoning_effort("xai", "grok-4.20") is True

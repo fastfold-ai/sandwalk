@@ -170,10 +170,23 @@ def test_openrouter_vision_catalog_rows():
 
 
 def test_gemini_full_multimodal():
-    assert model_supports_image_inputs("google", "gemini-2.5-flash") is True
-    assert model_supports_pdf_inputs("google", "gemini-2.5-flash") is True
-    assert model_supports_audio_inputs("google", "gemini-2.5-flash") is True
-    assert model_supports_video_inputs("google", "gemini-2.5-flash") is True
+    for provider, model_id in (
+        ("google", "gemini-4-argon"),
+        ("google", "gemini-3.5-flash"),
+        ("google", "gemini-2.5-flash"),
+        ("meta", "muse-wonder-1.0"),
+        ("meta", "muse-spark-1.3"),
+    ):
+        assert model_supports_image_inputs(provider, model_id) is True
+        assert model_supports_pdf_inputs(provider, model_id) is True
+        assert model_supports_audio_inputs(provider, model_id) is True
+        assert model_supports_video_inputs(provider, model_id) is True
+        assert allowlist_modalities(provider, model_id) == {
+            "image",
+            "file",
+            "audio",
+            "video",
+        }
 
 
 def test_profile_overrides_true():

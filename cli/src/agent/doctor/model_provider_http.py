@@ -58,6 +58,7 @@ _PROBE_MODELS = {
     "cerebras": "gemma-4-31b",
     "groq": "llama-3.1-8b-instant",
     "fireworks": "accounts/fireworks/models/llama-v3p1-8b-instruct",
+    "meta": "muse-spark-1.3",
 }
 
 # Models vary by Qwen plan; try a few cheap/common ids per endpoint.
@@ -528,6 +529,7 @@ CHAT_PROBE_PROVIDERS = frozenset(
         "cerebras",
         "groq",
         "fireworks",
+        "meta",
     }
 )
 

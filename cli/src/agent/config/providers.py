@@ -193,6 +193,15 @@ OPENAI_COMPATIBLE_PROVIDERS: dict[str, dict[str, str]] = {
         "default_model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
         "discover_models": "true",
     },
+    "meta": {
+        "base_url": "https://api.meta.ai/v1",
+        "config_key": "llm.meta_api_key",
+        "env_var": "MODEL_API_KEY",
+        "env_var_aliases": "META_API_KEY",
+        "label": "Meta (Muse)",
+        "signup_url": "https://dev.meta.ai/docs/overview",
+        "default_model": "muse-spark-1.3",
+    },
 }
 
 OPENAI_PROFILE_DEFAULTS = {

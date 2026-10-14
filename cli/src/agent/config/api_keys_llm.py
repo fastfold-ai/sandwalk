@@ -132,6 +132,15 @@ API_KEYS_LLM = {
         "url": "https://fireworks.ai/account/api-keys",
         "free": True,
     },
+    "llm.meta_api_key": {
+        "name": "Meta (Muse)",
+        "provider_key": "meta",
+        "env_var": "MODEL_API_KEY",
+        "env_var_aliases": "META_API_KEY",
+        "description": "Meta Model API for Muse Wonder and Muse Spark",
+        "url": "https://dev.meta.ai/docs/overview",
+        "free": False,
+    },
     "llm.aws_region": {
         "name": "AWS region",
         "provider_key": "bedrock",

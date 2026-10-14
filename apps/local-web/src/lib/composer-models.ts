@@ -60,6 +60,7 @@ const CLOUD_PROVIDER_LABELS: Record<string, string> = {
   cerebras: 'Cerebras',
   groq: 'Groq',
   fireworks: 'Fireworks',
+  meta: 'Meta (Muse)',
   bedrock: 'Bedrock'
 }
 

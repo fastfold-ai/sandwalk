@@ -29,6 +29,7 @@ DEFAULTS_LLM = {
     "llm.cerebras_api_key": None,
     "llm.groq_api_key": None,
     "llm.fireworks_api_key": None,
+    "llm.meta_api_key": None,
     "llm.aws_region": "us-east-1",
     "llm.aws_profile": None,
     "llm.aws_access_key_id": None,

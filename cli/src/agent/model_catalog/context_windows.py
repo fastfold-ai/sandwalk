@@ -65,9 +65,13 @@ _PREFIX_CONTEXT_WINDOWS: list[tuple[str, int]] = [
     ("gpt-6", 1_050_000),
     ("gpt-5.6", 1_050_000),
     ("gpt-5", 400_000),
-    # Google Gemini — 1M input window.
+    # Google Gemini — 1M input window (1,048,576 on Gemini 4 Argon / 3.x).
+    ("gemini-4", 1_048_576),
     ("gemini-3", 1_048_576),
     ("gemini-", 1_048_576),
+    # Meta Muse (Model API) — 1,048,576 tokens on Muse Wonder & Muse Spark.
+    ("muse-wonder", 1_048_576),
+    ("muse-spark", 1_048_576),
     # Moonshot / Kimi — k3 is 1M; other kimi-* are 256k.
     ("kimi-k3", 1_000_000),
     ("kimi-", 256_000),

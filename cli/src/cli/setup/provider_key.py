@@ -71,6 +71,7 @@ def _resolve_provider_key(
         "cerebras",
         "groq",
         "fireworks",
+        "meta",
     ):
         from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 

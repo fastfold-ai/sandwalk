@@ -25,6 +25,7 @@ SETUP_PROVIDER_ORDER = (
     "cerebras",
     "groq",
     "fireworks",
+    "meta",
     "bedrock",
     "openai_compatible",
 )

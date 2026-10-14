@@ -41,6 +41,8 @@ def _parse_provider_list(raw: str) -> list[str]:
         "groq": "groq",
         "fireworks": "fireworks",
         "fireworks-ai": "fireworks",
+        "meta": "meta",
+        "muse": "meta",
         "bedrock": "bedrock",
         "aws": "bedrock",
         "amazon": "bedrock",
@@ -82,6 +84,7 @@ def _prompt_setup_providers(default_provider: str) -> list[str]:
         "cerebras": "Cerebras",
         "groq": "Groq",
         "fireworks": "Fireworks AI",
+        "meta": "Meta (Muse)",
         "bedrock": "Amazon Bedrock (IAM)",
         "openai_compatible": "OpenAI-compatible custom endpoint",
     }

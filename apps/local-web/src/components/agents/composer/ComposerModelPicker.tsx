@@ -177,7 +177,11 @@ export function ComposerModelPicker({
         <button
           ref={triggerRef}
           type="button"
-          title={selectedModel.label}
+          title={
+            selectedModel.speed
+              ? `${selectedModel.label} · ${selectedModel.speed}`
+              : selectedModel.label
+          }
           className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 rounded-md py-1 text-[13px]"
         >
           <span className="whitespace-nowrap">
@@ -253,6 +257,14 @@ export function ComposerModelPicker({
                 </span>
               </button>
             ) : null}
+            {selectedModel.speed ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5">
+                <span>Provider</span>
+                <span className="text-muted-foreground truncate">
+                  {selectedModel.speed}
+                </span>
+              </div>
+            ) : null}
             <button
               type="button"
               className={cn(
@@ -296,7 +308,7 @@ export function ComposerModelPicker({
             </div>
           ) : null}
           {flyout === 'model' ? (
-            <div className="bg-popover absolute top-0 left-full z-10 ml-1.5 flex w-64 flex-col overflow-hidden rounded-2xl border shadow-lg">
+            <div className="bg-popover absolute top-0 left-full z-10 ml-1.5 flex w-72 flex-col overflow-hidden rounded-2xl border shadow-lg">
               <div className="border-b px-3 py-1.5">
                 <Input
                   value={modelSearch}
@@ -349,9 +361,16 @@ export function ComposerModelPicker({
                               <span className="min-w-0 truncate">
                                 {option.label}
                               </span>
-                              {selected ? (
-                                <Check className="size-3.5 shrink-0" />
-                              ) : null}
+                              <span className="flex shrink-0 items-center gap-1.5">
+                                {option.speed ? (
+                                  <span className="text-muted-foreground text-xs">
+                                    {option.speed}
+                                  </span>
+                                ) : null}
+                                {selected ? (
+                                  <Check className="size-3.5 shrink-0" />
+                                ) : null}
+                              </span>
                             </button>
                           )
                         })}
