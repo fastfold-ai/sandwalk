@@ -57,6 +57,10 @@ import {
 import { visibleSessionIds } from '@/lib/sessions'
 import { resolveStripActiveId } from '@/lib/strip-active'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
+import {
+  refreshInstalledAgents,
+  useExternalAgentActions
+} from '@/lib/external-agent-actions'
 import { queueTerminalStartup } from '@/lib/terminal-startup'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
@@ -265,6 +269,32 @@ export default function App() {
   useEffect(() => {
     openSessionTabRef.current = tabs.openSessionTab
   }, [tabs.openSessionTab])
+
+  // Claude Code / Codex / OpenCode / fx bridge: menus deep in the tree call
+  // `continueSessionIn` / `convertTerminalToSession`; give them the client
+  // and a way to open the resulting chat or terminal.
+  const openItemFromExternal = useCallback(
+    (id: string) => {
+      openSessionTabRef.current?.(id)
+      navigate(id.startsWith('term_') ? `/terminals/${id}` : `/agents/${id}`)
+    },
+    [navigate]
+  )
+  const externalClient = bootstrap.client
+  const reloadSessionsForExternal = bootstrap.loadSessions
+  useEffect(() => {
+    if (!externalClient) {
+      useExternalAgentActions.getState().bind(null)
+      return
+    }
+    useExternalAgentActions.getState().bind({
+      client: externalClient,
+      openItem: openItemFromExternal,
+      reloadSessions: () => reloadSessionsForExternal({ force: true })
+    })
+    void refreshInstalledAgents(externalClient)
+    return () => useExternalAgentActions.getState().bind(null)
+  }, [externalClient, openItemFromExternal, reloadSessionsForExternal])
   const tabGroupsStore = useAppTabGroups(
     ui.projectScopeId,
     bootstrap.sessions,
@@ -508,6 +538,21 @@ export default function App() {
     sessionIdRef: ui.sessionIdRef,
     setSessions: bootstrap.setSessions,
     onUiCommand: payload => {
+      if (payload.action === 'open_item') {
+        // Capy launched a CLI terminal or imported a chat server-side;
+        // bring it into the strip and route to it.
+        const itemId =
+          typeof payload.itemId === 'string' ? payload.itemId : null
+        if (!itemId) return
+        const isTerminal = itemId.startsWith('term_')
+        const ready = isTerminal
+          ? externalClient
+              ?.listTerminals()
+              .then(list => useTerminalsStore.getState().setAll(list))
+          : bootstrap.loadSessions({ force: true })
+        void Promise.resolve(ready).then(() => openItemFromExternal(itemId))
+        return
+      }
       if (payload.action !== 'open_split') return
       const ids = Array.isArray(payload.sessionIds)
         ? payload.sessionIds.filter((id): id is string => typeof id === 'string')

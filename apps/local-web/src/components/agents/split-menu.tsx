@@ -15,39 +15,14 @@ import {
   type PaneSplitTarget
 } from '@/lib/pane-split'
 
+import { ExternalAgentIcon, isExternalAgentKind } from './ExternalAgentIcon'
 import { SplitDownIcon, SplitRightIcon } from './split-icons'
 import { TabContextItem, TabContextSeparator, TabContextSubmenu } from './tab-context-menu'
-
-function ClaudeMark() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-      <path
-        fill="currentColor"
-        d="M8 1.2 9.1 6 14 4.6 10.2 8 14 11.4 9.1 10 8 14.8 6.9 10 2 11.4 5.8 8 2 4.6 6.9 6Z"
-      />
-    </svg>
-  )
-}
-
-function CodexMark() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
-      <circle cx="8" cy="8" r="2.1" fill="currentColor" />
-      <circle cx="8" cy="2.4" r="1.15" fill="currentColor" />
-      <circle cx="12.6" cy="5.2" r="1.15" fill="currentColor" />
-      <circle cx="12.6" cy="10.8" r="1.15" fill="currentColor" />
-      <circle cx="8" cy="13.6" r="1.15" fill="currentColor" />
-      <circle cx="3.4" cy="10.8" r="1.15" fill="currentColor" />
-      <circle cx="3.4" cy="5.2" r="1.15" fill="currentColor" />
-    </svg>
-  )
-}
 
 function targetIcon(id: PaneSplitTarget): ReactNode {
   if (id === 'agent') return <MessageSquare className="size-3.5" />
   if (id === 'terminal') return <SquareTerminal className="size-3.5" />
-  if (id === 'claude') return <ClaudeMark />
-  if (id === 'codex') return <CodexMark />
+  if (isExternalAgentKind(id)) return <ExternalAgentIcon kind={id} />
   return <SandwalkMark className="size-3.5" />
 }
 

@@ -9,6 +9,7 @@ import {
   Trash2
 } from 'lucide-react'
 
+import { ContinueInRows } from '@/components/agents/ExternalAgentMenuBlocks'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import {
   TabContextSeparator,
@@ -26,7 +27,8 @@ export function SessionActionsMenu({
   onExport,
   onInspect,
   onArchive,
-  onDelete
+  onDelete,
+  onContinueIn
 }: {
   session: AgentSession
   projects: AgentProject[]
@@ -39,6 +41,8 @@ export function SessionActionsMenu({
   onInspect: () => void
   onArchive: () => void
   onDelete: () => void
+  /** Called right before a "Continue in <CLI>" row runs — close the popover. */
+  onContinueIn?: () => void
 }) {
   return (
     <>
@@ -99,6 +103,9 @@ export function SessionActionsMenu({
         <Search className="h-3.5 w-3.5" />
         Inspect chat
       </button>
+      <TabContextSeparator />
+      <ContinueInRows session={session} onDone={onContinueIn} />
+      <TabContextSeparator />
       <button
         type="button"
         className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"

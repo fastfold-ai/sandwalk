@@ -69,6 +69,24 @@ class PtyAgentMixin:
         for ws in stale:
             session.subscribers.discard(ws)
 
+    async def watch_agent_while_attached(self, session: PtySession, websocket: Any) -> None:
+        """Probe on a timer while ``websocket`` is attached.
+
+        Output-driven probes miss the common case: a TUI agent prints its
+        banner, then sits idle waiting for input. A 2 s tick costs one ``ps``
+        per attached terminal and keeps the tab icon honest.
+        """
+        try:
+            while websocket in session.subscribers and session.info.status == "running":
+                await asyncio.sleep(AGENT_PROBE_INTERVAL_S)
+                if websocket not in session.subscribers:
+                    break
+                await self._maybe_announce_agent(session)
+        except asyncio.CancelledError:
+            pass
+        except Exception:  # noqa: BLE001 - never let a probe kill the attach loop
+            pass
+
     async def type_startup(self, session: PtySession, command: str, *, delay_s: float = 0.35) -> None:
         """Type ``command`` + Enter into the PTY once the shell has had a moment to start."""
         import os

@@ -2,10 +2,11 @@ import type {
   AgentProject,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
-import { ChevronDown, MoreHorizontal, Pin, SquareTerminal } from 'lucide-react'
+import { ChevronDown, MoreHorizontal, Pin } from 'lucide-react'
 import { useState } from 'react'
 
 import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
+import { TerminalTypeIcon } from '@/components/agents/TerminalTypeIcon'
 import {
   Popover,
   PopoverContent,
@@ -228,7 +229,7 @@ function TerminalRowInner({
             aria-hidden
             className="grid size-4 shrink-0 place-items-center"
           >
-            <SquareTerminal className="size-3.5 text-orange-500" />
+            <TerminalTypeIcon terminalId={term.id} />
           </span>
           {colorValue ? (
             <span

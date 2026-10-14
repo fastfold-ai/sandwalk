@@ -1,6 +1,7 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { type ReactNode,useEffect, useState } from 'react'
 
+import { OnboardingAgentsStep } from '@/components/agents/OnboardingAgentsStep'
 import { OnboardingDoneStep } from '@/components/agents/OnboardingDoneStep'
 import { OnboardingIntegrationsStep } from '@/components/agents/OnboardingIntegrationsStep'
 import { OnboardingModelStep } from '@/components/agents/OnboardingModelStep'
@@ -47,6 +48,8 @@ export function OnboardingWizardHost({
     )
   } else if (def.id === 'models') {
     body = <OnboardingModelStep client={client} />
+  } else if (def.id === 'agents') {
+    body = <OnboardingAgentsStep client={client} />
   } else if (def.id === 'skills') {
     body = <OnboardingSkillsStep client={client} />
   } else if (def.id === 'integrations') {

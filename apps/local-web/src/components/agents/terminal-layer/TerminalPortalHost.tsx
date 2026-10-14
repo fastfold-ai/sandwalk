@@ -21,6 +21,7 @@ import {
   isDocumentDark,
   watchTerminalTheme
 } from '@/lib/terminal-theme'
+import { isExternalAgentKind } from '@/components/agents/ExternalAgentIcon'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
 import { useTerminalLayer } from './terminal-layer-registry'
@@ -137,12 +138,21 @@ export function TerminalPortalHost({
       durationMs?: number | null
       title?: string
       body?: string
+      agent?: string | null
     }
     const terminal = useTerminalsStore
       .getState()
       .terminals.find(t => t.id === terminalId)
     const terminalTitle = terminal?.title ?? null
     const viewing = getFocusedItemId() === terminalId
+    if (event.kind === 'agent.changed') {
+      // Backend probed the PTY foreground process: a coding-agent CLI
+      // started or exited. Drives the tab / sidebar icon swap.
+      useTerminalsStore.getState().patch(terminalId, {
+        agent: isExternalAgentKind(event.agent) ? event.agent : null
+      })
+      return
+    }
     if (event.kind === 'command.finished') {
       // Los comandos cortos NO gritan por notificación nativa — pero sí
       // marcan attention si el usuario no estaba mirando ese pane, para
@@ -364,6 +374,12 @@ export function TerminalPortalHost({
             id: info.id,
             session_id: info.sessionId,
             title: info.title
+          }
+          // Seed the agent mark from the list response (e.g. a Capy /
+          // handoff launch where the CLI was already running before the
+          // xterm mounted). Live changes arrive as `agent.changed` events.
+          if (isExternalAgentKind(info.agent)) {
+            useTerminalsStore.getState().patch(terminalId, { agent: info.agent })
           }
         }
         const info = ptyRef.current

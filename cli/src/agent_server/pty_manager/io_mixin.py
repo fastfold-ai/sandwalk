@@ -38,6 +38,27 @@ class PtyIOMixin:
             os.kill(session.info.pid, signal.SIGWINCH)
         except OSError:
             pass
+        # Tell this subscriber which agent is already in the foreground, then
+        # keep probing on a timer for as long as it stays attached.
+        self.refresh_agent(session, force=True)  # type: ignore[attr-defined]
+        if session.info.agent:
+            try:
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "pty.event",
+                            "terminalId": session.info.session_id,
+                            "event": {
+                                "kind": "agent.changed",
+                                "agent": session.info.agent,
+                                "agentCwd": session.info.agent_cwd,
+                            },
+                        }
+                    )
+                )
+            except Exception:
+                pass
+        watcher = asyncio.create_task(self.watch_agent_while_attached(session, websocket))  # type: ignore[attr-defined]
         try:
             while True:
                 message = await websocket.receive()
@@ -54,6 +75,7 @@ class PtyIOMixin:
                     break
         finally:
             session.subscribers.discard(websocket)
+            watcher.cancel()
 
     async def _read_loop(self, pty_id: str) -> None:
         loop = asyncio.get_running_loop()

@@ -1,6 +1,7 @@
 import type { AgentProject, TerminalSession } from '@sandwalk/agent-ui-core'
 import { Archive, Folder, Pencil, Pin, Trash2 } from 'lucide-react'
 
+import { ConvertTerminalItem } from '@/components/agents/ExternalAgentMenuBlocks'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import {
   TabContextSeparator,
@@ -27,7 +28,8 @@ export function TerminalActionsMenu({
   onMoveToProject,
   onSetTabColor,
   onArchive,
-  onDelete
+  onDelete,
+  onConvert
 }: {
   terminal: TerminalSession
   projects: AgentProject[]
@@ -38,6 +40,8 @@ export function TerminalActionsMenu({
   onSetTabColor: (color: string | null) => void
   onArchive: () => void
   onDelete: () => void
+  /** Called right before "Convert … to chat" runs — close the popover. */
+  onConvert?: () => void
 }) {
   return (
     <>
@@ -82,6 +86,7 @@ export function TerminalActionsMenu({
         onClear={() => onSetTabColor(null)}
       />
       <TabContextSeparator />
+      <ConvertTerminalItem terminal={terminal} variant="popover" onDone={onConvert} />
       <button
         type="button"
         className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"

@@ -79,6 +79,7 @@ import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
 import { gridLayoutChoices } from './GridArrangeControl'
+import { ContinueInSubmenu, ConvertTerminalItem } from './ExternalAgentMenuBlocks'
 import { ProjectPicker } from './ProjectPicker'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionStatusIcon } from './SessionStatusIcon'
@@ -1058,6 +1059,7 @@ export function SessionTabs({
             label="Inspect chat"
             onClick={() => runAction(() => onInspect(menuSession))}
           />
+          <ContinueInSubmenu session={menuSession} onClose={() => setMenu(null)} />
           <TabContextItem
             icon={<Archive className="size-3.5" />}
             label={
@@ -1290,6 +1292,11 @@ export function SessionTabs({
             </>
           ) : null}
           <TabContextSeparator />
+          <ConvertTerminalItem
+            terminal={menuTerminal}
+            variant="context"
+            onDone={() => setMenu(null)}
+          />
           <TabContextItem
             icon={<X className="size-3.5" />}
             label="Close tab"

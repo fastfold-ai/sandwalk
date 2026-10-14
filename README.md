@@ -36,8 +36,9 @@ Sandwalk is in developer preview.
 ## What Sandwalk does
 
 - **Shares one session list across the app, the CLI, and remote devices.** Start a session in the terminal, continue it in the Mac app, or check on it from a phone.
-- **Runs on any LLM, cloud or local.** OpenAI, Anthropic, Gemini, xAI, DeepSeek, OpenRouter, Bedrock, or a local model on Ollama, oMLX, llama.cpp, or LM Studio.
-- **Includes Capy, a meta agent for the workspace.** Aware of your active sessions, Capy spawns new sessions, seeds them with briefs, arranges them into grids, and runs benchmarks or diagnostics on command.
+- **Runs on any LLM, cloud or local.** OpenAI, Anthropic, Gemini, xAI, DeepSeek, OpenRouter, Bedrock, or a local model on Ollama, oMLX, llama.cpp, or LM Studio. Sign in with ChatGPT to run OpenAI models on a Plus or Pro plan instead of an API key.
+- **Works with the other coding agents you already use.** Open Claude Code, Codex, OpenCode, or fx in a Sandwalk terminal; the tab shows which one is running. Import any of their sessions as a Sandwalk chat, or hand a Sandwalk chat to them. Claude Code and Codex can resume it as native history.
+- **Includes Capy, a meta agent for the workspace.** Aware of your active sessions, Capy spawns new sessions, seeds them with briefs, arranges them into grids, launches or imports from the other coding agents, and runs benchmarks or diagnostics on command.
 - **Installs skills in one click from skills.sh.** Pull from the public catalog, a GitHub repo, or a local folder, and attach any MCP server.
 - **Bundles workflows into Specialists.** Save a set of skills, MCP servers, and instructions as a reusable profile for any kind of work.
 - **Organizes long-horizon work into Projects.** Scope sessions, shared library files, custom instructions, and usage boards per project.
@@ -163,6 +164,35 @@ Keys stay on this computer. Connected providers show up in the composer.
 
 Local endpoints are discovered from `/v1/models` or Ollama's `/api/tags`. Add one with **Add Local LLM**, or in the CLI with `/model-manager`.
 
+### Sign in with ChatGPT
+
+OpenAI models can run on a ChatGPT Plus or Pro plan with no API key. In the app it is **Continue with ChatGPT** on the Model step or under Dashboard → Models; in a terminal:
+
+```bash
+sandwalk login chatgpt            # opens the browser, keeps tokens in ~/.sandwalk/chatgpt-auth.json
+sandwalk login status
+sandwalk logout chatgpt
+```
+
+Models then appear under **ChatGPT plan** in the picker. The same model under **OpenAI** still bills your API key; the row you pick decides.
+
+## Other coding agents
+
+Sandwalk reads and writes the session stores of Claude Code, Codex, OpenCode, and fx.
+
+| | Claude Code | Codex | OpenCode | fx |
+|---|---|---|---|---|
+| Open in a Sandwalk terminal, tab shows the agent | ✓ | ✓ | ✓ | ✓ |
+| Import a session as a Sandwalk chat | ✓ | ✓ | ✓ | ✓ |
+| Continue a Sandwalk chat there (handoff file) | ✓ | ✓ | ✓ | ✓ |
+| Continue with native history (`--resume`) | ✓ | ✓ | — | — |
+
+- **Import**: onboarding offers your recent sessions; later, right-click a terminal running one of these agents and choose **Convert to chat**, or ask Capy. The chat keeps the original folder as its workspace and is history only until you send a message.
+- **Continue in…**: on any chat, pick the agent. Sandwalk writes `.sandwalk/handoff-<id>.md` in the workspace and opens the CLI on it. For Claude Code and Codex, **native history** also writes their own session file so `claude --resume` / `codex resume` open the conversation directly (experimental; the handoff file is always there as a fallback).
+- **Capy**: “import my last Codex session”, “open OpenCode in this project”, “hand this chat to Claude Code”.
+
+Those formats belong to their vendors and change between releases; readers degrade to the handoff path when they stop matching.
+
 ## CLI
 
 Same sessions, same files. Type `sandwalk` in a terminal, or press **⌘⇧T** and type it in the app. `/` opens the command list.
@@ -176,6 +206,7 @@ sandwalk "question"               # one-shot
 sandwalk serve                    # local agent API on :8787
 sandwalk serve --host 0.0.0.0     # expose to the LAN (needs sandwalk auth)
 sandwalk auth                     # manage the API key for serve
+sandwalk login chatgpt            # use a ChatGPT Plus/Pro plan for OpenAI models
 sandwalk doctor                   # environment and configuration checks
 sandwalk eval                     # run Bench suites headlessly
 sandwalk skills add fastfold-ai/skills
