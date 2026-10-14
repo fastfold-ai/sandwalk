@@ -36,7 +36,7 @@ function clampSize(width: number, height: number) {
 
 const SUGGESTIONS = [
   'Capy, what can you help me with?',
-  'Start 3 sessions and say hi',
+  'Start a 4×2 grid researching the latest in protein design',
   'Run doctor and summarize diagnostics',
   'List bench suites and start a run',
   'Show last bench results and token usage'
