@@ -35,8 +35,6 @@
 |----------|------|
 | macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
 
-Drag Sandwalk to Applications and open it. The disk is signed with a Developer ID certificate. The app bundles the agent server, a Python runtime, and the dashboard, so nothing else needs to be installed. Updates arrive in-app. All builds are on [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases).
-
 Requires macOS 12.0+ and Apple Silicon.
 
 ### CLI
