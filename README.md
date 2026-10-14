@@ -25,20 +25,26 @@
 
 ## Why Sandwalk exists
 
-Deep research still stops where one person's time, tools, or machine stops. Sandwalk exists to turn individual curiosity into collective discovery.
+Sandwalk exists to turn individual curiosity into collective discovery.
 
-The agent keeps working overnight on a machine at home or on a university cluster. The agent reads, runs, and brings the result back. The person asking decides which results matter. A shared skill, an open codebase, or a published page is how that result leaves one session.
+It is built for scientists, engineers, and anyone chasing a question that takes days, not one prompt.
+
+Serious research cannot live inside one vendor's model, one set of tools, or one cloud. The model, the skills, the MCP servers, and the compute are separate pieces in Sandwalk, so a session can pair any of them and swap any of them as the field moves. The harness is open, self-hosted, and Apache-2.0. The work stays on the machine that ran it, and a skill or a published page is how a result is shared.
 
 Sandwalk is in developer preview.
 
 ## What Sandwalk does
 
-- **The agent returns the files with the answer.** A structure, a plot, a report, opened next to the session.
-- **Several agents work one question.** Different models, different slices, one grid.
-- **A session can start with a plan.** The agent drafts the steps. Build runs them.
-- **A skill and a sandbox travel with the job.** Folding, literature, a Modal GPU. The outputs land on disk.
-- **A result can become a page.** Published at a sandwalk.site address, only after confirmation.
-- **The agent keeps running on another machine.** A phone opens the same sessions from a QR code.
+- **Shares one session list across the app, the CLI, and remote devices.** Start a session in the terminal, continue it in the Mac app, or check on it from a phone.
+- **Runs on any LLM, cloud or local.** OpenAI, Anthropic, Gemini, xAI, DeepSeek, OpenRouter, Bedrock, or a local model on Ollama, oMLX, llama.cpp, or LM Studio.
+- **Includes Capy, a meta agent for the workspace.** Aware of your active sessions, Capy spawns new sessions, seeds them with briefs, arranges them into grids, and runs benchmarks or diagnostics on command.
+- **Installs skills in one click from skills.sh.** Pull from the public catalog, a GitHub repo, or a local folder, and attach any MCP server.
+- **Bundles workflows into Specialists.** Save a set of skills, MCP servers, and instructions as a reusable profile for any kind of work.
+- **Organizes long-horizon work into Projects.** Scope sessions, shared library files, custom instructions, and usage boards per project.
+- **Executes code locally or on cloud GPUs.** Run in a local sandbox or a Modal container, and every file, plot, report, notebook (`.ipynb`), or 3D output lands beside the session.
+- **Measures the whole harness with built-in Benchmarking.** In science and ambitious work, changing a model, a skill, or a prompt should be tested, not guessed. Run MMLU, MMLU-Pro, ARC-C, MBPP, LiveCodeBench, BixBench, or Bio-Capybara through real agent sessions, compare two runs side by side across models or Specialists, or gate changes from the CLI with `sandwalk eval`.
+- **Ships with a scientific toolkit and local corpora.** Query PubChem, ChEMBL, UniProt, PDB, Open Targets, and ClinicalTrials.gov out of the box, or pull local datasets (DepMap, MSigDB, STRING).
+- **Scales from one plan to a grid of agents.** Draft a plan before a long run, split a question across parallel sessions, talk to Capy hands-free with local voice, and publish the result as a static site at `sandwalk.site`.
 
 ## A look inside
 
