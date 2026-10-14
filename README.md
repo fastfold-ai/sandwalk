@@ -26,9 +26,7 @@
   <img alt="Sandwalk desktop: a chat, the files it produced, and a terminal, side by side" src="images/showcase.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
-> *Research does not fit in one chat. A real question needs a model, a few tools, some data on disk, a GPU for an hour, and often more than one agent pulling on different threads at once. Every harness I tried gave me one of those and made me stitch the rest together by hand.*
->
-> *Sandwalk is the harness with all of it already wired. Skills, MCP servers, local and cloud models, a sandbox on your Mac or on Modal, a grid of agents working side by side, and a place to turn the result into a page you can send someone. It runs on your own compute, and the CLI, the Mac app, and a remote server all share the same sessions.*
+Sandwalk is an open, self-hosted agent you run on your own compute. Point it at hard scientific research, or any ambitious work. It comes with skills, MCP servers, local and cloud models, a sandbox on your Mac or on Modal, and a grid for running several agents at once. The Mac app, the CLI, and a remote server share one session list, so you can leave a run going on a Mac mini or a cluster and pick it up from anywhere.
 
 ## Install
 
