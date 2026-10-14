@@ -30,7 +30,7 @@ _PINNED_TOOL_NAMES = (
 
 def provider_needs_openai_tool_cap(provider: str | None) -> bool:
     """Return True when the provider enforces OpenAI's ≤128 tools limit."""
-    return str(provider or "").strip().lower() == "openai"
+    return str(provider or "").strip().lower() in {"openai", "openai-chatgpt"}
 
 
 def finalize_tools_for_provider(tools: list, provider: str | None) -> list:
@@ -59,6 +59,10 @@ def build_chat_model(config, *, streaming: bool = True):
         return build_anthropic_chat_model(config, temperature=temperature)
     if provider == "openai":
         return build_openai_chat_model(config, temperature=temperature)
+    if provider == "openai-chatgpt":
+        from agent.deepagents_runtime.chat_model_chatgpt import build_chatgpt_chat_model
+
+        return build_chatgpt_chat_model(config, temperature=temperature)
     if provider == "google":
         return build_google_chat_model(config, temperature=temperature)
     if provider == "moonshot":

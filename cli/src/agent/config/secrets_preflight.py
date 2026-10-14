@@ -67,6 +67,16 @@ class SecretsPreflightMixin:
         if provider == "bedrock":
             return None
 
+        if provider == "openai-chatgpt":
+            from .chatgpt_auth import is_connected
+
+            if is_connected():
+                return None
+            return (
+                "Not signed in with ChatGPT. Open Dashboard → Models and choose "
+                "Continue with ChatGPT, or run: sandwalk setup"
+            )
+
         provider_key = self.llm_api_key(provider)
         if provider_key:
             if provider == "openai" and str(provider_key).startswith("sk-ant-"):
@@ -148,6 +158,9 @@ class SecretsPreflightMixin:
             if backend and backend != "openai":
                 return f"{label or backend} · {model}"
             return f"OpenAI · {model}"
+
+        if provider == "openai-chatgpt":
+            return f"ChatGPT plan · {model}"
 
         if provider in OPENAI_COMPATIBLE_PROVIDERS:
             label = OPENAI_COMPATIBLE_PROVIDERS[provider].get("label") or provider

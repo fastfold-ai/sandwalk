@@ -48,6 +48,7 @@ export function filterModelCatalog(
 
 export const CLOUD_PROVIDERS = [
   { value: 'openai', label: 'OpenAI' },
+  { value: 'openai-chatgpt', label: 'ChatGPT plan' },
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'google', label: 'Google Gemini' },
   { value: 'xai', label: 'xAI (Grok)' },

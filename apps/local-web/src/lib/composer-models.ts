@@ -46,6 +46,7 @@ export function formatPickerContextBadge(
 const CLOUD_PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  'openai-chatgpt': 'ChatGPT plan',
   google: 'Gemini',
   xai: 'Grok',
   moonshot: 'Kimi',

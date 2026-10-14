@@ -24,6 +24,8 @@ dependencies = [
     "langchain-moonshot>=0.1.0",
     "langgraph>=1.2.9",
     "httpx>=0.27",
+    # Sign in with ChatGPT: verify the OpenAI ID token (RS256 via JWKS).
+    "pyjwt[crypto]>=2.8",
     "pandas>=2.0",
     "numpy>=1.24",
     "scipy>=1.10",

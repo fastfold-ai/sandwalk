@@ -31,6 +31,8 @@ VALID_LLM_PROVIDERS = frozenset(
         "groq",
         "fireworks",
         "meta",
+        # Sign in with ChatGPT: OAuth-backed OpenAI Responses API (no API key).
+        "openai-chatgpt",
     }
 )
 

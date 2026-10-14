@@ -1,6 +1,6 @@
 import type { IntegrationSummary } from '@sandwalk/agent-ui-core'
 import { Check, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Loader, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { IntegrationIcon } from '@/components/agents/IntegrationIcon'
@@ -74,10 +74,13 @@ export function ModelsApiKeysSection({
   onRevealStoredSecret,
   onSaveProviderKey,
   onClearProviderKey,
-  onTestProviderKey
+  onTestProviderKey,
+  chatGPTSignIn
 }: {
   open: boolean
   providerIntegrations: IntegrationSummary[]
+  /** "Continue with ChatGPT" card, rendered above the API-key grid. */
+  chatGPTSignIn?: ReactNode
   keyDrafts: Record<string, string>
   endpointDrafts: Record<string, string>
   revealedKeys: Record<string, boolean>
@@ -315,6 +318,7 @@ export function ModelsApiKeysSection({
 
       {open ? (
         <div className="space-y-3">
+          {chatGPTSignIn}
           {providerIntegrations.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No LLM provider integrations available from the agent backend.

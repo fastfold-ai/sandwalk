@@ -10,6 +10,7 @@ import {
   toComposerModelOptions
 } from '@/lib/composer-models'
 
+import { ChatGPTSignInCard } from './models-view/ChatGPTSignInCard'
 import { OnboardingModelCloudPanel } from './onboarding/onboarding-model-cloud-panel'
 import { OnboardingModelDefaultPicker } from './onboarding/onboarding-model-default-picker'
 import { OnboardingModelLocalPanel } from './onboarding/onboarding-model-local-panel'
@@ -79,6 +80,10 @@ export function OnboardingModelStep({
   const selectedIntegration = cloudProviders.find(
     item => item.key === selectedCloud
   )
+
+  // Set when the user connected via Sign in with ChatGPT rather than a key.
+  const [chatGPTConnected, setChatGPTConnected] = useState(false)
+  const CHATGPT_PROVIDER = 'openai-chatgpt'
 
   const refreshIntegrations = useCallback(async () => {
     setLoadingIntegrations(true)
@@ -220,6 +225,34 @@ export function OnboardingModelStep({
     }
   }
 
+  const onChatGPTConnected = async () => {
+    setError(null)
+    setNotice(null)
+    setSelectedCloud(null)
+    setCloudKey('')
+    setCloudSaved(false)
+    setDefaultSaved(false)
+    setChatGPTConnected(true)
+    try {
+      await client.updateRuntimeSettings({ provider: CHATGPT_PROVIDER })
+      setNotice('ChatGPT connected. Pick a default model below.')
+      await refreshIntegrations()
+      setShowDefaultPicker(true)
+      await loadProviderModels(CHATGPT_PROVIDER)
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'ChatGPT connected, but the models could not be loaded.'
+      )
+    }
+  }
+
+  const onChatGPTDisconnected = async () => {
+    setChatGPTConnected(false)
+    setShowDefaultPicker(false)
+    setProviderModelOptions([])
+    setNotice('ChatGPT disconnected.')
+  }
+
   const selectDefaultModel = async (
     provider: string,
     model: string,
@@ -344,6 +377,19 @@ export function OnboardingModelStep({
 
       {mode === 'cloud' ? (
         <>
+          <ChatGPTSignInCard
+            client={client}
+            compact
+            onConnected={onChatGPTConnected}
+            onDisconnected={onChatGPTDisconnected}
+          />
+          <div className="flex items-center gap-3">
+            <span className="bg-border/70 h-px flex-1" />
+            <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
+              or add an API key
+            </span>
+            <span className="bg-border/70 h-px flex-1" />
+          </div>
           <OnboardingModelCloudPanel
             loadingIntegrations={loadingIntegrations}
             cloudProviders={cloudProviders}
@@ -361,6 +407,7 @@ export function OnboardingModelStep({
               setShowDefaultPicker(false)
               setDefaultSaved(false)
               setProviderModelOptions([])
+              setChatGPTConnected(false)
               setError(null)
               setNotice(null)
             }}
@@ -372,9 +419,13 @@ export function OnboardingModelStep({
             onToggleShowKey={() => setShowCloudKey(open => !open)}
             onSave={() => void saveCloud()}
           />
-          {showDefaultPicker && selectedIntegration ? (
+          {showDefaultPicker && (selectedIntegration || chatGPTConnected) ? (
             <OnboardingModelDefaultPicker
-              providerName={selectedIntegration.name}
+              providerName={
+                chatGPTConnected
+                  ? 'ChatGPT plan'
+                  : selectedIntegration?.name || 'this provider'
+              }
               modelOptions={providerModelOptions}
               runtimeSettings={runtimeSettings}
               loading={modelsLoading}

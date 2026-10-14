@@ -56,6 +56,20 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
         ("gpt-5-mini", "GPT-5 Mini", "Near-frontier model for cost-sensitive low-latency workloads"),
         ("gpt-5-nano", "GPT-5 Nano", "Cheapest GPT-5-class model for simple high-volume tasks"),
     ],
+    # Sign in with ChatGPT: same OpenAI models, billed to the user's Plus/Pro plan
+    # via OAuth. Only the Responses-API-capable GPT-5/6 rows are offered.
+    "openai-chatgpt": [
+        (
+            "gpt-6-astra",
+            "GPT-6 Astra",
+            "Most capable GPT-6 on your ChatGPT plan (1.05M context)",
+        ),
+        ("gpt-5.6-sol", "GPT-5.6 Sol", "High-speed frontier model on your ChatGPT plan"),
+        ("gpt-5.6-terra", "GPT-5.6 Terra", "Balanced GPT-5.6 on your ChatGPT plan"),
+        ("gpt-5.6-luna", "GPT-5.6 Luna", "GPT-5.6 for broader agent work on your ChatGPT plan"),
+        ("gpt-5.5", "GPT-5.5", "Frontier coding model on your ChatGPT plan"),
+        ("gpt-5.3-codex", "Codex 5.3", "OpenAI coding model on your ChatGPT plan"),
+    ],
     "xai": [
         ("grok-4.5", "Grok 4.5", "Most intelligent and fastest xAI model"),
         ("grok-4.3", "Grok 4.3", "Fast general-purpose xAI model with 1M context"),

@@ -310,7 +310,7 @@ def allowlist_modalities(
     if provider_norm in {"opencode", "openrouter"}:
         return _gateway_multimodal(value)
 
-    if provider_norm in {"openai", "nvidia"}:
+    if provider_norm in {"openai", "openai-chatgpt", "nvidia"}:
         kinds = _openai_cloud_multimodal(value)
         # Local VLMs (oMLX / Ollama / MLX) are catalogued as provider=local but
         # remapped to openai at runtime for the OpenAI-compatible wire protocol.

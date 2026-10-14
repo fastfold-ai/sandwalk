@@ -9,7 +9,7 @@ import type {
   UpsertModelProfileInput
 } from '@sandwalk/agent-ui-core'
 import { Info } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -49,9 +49,15 @@ export function ModelsView({
   onRevealProfileSecret,
   onLoadModelPreferences,
   onToggleModelFavorite,
-  embedded = false
+  embedded = false,
+  renderChatGPTSignIn
 }: {
   integrations: IntegrationSummary[]
+  /**
+   * Sign in with ChatGPT card. Receives a reload callback so the models list
+   * refreshes once the plan is connected or disconnected.
+   */
+  renderChatGPTSignIn?: (reload: () => Promise<void>) => ReactNode
   onListModels: (options?: {
     discover?: boolean
     signal?: AbortSignal
@@ -242,6 +248,7 @@ export function ModelsView({
             state.clearProviderKey(integration)
           }
           onTestProviderKey={state.testProviderKey}
+          chatGPTSignIn={renderChatGPTSignIn?.(() => state.load(true))}
         />
 
         <ModelsProfilesSection

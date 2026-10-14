@@ -1,5 +1,6 @@
 import { onboardingPath } from '@/lib/onboarding'
 
+import { ChatGPTSignInCard } from './models-view/ChatGPTSignInCard'
 import {
   AgentPromptsView,
   AgentRuntimeView,
@@ -274,6 +275,19 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
             profileId: model.profileId
           })
         }
+        renderChatGPTSignIn={reload => (
+          <ChatGPTSignInCard
+            client={client}
+            onConnected={async () => {
+              await reload()
+              await loadModelOptions({ force: true })
+            }}
+            onDisconnected={async () => {
+              await reload()
+              await loadModelOptions({ force: true })
+            }}
+          />
+        )}
       />
     )
   }

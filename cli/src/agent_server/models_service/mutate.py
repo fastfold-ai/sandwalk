@@ -80,6 +80,10 @@ def _cloud_provider_key_present(cfg: Config, provider: str) -> bool:
     if provider == "bedrock":
         # IAM default — do not hide the static Bedrock gallery for missing keys.
         return True
+    if provider == "openai-chatgpt":
+        from agent.config.chatgpt_auth import is_connected
+
+        return is_connected()
     return bool(cfg.llm_api_key(provider))
 
 
@@ -91,7 +95,12 @@ def sync_models_for_unconfigured_providers(cfg: Config) -> bool:
     integrations save path when a key is newly stored.
     """
     changed = False
-    providers = ("anthropic", "openai", *OPENAI_COMPATIBLE_PROVIDERS.keys())
+    providers = (
+        "anthropic",
+        "openai",
+        "openai-chatgpt",
+        *OPENAI_COMPATIBLE_PROVIDERS.keys(),
+    )
     for provider in providers:
         if _cloud_provider_key_present(cfg, provider):
             continue

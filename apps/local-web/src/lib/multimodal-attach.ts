@@ -132,6 +132,7 @@ export function resolveMultimodalCapabilityFlags(model: {
     provider === 'compatible' ||
     provider === 'openai-compatible' ||
     provider === 'openai' ||
+    provider === 'openai-chatgpt' ||
     provider === 'opencode' ||
     provider === 'nvidia' ||
     !provider

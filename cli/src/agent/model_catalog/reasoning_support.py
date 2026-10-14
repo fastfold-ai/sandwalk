@@ -37,8 +37,8 @@ def model_supports_reasoning_effort(
         return True
     if not value:
         return False
-    # OpenAI cloud GPT-5 / o-series reasoning models.
-    if provider_norm in {"openai", "opencode", ""}:
+    # OpenAI cloud GPT-5 / o-series reasoning models (also via ChatGPT plan OAuth).
+    if provider_norm in {"openai", "openai-chatgpt", "opencode", ""}:
         if value.startswith("o1") or value.startswith("o3") or value.startswith("o4"):
             return True
         if value.startswith("gpt-5") or value.startswith("gpt-6"):

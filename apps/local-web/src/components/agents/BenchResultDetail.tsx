@@ -31,6 +31,7 @@ function prettyProvider(id: string): string {
   if (!raw) return ''
   const key = raw.toLowerCase()
   if (key === 'openai') return 'OpenAI'
+  if (key === 'openai-chatgpt') return 'ChatGPT plan'
   if (key === 'openai_compatible' || key === 'openai-compatible') {
     return 'OpenAI-compatible'
   }

@@ -9,6 +9,7 @@ from agent_server.routes.account import register_account_routes
 from agent_server.routes.auth import register_auth_routes
 from agent_server.routes.bench import register_bench_routes
 from agent_server.routes.capy import register_capy_routes
+from agent_server.routes.chatgpt_auth import register_chatgpt_auth_routes
 from agent_server.routes.connectors import register_connector_routes
 from agent_server.routes.dashboard_layout import register_dashboard_layout_routes
 from agent_server.routes.datasets_tools import register_dataset_tool_routes
@@ -51,6 +52,7 @@ from agent_server.routes.workspace_items import register_workspace_item_routes
 def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     """Register every `/v1/*` route on `app`. Auth middleware is wired separately."""
     register_auth_routes(app, deps)
+    register_chatgpt_auth_routes(app, deps)
     register_health_routes(app, deps)
     register_offline_status_routes(app, deps)
     register_mcp_server_routes(app, deps)

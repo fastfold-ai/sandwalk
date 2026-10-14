@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from agent_server.models.base import ApiModel, to_camel
 from agent_server.models.account import AccountAbout, AccountOrganization, AccountSummary, AccountUser
-from agent_server.models.auth import AuthLoginRequest, AuthSettingsResponse, AuthStatusResponse, UpdateAuthSettingsRequest
+from agent_server.models.auth import AuthLoginRequest, AuthSettingsResponse, AuthStatusResponse, ChatGPTAuthStart, ChatGPTAuthStatus, UpdateAuthSettingsRequest
 from agent_server.models.bench import BenchActiveStatus, BenchCancelResponse, BenchGradeRequest, BenchGradeResponse, BenchInstallResponse, BenchProgress, BenchQueueItem, BenchResetResponse, BenchResultList, BenchResultSummary, BenchSpawnRequest, BenchSpawnResponse, BenchSuiteCard, BenchSuiteList, BenchSuiteRef
 from agent_server.models.connectors import AddSlackSubscriptionRequest, AllowSlackUserRequest, ConnectSlackManualRequest, ConnectorActionResponse, ConnectorName, SessionConnectorMute, SetConnectorMuteRequest, SlackAllowedUser, SlackAllowedUserList, SlackConnectorStatus, SlackDirectory, SlackDirectoryChannel, SlackDirectoryPerson, SlackManifestResponse, SlackMode, SlackOneClickStart, SlackParkedMessage, SlackParkedMessageList, SlackSubscription, SlackSubscriptionList, SlackWorkspace, SlackWorkspaceList, StartSlackOneClickRequest
 from agent_server.models.datasets_tools import DatasetInstallResponse, DatasetList, DatasetSummary, ToolBatchAction, ToolBatchActionRequest, ToolBatchActionResponse, ToolList, ToolSummary, UpdateToolRequest

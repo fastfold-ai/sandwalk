@@ -186,6 +186,21 @@ class UsageUIMixin:
                 "No model is set up yet. Add a provider and API key in "
                 "[Models](/dashboard/models)."
             )
+        if "not signed in with chatgpt" in lower or "chatgpt plan usage is not enabled" in lower:
+            return (
+                "ChatGPT is not connected. Choose Continue with ChatGPT in "
+                "[Models](/dashboard/models)."
+            )
+        if (
+            "chatgpt.tokens.use.direct" in lower
+            or ("plan" in lower and "429" in lower)
+            or ("usage limit" in lower and "chatgpt" in lower)
+        ):
+            return (
+                "ChatGPT plan limit reached. Plus plans share one 5-hour window "
+                "across every connected app; wait for it to reset or switch to an "
+                "API key in [Models](/dashboard/models)."
+            )
         return text
 
     @staticmethod

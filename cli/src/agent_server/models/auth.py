@@ -25,3 +25,19 @@ class AuthSettingsResponse(ApiModel):
 class UpdateAuthSettingsRequest(ApiModel):
     api_key: str | None = None
     auth_enabled: bool | None = None
+
+
+class ChatGPTAuthStatus(ApiModel):
+    """Sign in with ChatGPT connection state (never includes tokens)."""
+
+    connected: bool = False
+    email: str | None = None
+    plan_usage: bool = False
+    expires_at: float | None = None
+
+
+class ChatGPTAuthStart(ApiModel):
+    """Browser authorize URL plus the state the UI polls on."""
+
+    url: str
+    state: str

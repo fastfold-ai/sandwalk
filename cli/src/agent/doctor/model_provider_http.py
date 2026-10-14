@@ -343,8 +343,59 @@ def supports_llm_key_probe(provider_key: str) -> bool:
     from agent.config import OPENAI_COMPATIBLE_PROVIDERS
 
     return (
-        provider_key in ("anthropic", "openai", "bedrock")
+        provider_key in ("anthropic", "openai", "openai-chatgpt", "bedrock")
         or provider_key in OPENAI_COMPATIBLE_PROVIDERS
+    )
+
+
+def probe_chatgpt_plan(*, label: str = "ChatGPT plan", timeout: float = 30.0) -> ModelsProbeResult:
+    """Verify the saved ChatGPT OAuth token with a 1-token Responses call."""
+    from agent.config import chatgpt_auth
+
+    try:
+        token = chatgpt_auth.access_token()
+    except chatgpt_auth.ChatGPTAuthError as exc:
+        return ModelsProbeResult(ok=False, message=str(exc))
+    try:
+        import httpx
+    except ImportError:
+        return ModelsProbeResult(ok=False, message="httpx is not installed — cannot test the sign-in.")
+    try:
+        resp = httpx.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": "Sandwalk/1.0",
+            },
+            json={
+                "model": "gpt-5.6-sol",
+                "input": "ping",
+                "max_output_tokens": 16,
+                "store": False,
+            },
+            timeout=timeout,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return ModelsProbeResult(ok=False, message=f"Couldn't reach OpenAI ({exc.__class__.__name__}).")
+    payload: object | None = None
+    try:
+        payload = resp.json()
+    except Exception:  # noqa: BLE001
+        payload = None
+    if resp.status_code == 429:
+        return ModelsProbeResult(
+            ok=False,
+            message=f"{label} limit reached. Plus plans share a 5-hour window across apps.",
+            status_code=429,
+        )
+    return _classify_http_result(
+        label=label,
+        code=resp.status_code,
+        body_text=resp.text or "",
+        payload=payload,
+        success_message=f"{label} is connected and working.",
     )
 
 
@@ -371,6 +422,8 @@ def probe_llm_api_key(
     name = label or provider_key
     if provider_key == "bedrock":
         return probe_bedrock_iam(label=name)
+    if provider_key == "openai-chatgpt":
+        return probe_chatgpt_plan(label=label or "ChatGPT plan", timeout=max(timeout, 30.0))
     if not key:
         return ModelsProbeResult(
             ok=False,

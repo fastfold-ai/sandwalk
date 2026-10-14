@@ -21,6 +21,8 @@ import type {
   AgentCatalogSkillAudit,
   AgentCatalogSkillDetail,
   AgentSkill,
+  ChatGPTAuthStart,
+  ChatGPTAuthStatus,
   AgentSkillBatchAction,
   AgentSkillBatchResult,
   AgentSkillDepsInstallResult,
@@ -526,6 +528,40 @@ export class LocalAgentClient
     authenticated?: boolean
   }> {
     return this.request('/auth/status', { signal })
+  }
+
+  // --- Sign in with ChatGPT (subscription-backed OpenAI) -------------------
+
+  /**
+   * Current ChatGPT connection. Pass the ``state`` from ``startChatGPTLogin``
+   * to also learn whether that pending browser sign-in finished; a failed
+   * attempt rejects with the server's error message.
+   */
+  getChatGPTAuthStatus(
+    options?: { state?: string; signal?: AbortSignal }
+  ): Promise<ChatGPTAuthStatus> {
+    const query = options?.state
+      ? `?state=${encodeURIComponent(options.state)}`
+      : ''
+    return this.request<ChatGPTAuthStatus>(`/auth/chatgpt/status${query}`, {
+      signal: options?.signal
+    })
+  }
+
+  /** Begin the browser sign-in. Open ``url`` externally, then poll status. */
+  startChatGPTLogin(signal?: AbortSignal): Promise<ChatGPTAuthStart> {
+    return this.request<ChatGPTAuthStart>('/auth/chatgpt/start', {
+      method: 'POST',
+      signal
+    })
+  }
+
+  /** Revoke the refresh token at OpenAI and forget the local sign-in. */
+  logoutChatGPT(signal?: AbortSignal): Promise<ChatGPTAuthStatus> {
+    return this.request<ChatGPTAuthStatus>('/auth/chatgpt/logout', {
+      method: 'POST',
+      signal
+    })
   }
 
   async login(

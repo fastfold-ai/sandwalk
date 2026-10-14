@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 const PROVIDER_ORDER = [
   'anthropic',
   'openai',
+  'openai-chatgpt',
   'google',
   'xai',
   'moonshot',
@@ -37,6 +38,7 @@ const PROVIDER_ORDER = [
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  'openai-chatgpt': 'ChatGPT plan',
   google: 'Gemini',
   xai: 'Grok',
   moonshot: 'Kimi',

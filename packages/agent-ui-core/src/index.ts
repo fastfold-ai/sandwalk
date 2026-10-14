@@ -867,6 +867,19 @@ export type IntegrationUnlock = {
   statusDetail: string | null
 }
 
+/** Sign in with ChatGPT connection state (server never sends tokens). */
+export type ChatGPTAuthStatus = {
+  connected: boolean
+  email: string | null
+  planUsage: boolean
+  expiresAt: number | null
+}
+
+export type ChatGPTAuthStart = {
+  url: string
+  state: string
+}
+
 export type IntegrationSummary = {
   key: string
   name: string
