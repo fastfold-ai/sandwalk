@@ -114,14 +114,7 @@ export function ChatGPTSignInCard({
         )}
       </div>
 
-      {auth.error ? (
-        <p className="text-destructive text-xs">{auth.error}</p>
-      ) : auth.status.connected ? null : (
-        <p className="text-muted-foreground text-[11px] leading-relaxed">
-          Plus plans share one 5-hour usage window across every app connected to
-          ChatGPT. Pro plans have no 5-hour cap.
-        </p>
-      )}
+      {auth.error ? <p className="text-destructive text-xs">{auth.error}</p> : null}
     </div>
   )
 }

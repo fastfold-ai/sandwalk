@@ -421,18 +421,12 @@ def test_models_list_hides_chatgpt_rows_until_connected(tmp_path: Path, monkeypa
     assert "gpt-5.6-sol" in after
 
 
-def test_chat_model_uses_oauth_token_and_responses_api(monkeypatch):
+def test_chat_model_uses_oauth_token_and_lifts_system_prompt():
+    from langchain_core.messages import HumanMessage, SystemMessage
+
     from agent.deepagents_runtime.chat_model_chatgpt import build_chatgpt_chat_model
 
     ca.save_credentials(_creds(access_token="oauth-token"))
-    captured: dict = {}
-
-    def fake_init(model_id, **kwargs):
-        captured["model_id"] = model_id
-        captured.update(kwargs)
-        return object()
-
-    monkeypatch.setattr("langchain.chat_models.init_chat_model", fake_init)
 
     class _Cfg:
         def get(self, key, default=None):
@@ -443,14 +437,26 @@ def test_chat_model_uses_oauth_token_and_responses_api(monkeypatch):
                 "llm.param_heals": {},
             }.get(key, default)
 
-    build_chatgpt_chat_model(_Cfg(), temperature=0.3)
-    assert captured["model_id"] == "openai:gpt-5.6-sol"
-    assert captured["api_key"] == "oauth-token"
-    assert captured["use_responses_api"] is True
-    assert captured["extra_body"] == {"store": False}
-    assert "base_url" not in captured
-    assert "temperature" not in captured  # GPT-5 rejects custom temperature
-    assert captured["reasoning_effort"] == "high"
+    model = build_chatgpt_chat_model(_Cfg(), temperature=0.3)
+    assert model.model_name == "gpt-5.6-sol"
+    assert model.openai_api_key.get_secret_value() == "oauth-token"
+    assert model.use_responses_api is True
+    assert model.store is False
+    assert model.temperature is None  # GPT-5 rejects custom temperature
+    assert model.reasoning_effort == "high"
+
+    payload = model._get_request_payload(
+        [
+            SystemMessage(
+                content=[{"type": "text", "text": "You are Sandwalk."}],
+            ),
+            HumanMessage(content="Hi"),
+        ]
+    )
+    assert payload["store"] is False
+    assert payload["instructions"] == "You are Sandwalk."
+    assert all(item.get("role") != "system" for item in payload["input"])
+    assert any(item.get("role") == "user" for item in payload["input"])
 
 
 def test_friendly_error_maps_plan_limit():

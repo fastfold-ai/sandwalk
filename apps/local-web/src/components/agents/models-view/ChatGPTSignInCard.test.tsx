@@ -37,7 +37,7 @@ describe('ChatGPTSignInCard', () => {
       name: /continue with chatgpt/i
     })) as HTMLButtonElement
     expect(button.disabled).toBe(false)
-    expect(screen.getByText(/5-hour usage window/i)).toBeTruthy()
+    expect(screen.queryByText(/5-hour usage window/i)).toBeNull()
     expect(screen.queryByText(/^connected$/i)).toBeNull()
   })
 

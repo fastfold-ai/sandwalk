@@ -23,6 +23,11 @@ AVAILABLE_MODELS: dict[str, list[tuple[str, str, str]]] = {
             "Latest Fable for long-horizon agents and demanding reasoning (1M context)",
         ),
         (
+            "claude-opus-5-5",
+            "Opus 5.5",
+            "Long-running agentic coding and knowledge work at Fable 5.1 level (1M context)",
+        ),
+        (
             "claude-opus-5",
             "Opus 5",
             "Powerful model for complex agentic coding and enterprise work (1M context)",
