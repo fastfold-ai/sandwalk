@@ -26,7 +26,7 @@
   <img alt="Sandwalk desktop: a chat, the files it produced, and a terminal, side by side" src="images/showcase.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
-Sandwalk is an open, self-hosted agent you run on your own compute. Point it at hard scientific research, or any ambitious work. It comes with skills, MCP servers, local and cloud models, a sandbox on your Mac or on Modal, and a grid for running several agents at once. The Mac app, the CLI, and a remote server share one session list, so you can leave a run going on a Mac mini or a cluster and pick it up from anywhere.
+> Sandwalk is an open, self-hosted agent you run on your own compute. Point it at hard scientific research, or any ambitious work. It comes with skills, MCP servers, local and cloud models, a sandbox on your Mac or on Modal, and a grid for running several agents at once. The Mac app, the CLI, and a remote server share one session list, so you can leave a run going on a Mac mini or a cluster and pick it up from anywhere.
 
 ## Install
 
