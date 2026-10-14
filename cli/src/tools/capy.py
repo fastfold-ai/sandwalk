@@ -1099,3 +1099,204 @@ def capy_move_session(session_ids: str = "", project_id: str = "current", **kwar
         "errors": errors,
         "projectId": resolved["projectId"],
     }
+
+
+# --- Other coding-agent CLIs (Claude Code, Codex, OpenCode, fx) -----------------
+
+
+def _external_workspace(deps, project_id: str, workspace_path: str) -> tuple[str | None, str | None, dict | None]:
+    """Resolve (workspace, project_id) for external-agent tools."""
+    folder = str(workspace_path or "").strip() or None
+    resolved = _resolve_project_id(deps.store, project_id)
+    if not resolved["ok"]:
+        return None, None, resolved
+    pid = resolved["projectId"]
+    if not folder and pid:
+        project = deps.store.get_project(pid)
+        folder = getattr(project, "folder_path", None) if project else None
+    return folder, pid, None
+
+
+@registry.register(
+    name="capy.list_external_sessions",
+    description="List recent Claude Code, Codex, OpenCode, and fx sessions on this machine (and which of those CLIs are installed).",
+    category="capy",
+    usage_guide="Use before importing. Pass agent to filter (claude, codex, opencode, fx) and workspace_path to scope to one folder; otherwise the current project's folder is used when it has one.",
+    parameters={
+        "agent": "Optional: claude, codex, opencode, or fx. Empty lists all four.",
+        "workspace_path": "Optional folder to scope the list to.",
+        "project_id": "current (default), all, or a project id/name — its folder scopes the list when workspace_path is empty.",
+        "limit": "Max sessions (default 20).",
+    },
+)
+def capy_list_external_sessions(
+    agent: str = "",
+    workspace_path: str = "",
+    project_id: str = "current",
+    limit: int = 20,
+    **kwargs,
+) -> dict:
+    from agent_server import external_agents_service as svc
+
+    deps = _deps()
+    folder, _pid, err = _external_workspace(deps, project_id, workspace_path)
+    if err:
+        return err
+    kind = str(agent or "").strip() or None
+    try:
+        sessions = svc.list_external(kind, folder, max(1, min(100, int(limit or 20))))
+    except svc.ExternalAgentError as exc:
+        return {"ok": False, "summary": str(exc)}
+    installed = [row["label"] for row in svc.list_installed() if row["installed"]]
+    scope = f" in {folder}" if folder else ""
+    return {
+        "ok": True,
+        "summary": f"{len(sessions)} external session(s){scope}. Installed: {', '.join(installed) or 'none'}.",
+        "installed": svc.list_installed(),
+        "sessions": sessions,
+    }
+
+
+@registry.register(
+    name="capy.import_external_session",
+    description="Convert a Claude Code / Codex / OpenCode / fx session into a Sandwalk chat (history only; no model run).",
+    category="capy",
+    usage_guide="Use after list_external_sessions. The new chat keeps the original folder as its workspace and lands in the chosen project.",
+    parameters={
+        "agent": "claude, codex, opencode, or fx.",
+        "session_id": "The external session id from list_external_sessions.",
+        "project_id": "current (default), all, or a project id/name.",
+    },
+)
+def capy_import_external_session(
+    agent: str = "",
+    session_id: str = "",
+    project_id: str = "current",
+    **kwargs,
+) -> dict:
+    from agent_server import external_agents_service as svc
+
+    deps = _deps()
+    resolved = _resolve_project_id(deps.store, project_id)
+    if not resolved["ok"]:
+        return resolved
+    try:
+        session = svc.import_session(
+            service=deps.service,
+            store=deps.store,
+            kind=str(agent or ""),
+            session_id=str(session_id or ""),
+            project_id=resolved["projectId"],
+        )
+    except (svc.ExternalAgentError, ValueError) as exc:
+        return {"ok": False, "summary": str(exc)}
+    return {
+        "ok": True,
+        "summary": f"Imported “{session.title}” from {session.source_label} into {resolved.get('projectName') or 'All'}.",
+        "sessionId": session.id,
+        "title": session.title,
+        "workspacePath": session.workspace_path,
+    }
+
+
+@registry.register(
+    name="capy.launch_external_agent",
+    description="Open a terminal running Claude Code, Codex, OpenCode, or fx in a folder, optionally with a first prompt or resuming one of its sessions.",
+    category="capy",
+    usage_guide="Use when the user wants to start or continue work in one of those CLIs. Defaults to the current project's folder.",
+    parameters={
+        "agent": "claude, codex, opencode, or fx.",
+        "workspace_path": "Folder to open in. Empty uses the current project's folder, then the home folder.",
+        "prompt": "Optional first message for the CLI.",
+        "resume_id": "Optional external session id to resume instead of starting fresh.",
+        "project_id": "current (default), all, or a project id/name for the new terminal.",
+    },
+)
+def capy_launch_external_agent(
+    agent: str = "",
+    workspace_path: str = "",
+    prompt: str = "",
+    resume_id: str = "",
+    project_id: str = "current",
+    **kwargs,
+) -> dict:
+    from agent_server import external_agents_service as svc
+
+    deps = _deps()
+    folder, pid, err = _external_workspace(deps, project_id, workspace_path)
+    if err:
+        return err
+    try:
+        result = deps.pty_manager.run_sync(
+            svc.launch_terminal(
+                store=deps.store,
+                pty_manager=deps.pty_manager,
+                kind=str(agent or ""),
+                workspace_path=folder,
+                project_id=pid,
+                prompt=str(prompt or "").strip() or None,
+                resume_id=str(resume_id or "").strip() or None,
+            )
+        )
+    except svc.ExternalAgentError as exc:
+        return {"ok": False, "summary": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "summary": f"Could not open the terminal: {exc}"}
+    terminal = result["terminal"]
+    from agent_server.session_event_bus import session_event_bus
+
+    session_event_bus.publish("ui.command", {"action": "open_item", "itemId": terminal["id"]})
+    return {
+        "ok": True,
+        "summary": f"Opened {terminal['title']} in {terminal.get('workspacePath') or 'home'}.",
+        "terminalId": terminal["id"],
+        "command": result["command"],
+    }
+
+
+@registry.register(
+    name="capy.handoff_session",
+    description="Hand a Sandwalk chat to Claude Code, Codex, OpenCode, or fx: writes a transcript file in its folder and opens that CLI on it.",
+    category="capy",
+    usage_guide="Use when the user wants to continue a Sandwalk chat inside one of those CLIs.",
+    parameters={
+        "session_id": "Sandwalk chat id (from #mention or list_sessions).",
+        "agent": "claude, codex, opencode, or fx.",
+    },
+)
+def capy_handoff_session(session_id: str = "", agent: str = "", **kwargs) -> dict:
+    from agent_server import external_agents_service as svc
+
+    deps = _deps()
+    sid = str(session_id or "").strip()
+    chat = deps.store.get_session(sid) if sid else None
+    if chat is None:
+        return {"ok": False, "summary": "Session not found."}
+    if str(getattr(chat, "source", "") or "") in {"capy", "bench"}:
+        return {"ok": False, "summary": "Cannot hand off Capy or bench chats."}
+    try:
+        exported = svc.export_handoff(service=deps.service, store=deps.store, session_id=sid, kind=str(agent or ""))
+        launched = deps.pty_manager.run_sync(
+            svc.launch_terminal(
+                store=deps.store,
+                pty_manager=deps.pty_manager,
+                kind=str(agent or ""),
+                workspace_path=exported["workspacePath"],
+                project_id=chat.project_id,
+                origin_chat_id=sid,
+                prompt=exported["prompt"],
+            )
+        )
+    except svc.ExternalAgentError as exc:
+        return {"ok": False, "summary": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "summary": f"Could not open the terminal: {exc}"}
+    from agent_server.session_event_bus import session_event_bus
+
+    session_event_bus.publish("ui.command", {"action": "open_item", "itemId": launched["terminal"]["id"]})
+    return {
+        "ok": True,
+        "summary": f"Handed “{chat.title}” to {launched['terminal']['title']} ({exported['messages']} messages).",
+        "terminalId": launched["terminal"]["id"],
+        "path": exported["path"],
+    }

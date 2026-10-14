@@ -466,3 +466,85 @@ def test_friendly_error_maps_plan_limit():
     assert "ChatGPT plan limit reached" in msg
     msg = UsageUIMixin._friendly_agent_error("Not signed in with ChatGPT. Open Dashboard")
     assert "Continue with ChatGPT" in msg
+
+
+# --- `sandwalk login` ------------------------------------------------------
+
+
+def test_cli_login_chatgpt_completes_via_loopback(monkeypatch):
+    """`sandwalk login chatgpt` opens the browser, waits for the callback, prints the account."""
+    import threading
+
+    import httpx
+    from typer.testing import CliRunner
+
+    from cli import app
+
+    _stub_token(
+        monkeypatch,
+        {"access_token": "at", "refresh_token": "rt", "id_token": "i", "expires_in": 3600, "scope": ca.SCOPES},
+    )
+    _stub_id_token(monkeypatch, email="cli@example.com")
+
+    opened: list[str] = []
+
+    def fake_open(url, new=0):
+        opened.append(url)
+        # Play the browser: hit the loopback with OpenAI's callback params.
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        redirect = q["redirect_uri"][0]
+
+        def hit():
+            httpx.get(
+                redirect,
+                params={"code": "c-1", "state": q["state"][0], "client_id": "oaiapp_cli"},
+                timeout=5.0,
+            )
+
+        threading.Timer(0.2, hit).start()
+        return True
+
+    monkeypatch.setattr("webbrowser.open", fake_open)
+    result = CliRunner().invoke(app, ["login", "chatgpt"])
+    assert result.exit_code == 0, result.output
+    assert opened and opened[0].startswith(ca.AUTHORIZE_URL)
+    assert "Connected to ChatGPT" in result.output
+    assert "cli@example.com" in result.output
+    assert ca.load_credentials().client_id == "oaiapp_cli"
+
+    status = CliRunner().invoke(app, ["login", "status"])
+    assert status.exit_code == 0
+    assert "connected" in status.output and "cli@example.com" in status.output
+    # Tokens never reach the terminal.
+    assert "access_token" not in status.output and "rt" not in status.output.split()
+
+    monkeypatch.setattr(ca, "revoke_and_clear", lambda: ca.clear_credentials())
+    out = CliRunner().invoke(app, ["logout", "chatgpt"])
+    assert out.exit_code == 0 and "Signed out" in out.output
+    assert ca.load_credentials() is None
+    again = CliRunner().invoke(app, ["logout", "chatgpt"])
+    assert "not connected" in again.output
+
+
+def test_cli_login_chatgpt_reports_denied_consent(monkeypatch):
+    import threading
+
+    import httpx
+    from typer.testing import CliRunner
+
+    from cli import app
+
+    def fake_open(url, new=0):
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        redirect = q["redirect_uri"][0]
+        threading.Timer(
+            0.2,
+            lambda: httpx.get(redirect, params={"error": "access_denied", "state": q["state"][0]}, timeout=5.0),
+        ).start()
+        return True
+
+    monkeypatch.setattr("webbrowser.open", fake_open)
+    result = CliRunner().invoke(app, ["login", "chatgpt"])
+    assert result.exit_code == 1
+    assert "did not allow" in result.output
+    assert ca.load_credentials() is None

@@ -123,6 +123,9 @@ class PtyIOMixin:
                         session.buffer = session.buffer[-BUFFER_LIMIT:]
                 if events:
                     await self._dispatch_pty_events(session, events)
+                # Output means something is running; cheap rate-limited probe
+                # keeps the tab icon in step with the foreground agent.
+                await self._maybe_announce_agent(session)  # type: ignore[attr-defined]
         finally:
             session = self._sessions.get(pty_id)
             if session is not None:

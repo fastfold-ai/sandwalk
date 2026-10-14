@@ -167,6 +167,7 @@ def create_app(
             pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
         session_event_bus.bind_loop(asyncio.get_running_loop())
+        pty_manager.bind_loop(asyncio.get_running_loop())
         from agent_server.bench_service.runtime import (
             api_executor_workers,
             start_bench_runtime,

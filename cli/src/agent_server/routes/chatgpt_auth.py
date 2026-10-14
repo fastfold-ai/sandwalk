@@ -177,6 +177,39 @@ def _serve_until_done(server: _LoopbackServer) -> None:
         server.server_close()
 
 
+def start_login_listener() -> dict[str, Any]:
+    """Bind a one-shot loopback listener and build the authorize URL.
+
+    Shared by the ``/v1/auth/chatgpt/start`` route and ``sandwalk login
+    chatgpt``. Returns ``{url, state, wait}`` where ``wait(timeout)`` blocks
+    until the browser callback has been handled and returns its result dict.
+    """
+    server = _LoopbackServer("pending")
+    port = server.server_address[1]
+    redirect_uri = f"http://127.0.0.1:{port}{chatgpt_auth.CALLBACK_PATH}"
+    try:
+        started = chatgpt_auth.begin_login(redirect_uri=redirect_uri)
+    except chatgpt_auth.ChatGPTAuthError:
+        server.server_close()
+        raise
+    server.expected_state = started["state"]
+    server.timeout = 1.0
+    thread = threading.Thread(
+        target=_serve_until_done,
+        args=(server,),
+        name="chatgpt-oauth-callback",
+        daemon=True,
+    )
+    thread.start()
+
+    def wait(timeout: float | None = None) -> dict[str, Any]:
+        server.finished.wait(timeout)
+        thread.join(timeout=5.0)
+        return _take_result(started["state"]) or {"ok": False, "error": "Sign-in timed out. Try again."}
+
+    return {"url": started["url"], "state": started["state"], "wait": wait}
+
+
 def register_chatgpt_auth_routes(app: FastAPI, deps: AppDeps) -> None:
     _ = deps
 
@@ -196,25 +229,10 @@ def register_chatgpt_auth_routes(app: FastAPI, deps: AppDeps) -> None:
     @app.post("/v1/auth/chatgpt/start", response_model=ChatGPTAuthStart)
     async def chatgpt_start() -> ChatGPTAuthStart:
         """Open a loopback listener and return the OpenAI authorize URL."""
-        # Bind first so the redirect_uri carries the real port.
-        placeholder_state = "pending"
-        server = _LoopbackServer(placeholder_state)
-        port = server.server_address[1]
-        redirect_uri = f"http://127.0.0.1:{port}{chatgpt_auth.CALLBACK_PATH}"
         try:
-            started = chatgpt_auth.begin_login(redirect_uri=redirect_uri)
+            started = start_login_listener()
         except chatgpt_auth.ChatGPTAuthError as exc:
-            server.server_close()
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        server.expected_state = started["state"]
-        server.timeout = 1.0
-        thread = threading.Thread(
-            target=_serve_until_done,
-            args=(server,),
-            name="chatgpt-oauth-callback",
-            daemon=True,
-        )
-        thread.start()
         return ChatGPTAuthStart(url=started["url"], state=started["state"])
 
     @app.post("/v1/auth/chatgpt/logout", response_model=ChatGPTAuthStatus)
@@ -229,4 +247,4 @@ def register_chatgpt_auth_routes(app: FastAPI, deps: AppDeps) -> None:
         return ChatGPTAuthStatus(**chatgpt_auth.status())
 
 
-__all__ = ["register_chatgpt_auth_routes"]
+__all__ = ["register_chatgpt_auth_routes", "start_login_listener"]

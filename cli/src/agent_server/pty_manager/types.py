@@ -27,6 +27,11 @@ class PtyInfo:
     rows: int
     pid: int
     status: str = "running"
+    # Coding-agent CLI in the foreground of this PTY (claude / codex /
+    # opencode / fx) and the directory it runs in. None while the shell
+    # itself is in the foreground. Refreshed by ``PtyAgentMixin``.
+    agent: str | None = None
+    agent_cwd: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -38,6 +43,8 @@ class PtyInfo:
             "rows": self.rows,
             "pid": self.pid,
             "status": self.status,
+            "agent": self.agent,
+            "agentCwd": self.agent_cwd,
         }
 
 
@@ -64,3 +71,6 @@ class PtySession:
     # prompt.
     osc_parser: OscParser = field(default_factory=OscParser)
     command_started_at: float | None = None
+    # Last ``time.monotonic()`` the foreground agent was probed; the probe
+    # shells out to ``ps`` so it is rate-limited (see PtyAgentMixin).
+    agent_probed_at: float = 0.0
