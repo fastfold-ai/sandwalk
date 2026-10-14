@@ -42,17 +42,21 @@ curl -fsSL https://sandwalk.sh/install | bash
 
 ## Quickstart
 
-### macOS App
+### Connect
 
-Launch Sandwalk from Applications. Pick **Local** or **Remote**, then start a session.
+Launch Sandwalk from Applications. **Connect locally** uses the agent on this Mac. **Open remote** reaches one already running on another machine, by LAN scan or a pasted URL. Recent servers stay in the list.
 
-<!-- screenshot: images/welcome.png — Welcome: Local vs Remote -->
-<p align="center"><em>Placeholder: Welcome (Local vs Remote). Save as <code>images/welcome.png</code></em></p>
+<p align="center">
+  <img alt="Sandwalk welcome: connect locally or open a remote server" src="images/welcome.png">
+</p>
 
-<!-- screenshot: images/menubar.png — Sandwalk Server menubar -->
-<p align="center"><em>Placeholder: Menubar helper. Save as <code>images/menubar.png</code></em></p>
+### New agent
 
-### CLI
+A new chat is a blank pane: the Sandwalk mark, a project scope, and the composer. Plan, Skills, and Run in sandbox sit under it. The window stays on the desktop glass until the session fills.
+
+<p align="center">
+  <img alt="Empty new agent on the glass window" src="images/new-agent.png">
+</p>
 
 ```bash
 sandwalk setup
@@ -62,77 +66,99 @@ sandwalk "What is known about KRAS G12C inhibitors?"
 
 ## Features
 
-Agents run on your machine or in the cloud: OpenRouter, frontier APIs, or local models. Science is a starter toolkit, not a ceiling. Chat, CLI, and the Mac app share one session list.
+Agents run on your machine or in the cloud. Chat, CLI, and the Mac app share one session list.
 
 ### Capy
 
-Capy is the overlay agent. It is not a chat in the sidebar. It starts and steers other chats, and it can open Bench, skills, MCP servers, and projects.
+Capy is the overlay agent. It is not a row in the sidebar. Open it from the bottom of the sidebar, or press **Ctrl + Ctrl**. It starts chats, opens splits, and can reach Bench, skills, and MCP servers while a normal session stays on screen behind it.
 
-- Open it from the sidebar, or press **Ctrl + Ctrl** to show the minimized icon and talk hands-free.
-- Spawn chats, `#` mention them, seed context, and open a split when you start two or more.
-- New chats follow the sidebar scope (All, or the project you have selected). Capy can create projects and move chats.
-- Minimize it and keep talking. A red badge counts replies you have not opened.
+<p align="center">
+  <img alt="Capy overlay in front of an agent session" src="images/capy.png">
+</p>
 
-<!-- screenshot: images/capy.png — Capy overlay or minimized icon -->
-<p align="center"><em>Placeholder: Capy overlay. Save as <code>images/capy.png</code></em></p>
+### Grid
 
-### Split view and chats
+A group is a real grid, not a stack of tabs. Capy can open one for you — for example a 4×2 of chats each researching a slice of protein design — and every cell keeps its own composer, model, and stream. **⌘D** splits right, **⇧⌘D** splits down.
 
-Session tabs work like a browser. Split the focused pane right or down (**⌘D**, **⇧⌘D**) so two or more chats sit side by side, including chats from different projects. Each pane has its own composer and stream. Files, the terminal, and previews stay in that pane. Pin a chat to keep it at the front of the list.
-
-### CLI
-
-The same sessions, from a terminal. `sandwalk` opens the interactive TUI. `sandwalk serve` runs the local API the Mac app talks to. One-shot prompts, `sandwalk setup`, and the slash commands (`/model`, `/plan`, `/sandbox`) use the sessions you already have in the app.
-
-<!-- screenshot: images/cli.png — Interactive sandwalk TUI -->
-<p align="center"><em>Placeholder: Interactive CLI (TUI). Save as <code>images/cli.png</code></em></p>
+<p align="center">
+  <img alt="4 by 2 grid of protein design research chats" src="images/grid.png">
+</p>
 
 ### Plan mode
 
-Plan mode drafts before it edits. Shift-Tab, or the Plan chip, switches the composer. The agent writes `plans/*.md` with todos and a Mermaid flowchart. **Build** runs that plan. In the CLI, `/plan` does the same thing.
+Plan mode drafts before it edits. The Plan chip (Shift-Tab) switches the composer. The agent writes a plan with todos, then a Mermaid flowchart of the workflow sits in the file pane next to the chat. **Build** runs that plan.
 
-<!-- screenshot: images/plan-mode.png — Plan toggle, plan markdown, Build -->
-<p align="center"><em>Placeholder: Plan mode (toggle + Build). Save as <code>images/plan-mode.png</code></em></p>
+<p align="center">
+  <img alt="Plan mode with a Boltz screening plan and its flowchart" src="images/plan-mode.png">
+</p>
 
 ### Skills and MCPs
 
-Skills are instructions and scripts the agent loads on demand. Install them from GitHub or [skills.sh](https://skills.sh), or ask the agent to find one, try it once, or write one. Type `/` in the composer to attach a skill or an MCP server. MCP config is `~/.sandwalk/mcp.json`, the same shape Cursor uses. Specialists are saved profiles that pin a set of skills, MCPs, and extra instructions for a kind of session.
+The **+** menu is how you attach what the turn can use: Agent or Plan, files, skills, MCP servers, a specialist, or a sandbox. Skills install from GitHub or [skills.sh](https://skills.sh). MCP config is `~/.sandwalk/mcp.json`.
 
-<!-- screenshot: images/skills.png — Composer / picker with a skill open -->
-<p align="center"><em>Placeholder: Skills / MCP picker. Save as <code>images/skills.png</code></em></p>
+<p align="center">
+  <img alt="Composer plus menu with the skills list open" src="images/skills.png">
+</p>
+
+### CLI
+
+`sandwalk` is the same product in a terminal. `/help` lists the pickers: tools, datasets, skills, sandbox, specialist, models, and effort. `sandwalk serve` is the local API the Mac app talks to.
+
+<p align="center">
+  <img alt="Sandwalk CLI help inside a terminal pane" src="images/cli.png">
+</p>
 
 ### Benchmarking
 
-Bench runs question suites through real Sandwalk sessions. Pick a suite, a model, and an optional specialist, set the sample size and how many runs go out in parallel, then read scores on the Results tab. Compare models on the same suite. Runs stay off the chat list. From the CLI: `sandwalk eval`.
+Bench runs question suites through real sessions. Filter by suite, status, and provider, then read the score, duration, and token use for each run. Compare models on the same suite. From the CLI: `sandwalk eval`.
 
-<!-- screenshot: images/bench.png — Bench results with scores / judges -->
-<p align="center"><em>Placeholder: Bench results. Save as <code>images/bench.png</code></em></p>
+<p align="center">
+  <img alt="Benchmarking results with scores across suites and providers" src="images/bench.png">
+</p>
 
-### Projects and widgets
+### Projects and overview
 
-Projects group chats. Project Home and Dashboard Overview are boards you can rearrange: usage, library size, a description, agent context. The Library lists files in the project folder next to files the chats produced.
+Dashboard Overview is the usage board: lifetime tokens, streaks, an activity heatmap, and which models you actually ran. Widgets can be rearranged. Projects group the chats underneath that.
 
-### Artifacts
+<p align="center">
+  <img alt="Dashboard overview with usage, activity heatmap, and model chart" src="images/overview.png">
+</p>
 
-Structures, plots, and reports open beside the chat instead of as a raw download. That includes CIF and PDB, PAE and pLDDT, plus JSON and SVG.
+### Models
 
-<!-- screenshot: images/artifacts.png — Structure or plot beside chat -->
-<p align="center"><em>Placeholder: Artifacts / structure viewer. Save as <code>images/artifacts.png</code></em></p>
+Dashboard → Models is where provider keys live. Cloud models (OpenAI, Claude, Gemini, OpenRouter, and others) and local endpoints (Ollama, Unsloth, oMLX) show up in the composer once they connect. Keys stay on this computer.
 
-### Remote sessions
+<p align="center">
+  <img alt="Models settings with connected cloud providers and local endpoints" src="images/models.png">
+</p>
 
-Run the agent on a Mac Mini or a cluster and open it from another machine. The Mac app and the CLI both take a URL and an API key. The session list is the one on that server, not a copy on your laptop.
+### Files beside the chat
 
-<!-- screenshot: images/remote.png — Remote connect (URL + key) or a remote session -->
-<p align="center"><em>Placeholder: Remote session. Save as <code>images/remote.png</code></em></p>
+The right pane is the workspace for the session: files the agent wrote, a preview, and artifacts. A structure, a metrics table, and the chat that produced them stay open together.
 
-### Models and compute
+<p align="center">
+  <img alt="Chat with a protein structure and artifact files open beside it" src="images/artifacts.png">
+</p>
 
-`sandwalk setup`, or Dashboard → Models, stores keys for Anthropic, OpenAI, Gemini, OpenRouter, and local endpoints (Ollama, Unsloth, oMLX, llama.cpp, LM Studio). The composer shows the model, effort, and how much of the context window the turn is using. Sandbox runs stay on this machine, or go to Modal, Lambda, or Fastfold Cloud when you want a clean GPU box.
+### Plots
+
+Figures render in that same pane. A line chart, a sampling control, and the prompt that asked for it sit next to the transcript instead of in a separate viewer.
+
+<p align="center">
+  <img alt="Research chat with a monthly evidence line chart beside the transcript" src="images/preview.png">
+</p>
+
+### Structures
+
+CIF and PDB from a design run open as 3D in the artifact list. Ranked candidates, metrics, and the Go / No-Go note stay in the chat on the left.
+
+<p align="center">
+  <img alt="BoltzGen binder run with ranked structures rendered beside the chat" src="images/structures.png">
+</p>
 
 ### Science toolkit
 
-Live databases (PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, and others) are available as tools. Optional local corpora install with `sandwalk data pull-all`. Add tools for another domain with `sandwalk tool list`.
+Live databases (PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, and others) are tools the agent can call. Optional local corpora install with `sandwalk data pull-all`. Sandbox runs stay on this machine, or go to Modal when you want a clean GPU box.
 
 ## CLI
 
