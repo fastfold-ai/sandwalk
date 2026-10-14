@@ -136,6 +136,9 @@ class TestOpenAIModelCompatibility:
     def test_openai_token_limit_kwargs_for_gpt5(self):
         assert _openai_token_limit_kwargs("gpt-5.5", 1000) == {"max_completion_tokens": 1000}
 
+    def test_openai_token_limit_kwargs_for_gpt6(self):
+        assert _openai_token_limit_kwargs("gpt-6-astra", 16) == {"max_completion_tokens": 16}
+
     def test_openai_token_limit_kwargs_for_non_gpt5(self):
         assert _openai_token_limit_kwargs("gpt-4o", 1000) == {"max_tokens": 1000}
 

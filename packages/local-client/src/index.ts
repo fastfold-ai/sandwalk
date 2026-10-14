@@ -3051,7 +3051,7 @@ export class LocalAgentClient
     return this.request<OnboardingSettings>('/settings/onboarding', { signal })
   }
 
-  updateOnboardingSettings(
+    updateOnboardingSettings(
     changes: Partial<OnboardingSettings>,
     signal?: AbortSignal
   ): Promise<OnboardingSettings> {
@@ -3062,6 +3062,13 @@ export class LocalAgentClient
         step: changes.step
       }),
       headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  resetAppSettings(signal?: AbortSignal): Promise<OnboardingSettings> {
+    return this.request<OnboardingSettings>('/settings/reset', {
+      method: 'POST',
       signal
     })
   }

@@ -11,6 +11,8 @@ See https://github.com/langchain-ai/langchain/issues/38639
 
 from __future__ import annotations
 
+import inspect
+
 _APPLIED = False
 
 
@@ -61,9 +63,40 @@ def apply_anthropic_empty_thinking_patch() -> None:
     ChatAnthropic._make_message_chunk_from_anthropic_event = patched_chunk
 
     original_format = mod._format_messages
+    # langchain-anthropic 1.7+ passes model= (keyword-only). Older releases
+    # only accept messages. Forward whatever the installed function supports.
+    format_params = inspect.signature(original_format).parameters
+    format_accepts_var_keyword = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in format_params.values()
+    )
+    format_accepted_names = set(format_params)
 
-    def patched_format(messages):
-        system, formatted = original_format(messages)
+    def patched_format(messages, *args, **kwargs):
+        call_kwargs = kwargs
+        call_args = args
+        if not format_accepts_var_keyword:
+            call_kwargs = {
+                key: value
+                for key, value in kwargs.items()
+                if key in format_accepted_names
+            }
+            if args and not any(
+                param.kind
+                in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.POSITIONAL_ONLY)
+                for param in format_params.values()
+            ):
+                positional = [
+                    name
+                    for name, param in format_params.items()
+                    if param.kind
+                    in (
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                        inspect.Parameter.POSITIONAL_ONLY,
+                    )
+                ]
+                # `messages` is already bound. Drop extras older signatures reject.
+                call_args = args[: max(0, len(positional) - 1)]
+        system, formatted = original_format(messages, *call_args, **call_kwargs)
         for message in formatted:
             content = message.get("content")
             if not isinstance(content, list):

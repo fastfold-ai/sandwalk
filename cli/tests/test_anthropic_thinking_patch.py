@@ -44,7 +44,9 @@ def test_apply_patch_is_idempotent():
                     {"type": "text", "text": "hello"},
                 ]
             ),
-        ]
+        ],
+        model="claude-sonnet-4-5",
+        mid_conversation_system_messages=False,
     )
     del system
     thinking = messages[1]["content"][0]

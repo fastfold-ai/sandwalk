@@ -1,3 +1,4 @@
+import CoreImage
 import SwiftUI
 
 /// Network pane — API / dashboard ports + remote bind (oMLX Network style).
@@ -58,10 +59,10 @@ struct NetworkSettingsView: View {
                 if draft.apiExposesRemote {
                     SettingsRow(
                         label: "LAN hint",
-                        sublabel: "http://\(localLANHint()):\(draft.port)",
+                        sublabel: apiLANURL,
                         isLast: !remoteNeedsAuth
                     ) {
-                        EmptyView()
+                        lanActions(apiLANURL)
                     }
                 }
                 if remoteNeedsAuth {
@@ -102,10 +103,10 @@ struct NetworkSettingsView: View {
                 if draft.dashboardExposesRemote {
                     SettingsRow(
                         label: "LAN hint",
-                        sublabel: "http://\(localLANHint()):\(draft.dashboardPort)",
+                        sublabel: dashboardLANURL,
                         isLast: false
                     ) {
-                        EmptyView()
+                        lanActions(dashboardLANURL)
                     }
                 }
                 SettingsRow(
@@ -178,6 +179,48 @@ struct NetworkSettingsView: View {
         )
     }
 
+    private var apiLANURL: String {
+        "http://\(localLANHint()):\(draft.port)"
+    }
+
+    private var dashboardLANURL: String {
+        "http://\(localLANHint()):\(draft.dashboardPort)"
+    }
+
+    private func lanActions(_ url: String) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            copyButton(url)
+            LANQRCodeView(url: lanSignInURL(url))
+        }
+    }
+
+    /// Same LAN address, plus the API key the dashboard already accepts as
+    /// `sw_key`. The page strips that query after it signs in, so the key
+    /// does not stay in the address bar. The visible hint and copy button
+    /// stay the plain URL.
+    private func lanSignInURL(_ url: String) -> String {
+        let auth = AuthSettingsStore.load()
+        guard auth.authEnabled, auth.apiKeyConfigured else { return url }
+        guard var components = URLComponents(string: url) else { return url }
+        var items = components.queryItems ?? []
+        items.append(URLQueryItem(name: "sw_http", value: url))
+        items.append(URLQueryItem(name: "sw_key", value: auth.apiKey))
+        components.queryItems = items
+        return components.string ?? url
+    }
+
+    private func copyButton(_ url: String) -> some View {
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url, forType: .string)
+            statusMessage = "Copied."
+        } label: {
+            Image(systemName: "doc.on.doc")
+        }
+        .buttonStyle(.sandwalk(.normal))
+        .help("Copy")
+    }
+
     private func localLANHint() -> String {
         let host = ProcessInfo.processInfo.hostName
             .trimmingCharacters(in: CharacterSet(charactersIn: "."))
@@ -241,5 +284,42 @@ struct NetworkSettingsView: View {
         } catch {
             statusMessage = error.localizedDescription
         }
+    }
+}
+
+/// Black-on-white QR for a LAN URL. Phones need the quiet white margin to scan it.
+private struct LANQRCodeView: View {
+    let url: String
+    private let side: CGFloat = 84
+
+    var body: some View {
+        if let image = Self.makeImage(url: url) {
+            Image(nsImage: image)
+                .interpolation(.none)
+                .resizable()
+                .frame(width: side, height: side)
+                .padding(6)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .accessibilityLabel("QR code to open and sign in")
+                .help("Scan to open this address and sign in")
+        }
+    }
+
+    private static func makeImage(url: String) -> NSImage? {
+        guard let data = url.data(using: .utf8),
+              let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(data, forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+        let module = output.extent.width
+        guard module > 0 else { return nil }
+        let scale = max(1, floor(180 / module))
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let white = CIImage(color: CIColor(red: 1, green: 1, blue: 1)).cropped(to: scaled.extent)
+        let composited = scaled.composited(over: white)
+        let context = CIContext()
+        guard let cg = context.createCGImage(composited, from: composited.extent) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: composited.extent.width, height: composited.extent.height))
     }
 }

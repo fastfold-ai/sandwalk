@@ -181,17 +181,29 @@ class UsageUIMixin:
                 "Reasoning is mandatory for this model — disable Fast mode "
                 "(thinking must stay on)."
             )
+        if "patched_format" in lower and "unexpected keyword argument" in lower:
+            return (
+                "No model is set up yet. Add a provider and API key in "
+                "[Models](/dashboard/models)."
+            )
         return text
 
     @staticmethod
-    def _make_error_result(query: str, error: str, duration: float) -> ExecutionResult:
+    def _make_error_result(
+        query: str, error: str, duration: float, *, prefix_sdk: bool = True
+    ) -> ExecutionResult:
         """Build an ExecutionResult representing a failed query."""
         plan = Plan(query=query, steps=[])
         normalized = str(error).lower()
+        friendly = UsageUIMixin._friendly_agent_error(error)
         summary = (
             _FILE_ACCESS_MESSAGE
             if any(marker in normalized for marker in _FILE_ACCESS_ERROR_MARKERS)
-            else f"Agent SDK error: {UsageUIMixin._friendly_agent_error(error)}"
+            else (
+                f"Agent SDK error: {friendly}"
+                if prefix_sdk
+                else friendly
+            )
         )
         return ExecutionResult(
             plan=plan,

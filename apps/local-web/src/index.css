@@ -364,6 +364,24 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark [data-capy-root] {
   box-shadow: 0 18px 56px rgb(0 0 0 / 0.35) !important;
 }
 
+/* Menus portal to the document root, so they miss the shell frost and paint
+ * solid. Same glass as Capy, only while liquid glass is on. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off):not(.dark)
+  .sandwalk-glass-menu {
+  background-color: rgb(246 246 247 / 0.62) !important;
+  border-color: rgb(0 0 0 / 0.1) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
+  .sandwalk-glass-menu {
+  background-color: rgb(28 28 31 / 0.55) !important;
+  border-color: rgb(255 255 255 / 0.12) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
 html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar::after,
 html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar::after {
   content: none;

@@ -60,6 +60,7 @@ echo "==> Apple codesign identity: ${CODESIGN_IDENTITY}"
 TAURI_BUNDLE=""
 if [[ "${SKIP_TAURI:-0}" != "1" ]]; then
   echo "==> Building Tauri client (Sandwalk.app)..."
+  export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || echo 8)}"
   cd "${LOCAL_WEB}"
   pnpm exec tauri build
 fi
@@ -217,16 +218,22 @@ sign_bundle() {
 normalize_resource_bundle "${HELPER_STAGE}/Contents/MacOS/Sandwalk_SandwalkCore.bundle"
 
 # Sign nested Mach-O (Python runtime, resource bundle) before the app seal.
-# Hardened runtime is applied on the .app below, with library validation off.
+# Apple notarization requires the hardened runtime on every executable, not
+# only the .app. CPython needs JIT entitlements or native modules fail to load.
+PYTHON_ENTS="${SCRIPT_DIR}/python-runtime-entitlements.plist"
 if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
   echo "==> Signing nested helper binaries..."
   while IFS= read -r -d '' bin; do
     # The helper executable is sealed with the .app. Signing it first fails
     # while the resource bundle next to it is still unsigned.
     [[ "${bin}" == "${HELPER_STAGE}/Contents/MacOS/Sandwalk" ]] && continue
-    if file -b "${bin}" | grep -q 'Mach-O'; then
-      codesign --force --sign "${CODESIGN_IDENTITY}" --timestamp "${bin}"
+    kind="$(file -b "${bin}")"
+    [[ "${kind}" == *Mach-O* ]] || continue
+    args=(--force --sign "${CODESIGN_IDENTITY}" --timestamp)
+    if [[ "${kind}" == *executable* ]]; then
+      args+=(--options runtime --entitlements "${PYTHON_ENTS}")
     fi
+    codesign "${args[@]}" "${bin}"
   done < <(find "${HELPER_STAGE}" -type f -print0)
 fi
 sign_bundle "${HELPER_STAGE}/Contents/MacOS/Sandwalk_SandwalkCore.bundle" ""
@@ -247,7 +254,7 @@ rm -f "${DMG_PATH}"
 RW_DMG="${OUT_DIR}/Sandwalk-rw.dmg"
 rm -f "${RW_DMG}"
 hdiutil create \
-  -volname "Sandwalk" \
+  -volname "Sandwalk Installer" \
   -srcfolder "${STAGE}" \
   -ov \
   -format UDRW \
@@ -260,6 +267,12 @@ fi
 
 hdiutil convert "${RW_DMG}" -format UDZO -ov -o "${DMG_PATH}" >/dev/null
 rm -f "${RW_DMG}"
+
+ICON_ICNS="${SCRIPT_DIR}/../local-web/src-tauri/icons/icon.icns"
+if [[ -f "${ICON_ICNS}" ]]; then
+  echo "==> Setting DMG file icon..."
+  swift "${SCRIPT_DIR}/set-dmg-file-icon.swift" "${ICON_ICNS}" "${DMG_PATH}"
+fi
 
 if [[ "${CODESIGN_IDENTITY}" != "-" ]]; then
   echo "==> Signing DMG with ${CODESIGN_IDENTITY}..."
@@ -282,11 +295,14 @@ if [[ "${INSTALL:-0}" == "1" ]]; then
   echo "    open \"${DEST}\""
 fi
 
-cp -f "${DMG_PATH}" "${DMG_LATEST_PATH}"
-
 if [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
   bash "${SCRIPT_DIR}/notarize-macos.sh" "${DMG_PATH}"
+else
+  echo "==> Skipping notarization (APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID not all set)"
 fi
+
+# Copy after stapling so the stable download name is the notarized DMG.
+cp -f "${DMG_PATH}" "${DMG_LATEST_PATH}"
 
 # --- 5. Updater archive (nested app = UI + helper + agent-runtime) ----------
 UPDATER_TAR="${OUT_DIR}/Sandwalk.app.tar.gz"

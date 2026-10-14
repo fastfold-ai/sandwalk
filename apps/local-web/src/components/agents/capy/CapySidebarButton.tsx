@@ -1,4 +1,5 @@
 import capyLogo from '@/assets/capy-logo.png'
+import { CapyShortcutKeys } from '@/components/agents/capy/CapyShortcutKeys'
 import {
   Tooltip,
   TooltipContent,
@@ -24,7 +25,7 @@ export function CapySidebarButton() {
               className="size-6 shrink-0 rounded-full object-cover"
             />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">Capy</span>
-            <span className="text-muted-foreground shrink-0 text-xs">Ctrl + Ctrl</span>
+            <CapyShortcutKeys />
           </button>
         </TooltipTrigger>
         <TooltipContent side="top" align="start">

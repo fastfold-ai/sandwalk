@@ -11,7 +11,7 @@ logger = logging.getLogger("llm")
 def _openai_token_limit_kwargs(model: str, max_tokens: int) -> dict[str, int]:
     """Return OpenAI token limit arg compatible with model family."""
     model_name = str(model or "").strip().lower()
-    if model_name.startswith("gpt-5"):
+    if model_name.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
         return {"max_completion_tokens": int(max_tokens)}
     return {"max_tokens": int(max_tokens)}
 
@@ -19,7 +19,7 @@ def _openai_token_limit_kwargs(model: str, max_tokens: int) -> dict[str, int]:
 def _openai_temperature_kwargs(model: str, temperature: float) -> dict[str, float]:
     """Return OpenAI temperature kwargs compatible with model family."""
     model_name = str(model or "").strip().lower()
-    if model_name.startswith("gpt-5"):
+    if model_name.startswith(("gpt-5", "gpt-6", "o1", "o3", "o4")):
         return {}
     # Moonshot / Kimi reasoning models reject any temperature other than 1.
     if model_name.startswith("kimi-"):

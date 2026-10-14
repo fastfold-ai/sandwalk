@@ -70,6 +70,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         onOpenSetupWizard={() => {
           navigate(onboardingPath('welcome'))
         }}
+        onResetSettings={() => client.resetAppSettings().then(() => undefined)}
       />
     )
   }

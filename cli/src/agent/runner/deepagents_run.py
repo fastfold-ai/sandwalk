@@ -73,20 +73,14 @@ class DeepAgentsRunMixin:
                 0.0,
             )
 
-        # Preflight: surface missing/invalid API keys as a clear, actionable
-        # message instead of a generic provider-rejected error mid-request.
+        # Missing key, or a default model id that does not belong to the
+        # active provider: send the user to Models instead of an SDK traceback.
         try:
-            issue = self.session.config.llm_preflight_issue()
-        except Exception:  # noqa: BLE001 - never block a run on preflight itself
-            issue = None
-        if issue:
-            # Presentation layers render the summary as markdown; turn the
-            # dashboard reference into a clickable in-app link.
-            issue = issue.replace(
-                "Dashboard → Models → API Keys",
-                "[Dashboard → Models → API Keys](/dashboard/models)",
-            )
-            return self._make_error_result(query, issue, 0.0)
+            setup = self.session.config.model_setup_message()
+        except Exception:  # noqa: BLE001 - never block a run on the check itself
+            setup = None
+        if setup:
+            return self._make_error_result(query, setup, 0.0, prefix_sdk=False)
 
         return await self._run_async_deepagents(query, context, progress_callback)
 

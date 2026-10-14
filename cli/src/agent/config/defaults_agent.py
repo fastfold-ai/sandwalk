@@ -6,7 +6,9 @@ from .constants import CONFIG_DIR
 
 DEFAULTS_AGENT = {
     "sandbox.timeout": 30,
-    "sandbox.output_dir": str(Path.cwd() / "outputs"),
+    # Home, not cwd. The macOS app launches with cwd `/`, and `/outputs` is
+    # on the read-only system volume.
+    "sandbox.output_dir": str(CONFIG_DIR / "outputs"),
     "sandbox.max_retries": 2,
     # Deepagents filesystem/execute backend: "builtin" (local FilesystemBackend)
     # or "modal" (langchain-modal ModalSandbox). Domain tools stay on the host.

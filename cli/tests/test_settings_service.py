@@ -174,3 +174,30 @@ def test_settings_service_clamps_out_of_range(tmp_path: Path, monkeypatch):
     assert updated.max_sdk_turns == 1
     assert updated.tool_trace_detail_limit == 50
     assert updated.parallel_max_threads == 20
+
+
+def test_reset_clears_models_and_restarts_onboarding(tmp_path: Path, monkeypatch):
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    monkeypatch.setattr("agent.config.CONFIG_DIR", cfg_dir)
+    monkeypatch.setattr("agent.config.CONFIG_FILE", cfg_dir / "config.json")
+    monkeypatch.setattr("agent.config.CONFIG_BACKUP_FILE", cfg_dir / "config.json.bak")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    Config(
+        {
+            "llm.provider": "anthropic",
+            "llm.model": "claude-sonnet-4-5",
+            "llm.anthropic_api_key": "sk-ant-test",
+            "ui.onboarding_completed": True,
+            "ui.onboarding_step": 5,
+        }
+    ).save()
+
+    onboarding = SettingsService.reset_to_factory_defaults()
+    assert onboarding.completed is False
+    assert onboarding.step == 0
+    loaded = Config.load()
+    assert loaded.get("llm.provider") == "openai"
+    assert loaded.get("llm.anthropic_api_key") in (None, "")
+    assert loaded.get("ui.onboarding_completed") is False

@@ -81,6 +81,10 @@ def register_settings_routes(app: FastAPI, deps: AppDeps) -> None:
     ) -> OnboardingSettings:
         return await asyncio.to_thread(settings_service.update_onboarding, payload)
 
+    @app.post("/v1/settings/reset", response_model=OnboardingSettings)
+    async def reset_settings() -> OnboardingSettings:
+        return await asyncio.to_thread(settings_service.reset_to_factory_defaults)
+
     @app.get("/v1/settings/sandbox", response_model=SandboxSettings)
     async def get_sandbox_settings() -> SandboxSettings:
         return await asyncio.to_thread(sandbox_settings_service.get)

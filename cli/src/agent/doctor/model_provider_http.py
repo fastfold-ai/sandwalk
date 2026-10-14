@@ -190,6 +190,17 @@ def probe_chat_completions(
             message="httpx is not installed — cannot test the API key.",
         )
 
+    from models.llm.helpers import (
+        _openai_temperature_kwargs,
+        _openai_token_limit_kwargs,
+    )
+
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": "ping"}],
+        **_openai_token_limit_kwargs(model, 1),
+        **_openai_temperature_kwargs(model, 0),
+    }
     try:
         resp = httpx.post(
             url,
@@ -202,12 +213,7 @@ def probe_chat_completions(
                 ),
                 **headers,
             },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": "ping"}],
-                "max_tokens": 1,
-                "temperature": 0,
-            },
+            json=body,
             timeout=timeout,
             follow_redirects=True,
         )

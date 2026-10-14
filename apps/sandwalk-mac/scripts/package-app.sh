@@ -5,7 +5,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${ROOT}/.build"
 CONFIG="${CONFIG:-debug}"
-BIN="${BUILD_DIR}/arm64-apple-macosx/${CONFIG}/Sandwalk"
 APP_NAME="${APP_NAME:-Sandwalk Server.app}"
 APP_OUT="${BUILD_DIR}/${APP_NAME}"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/Applications}"
@@ -14,16 +13,21 @@ SKIP_INSTALL="${SKIP_INSTALL:-0}"
 
 echo "==> Building Sandwalk Server (${CONFIG})..."
 cd "${ROOT}"
+JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 8)"
 if [[ "${CONFIG}" == "release" ]]; then
-  swift build -c release
+  swift build -c release --jobs "${JOBS}"
 else
-  swift build
+  swift build --jobs "${JOBS}"
 fi
 
+# Xcode 16+ SwiftPM writes to .build/out/Products. An older binary can still
+# sit at .build/arm64-apple-macosx, so ask SwiftPM which product it just built.
+BIN="$(swift build ${CONFIG:+-c ${CONFIG}} --show-bin-path)/Sandwalk"
 if [[ ! -x "${BIN}" ]]; then
-  BIN="$(swift build ${CONFIG:+-c ${CONFIG}} --show-bin-path)/Sandwalk"
+  BIN="${BUILD_DIR}/arm64-apple-macosx/${CONFIG}/Sandwalk"
 fi
 [[ -x "${BIN}" ]] || { echo "error: Sandwalk binary not found at ${BIN}"; exit 1; }
+echo "    binary: ${BIN}"
 
 echo "==> Staging ${APP_OUT}..."
 rm -rf "${APP_OUT}"

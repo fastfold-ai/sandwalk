@@ -6,6 +6,11 @@ from urllib.parse import urlparse
 from .constants import VALID_LLM_PROVIDERS
 from .providers import OPENAI_COMPATIBLE_PROVIDERS, OPENAI_PROFILE_DEFAULTS
 
+MODEL_SETUP_MESSAGE = (
+    "No model is set up yet. Add a provider and API key in "
+    "[Models](/dashboard/models)."
+)
+
 
 class SecretsPreflightMixin:
     """Base-URL classification, preflight issue detection, selection summary."""
@@ -109,6 +114,21 @@ class SecretsPreflightMixin:
             "For Azure AI Foundry: set ANTHROPIC_FOUNDRY_API_KEY and "
             "ANTHROPIC_FOUNDRY_RESOURCE"
         )
+
+    def model_setup_message(self) -> str | None:
+        """User-facing prompt when chat cannot run because no model is ready.
+
+        A default model id (for example ``gpt-5.6-sol``) is not enough: the
+        active provider needs a key, and an Anthropic provider cannot run an
+        OpenAI model id left over from onboarding.
+        """
+        if self.llm_preflight_issue():
+            return MODEL_SETUP_MESSAGE
+        provider = str(self.get("llm.provider") or "").strip().lower()
+        model = str(self.get("llm.model") or "").strip()
+        if provider == "anthropic" and model and not self._looks_like_anthropic_model(model):
+            return MODEL_SETUP_MESSAGE
+        return None
 
     def llm_selection_summary(self) -> str:
         """Human-readable selected LLM line for doctor / UI (not raw provider=)."""
