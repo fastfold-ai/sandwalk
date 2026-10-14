@@ -142,20 +142,24 @@ Dashboard → Models lists every provider in a grid with a Connected or Not set 
   <img alt="Models settings: cloud providers with Connected badges and local endpoints below" src="images/models.png">
 </p>
 
-### Files beside the chat
+### Artifacts
 
-The right pane is the session workspace. This chat ran a binder design and the agent wrote a Go/No-Go assessment with iPTM, pTM, and PAE in a table. On the right the Artifacts view shows what it produced: `workflow.yml`, `gfp_binder.yaml`, a rendered `1ema.cif` structure, a PowerPoint, and a CSV of lysozyme variants. The chat and its files stay open together.
+Every session has a workspace on disk, and **Artifacts** is the view of it. Anything the agent produces lands there — whether it ran locally, in the local sandbox, or on a Modal GPU box — and comes back to the same folder. Files are grouped by where they came from: **Your uploads**, **Generated outputs**, **Project folder**, and anything a tool wrote. CIF and PDB render as 3D. CSV, YAML, PPTX, and PDF show a preview card. Search filters the list, and the workspace path is printed at the bottom so you can open it in Finder or a terminal.
+
+In this shot the agent ran a binder design on Modal. The chat on the left is its Go/No-Go assessment with iPTM, pTM, and PAE. The Artifacts pane on the right holds the files that run produced: `workflow.yml`, `gfp_binder.yaml`, a rendered `1ema.cif`, `fold_pipeline_overview.pptx`, and `lysozyme_variants.csv` under an inputs group. Click any file to open it in a tab next to the chat.
 
 <p align="center">
-  <img alt="Binder design chat with its metrics table, and the Artifacts pane showing the files it produced" src="images/artifacts.png">
+  <img alt="Artifacts pane listing the files a sandbox binder run produced, including a rendered CIF structure" src="images/artifacts.png">
 </p>
 
-### Plots
+### Sites
 
-A published page renders in that same pane. The user asked for the most-referenced open-weight model on arXiv since 2024, using the Paperclip MCP, with a line plot of the top five. The chat on the left shows the tool calls and the Result; the right side is the live page: a monthly line chart for Qwen, Llama, Gemma, GLM, and DeepSeek, with a sampling control and a family comparison table below.
+Sites is how a result becomes something you can send someone. Ask the agent to build a report, a dashboard, or a landing page and it uses the built-in `sites-building` skill: a static site from a report shell with charts, math, Mermaid, and a theme toggle already wired in. It builds a clean `dist/`, validates it, and previews it in the right pane. When you are happy, `sites-hosting` packages the exact output and publishes it to a public `https://<slug>.sandwalk.site` URL. Sites in the sidebar lists everything you have built, published or not, with Preview and Open.
+
+Here the user asked, through the Paperclip MCP, which open-weight model is most referenced in arXiv methods sections since 2024, with a top-five line plot. The left side is the chat: tool calls, the Result, and a proxy-count table. The right side is the published site — the **Published** badge and URL are in its header — with the monthly chart for Qwen, Llama, Gemma, GLM, and DeepSeek, a sampling control, and a family comparison below. That page is live and shareable.
 
 <p align="center">
-  <img alt="Research chat on the left and the published model trends page with its line chart on the right" src="images/preview.png">
+  <img alt="A published Sandwalk Site beside the chat that produced it, showing a model trends line chart" src="images/sites.png">
 </p>
 
 ### Structures
