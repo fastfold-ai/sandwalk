@@ -24,6 +24,12 @@
 
 > Sandwalk is an open, self-hosted agent you run on your own compute. Direct it toward hard scientific research, or any ambitious work. Chat, CLI, and the macOS app share the same sessions. Leave one running on a Mac Mini or a cluster and open it from wherever you are.
 
+The composer is the front door. One question can reach a model, a skill, an MCP server, a sandbox, and the files in the workspace — then a grid of agents can work the same problem side by side. Sandwalk is there so ambitious research is not stuck in a single chat.
+
+<p align="center">
+  <img alt="The Sandwalk composer: model, plan, skills, and sandbox on one pane" src="images/composer.png">
+</p>
+
 ## Get started
 
 Download the native Sandwalk app for your operating system:
@@ -50,14 +56,6 @@ Launch Sandwalk from Applications. **Connect locally** uses the agent on this Ma
   <img alt="Sandwalk welcome: connect locally or open a remote server" src="images/welcome.png">
 </p>
 
-### New agent
-
-A new chat is a blank pane: the Sandwalk mark, a project scope, and the composer. Plan, Skills, and Run in sandbox sit under it. The window stays on the desktop glass until the session fills.
-
-<p align="center">
-  <img alt="Empty new agent on the glass window" src="images/new-agent.png">
-</p>
-
 ```bash
 sandwalk setup
 sandwalk
@@ -79,10 +77,6 @@ Capy is the overlay agent. It is not a row in the sidebar. Open it from the bott
 ### Grid
 
 A group is a real grid, not a stack of tabs. Capy can open one for you — for example a 4×2 of chats each researching a slice of protein design — and every cell keeps its own composer, model, and stream. **⌘D** splits right, **⇧⌘D** splits down.
-
-<p align="center">
-  <img alt="4 by 2 grid of protein design research chats" src="images/grid.png">
-</p>
 
 ### Plan mode
 
@@ -154,6 +148,10 @@ CIF and PDB from a design run open as 3D in the artifact list. Ranked candidates
 
 <p align="center">
   <img alt="BoltzGen binder run with ranked structures rendered beside the chat" src="images/structures.png">
+</p>
+
+<p align="center">
+  <img alt="Ranked binder structures and a Go or No-Go note beside the files pane" src="images/binder.png">
 </p>
 
 ### Science toolkit
