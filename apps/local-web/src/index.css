@@ -191,12 +191,12 @@ html.sandwalk-mac-glass .sandwalk-shell-main {
  * full-page screens (overview, skills, MCP) and not only the sidebar. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main {
   background-color: rgb(246 246 247 / 0.74) !important;
-  border-left-color: transparent;
+  border-left-color: rgb(0 0 0 / 0.12);
 }
 
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main {
   background-color: rgb(24 24 26 / 0.74) !important;
-  border-left-color: transparent;
+  border-left-color: rgb(255 255 255 / 0.1);
 }
 
 /* Cards, list shells, and sticky toolbars paint opaque white over that
