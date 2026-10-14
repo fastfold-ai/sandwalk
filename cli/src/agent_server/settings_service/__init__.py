@@ -69,5 +69,19 @@ class SettingsService:
         config.save()
         return SettingsService.get_onboarding()
 
+    @staticmethod
+    def reset_to_factory_defaults() -> OnboardingSettings:
+        """Replace ~/.sandwalk/config.json with factory defaults.
+
+        Chats and datasets on disk are left alone. Onboarding starts over,
+        and no provider key or chosen model remains.
+        """
+        from agent.config import CONFIG_BACKUP_FILE, CONFIG_DIR, CONFIG_FILE, DEFAULTS
+        from agent.config.io_helpers import atomic_write_config
+
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        atomic_write_config(CONFIG_FILE, CONFIG_BACKUP_FILE, dict(DEFAULTS))
+        return get_onboarding_settings(Config.load())
+
 
 __all__ = ["SettingsService"]

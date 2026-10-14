@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   cancelTts,
@@ -39,7 +39,18 @@ export function useCapyVoiceReply({
   const turnRef = useRef(false)
   const speakingRef = useRef(false)
   const lastDeltaRef = useRef('')
+  const stopRequested = useRef(false)
   const [speakStatus, setSpeakStatus] = useState<string | null>(null)
+
+  const stopSpeaking = useCallback(() => {
+    stopRequested.current = true
+    speakingRef.current = false
+    spokenRef.current = true
+    turnRef.current = false
+    stopTtsPlayback()
+    void cancelTts().catch(() => undefined)
+    setSpeakStatus(null)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -106,27 +117,31 @@ export function useCapyVoiceReply({
     }
     speakingRef.current = true
     spokenRef.current = true
+    stopRequested.current = false
     setSpeakStatus('Loading model into memory…')
     void (async () => {
       try {
         const status = await getTtsStatus()
-        if (!voiceTtsReady(status)) return
+        if (stopRequested.current || !voiceTtsReady(status)) return
         const selected = pickCapyVoice(status.voices, status.active_model)
         const voice = readCapyVoiceAuto()
           ? voiceForDetectedText(source, selected, status.voices)
           : selected
         const audio = await speakTts(text, voice, readCapyVoiceSpeed())
+        if (stopRequested.current) return
         setSpeakStatus('Playing…')
         await playTtsAudio(audio)
       } catch {
         // Stay silent if TTS is missing or the user barged in.
       } finally {
         speakingRef.current = false
-        setSpeakStatus(null)
-        turnRef.current = false
+        if (!stopRequested.current) {
+          setSpeakStatus(null)
+          turnRef.current = false
+        }
       }
     })()
   }, [enabled, liveDelta, recording, replyText, runActive, speakTurn])
 
-  return { speakStatus }
+  return { speakStatus, stopSpeaking }
 }

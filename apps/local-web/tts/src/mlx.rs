@@ -54,14 +54,42 @@ fn mlx_python_ok(version: (u8, u8)) -> bool {
     version.0 == 3 && (10..=12).contains(&version.1)
 }
 
-fn find_compatible_python() -> Result<String, String> {
+fn venv_python(venv: &Path) -> Option<PathBuf> {
+    for name in ["python3", "python"] {
+        let bin = venv.join("bin").join(name);
+        if bin.is_file() {
+            return Some(bin);
+        }
+    }
+    None
+}
+
+fn bundled_runtime_pythons() -> Vec<String> {
+    let Ok(exe) = std::env::current_exe() else {
+        return Vec::new();
+    };
+    // Sandwalk.app/Contents/MacOS/<bin> → Helpers/Sandwalk Server.app/…/agent-runtime
+    let Some(contents) = exe.parent().and_then(|dir| dir.parent()) else {
+        return Vec::new();
+    };
+    let bin = contents
+        .join("Helpers")
+        .join("Sandwalk Server.app")
+        .join("Contents")
+        .join("Resources")
+        .join("agent-runtime")
+        .join("bin");
+    [12u8, 11, 10]
+        .into_iter()
+        .map(|minor| bin.join(format!("python3.{minor}")).to_string_lossy().into_owned())
+        .collect()
+}
+
+fn python_candidates() -> Vec<String> {
     let home = std::env::var("HOME").unwrap_or_default();
-    let mut candidates = vec![
-        "python3.12".to_owned(),
-        "python3.11".to_owned(),
-        "python3.10".to_owned(),
-    ];
+    let mut candidates = bundled_runtime_pythons();
     for minor in [12u8, 11, 10] {
+        candidates.push(format!("python3.{minor}"));
         candidates.push(format!("{home}/.local/bin/python3.{minor}"));
         candidates.push(format!("/opt/homebrew/bin/python3.{minor}"));
         candidates.push(format!(
@@ -71,8 +99,109 @@ fn find_compatible_python() -> Result<String, String> {
         candidates.push(format!(
             "/usr/local/opt/python@{minor}/bin/python3.{minor}"
         ));
+        candidates.push(format!(
+            "/Library/Frameworks/Python.framework/Versions/3.{minor}/bin/python3.{minor}"
+        ));
     }
-    for candidate in candidates {
+    candidates
+}
+
+fn command_error(output: &std::process::Output, fallback: &str) -> String {
+    let err = String::from_utf8_lossy(&output.stderr);
+    let line = err
+        .trim()
+        .lines()
+        .rev()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or(fallback);
+    line.trim().to_owned()
+}
+
+fn create_venv(base: &str, venv: &Path) -> Result<(), String> {
+    let first = Command::new(base)
+        .args(["-m", "venv", "--clear"])
+        .arg(venv)
+        .output()
+        .map_err(|e| format!("Could not run {base} -m venv: {e}"))?;
+    if first.status.success() && venv_python(venv).is_some() {
+        return Ok(());
+    }
+    let detail = command_error(&first, "python -m venv failed");
+    let _ = fs::remove_dir_all(venv);
+    let without_pip = Command::new(base)
+        .args(["-m", "venv", "--without-pip", "--clear"])
+        .arg(venv)
+        .output();
+    if let Ok(without_pip) = without_pip {
+        if without_pip.status.success() {
+            if let Some(py) = venv_python(venv) {
+                let ensured = Command::new(&py)
+                    .args(["-m", "ensurepip", "--upgrade"])
+                    .output();
+                if ensured.as_ref().map(|out| out.status.success()).unwrap_or(false) {
+                    return Ok(());
+                }
+                if uv_install_pip(&py) {
+                    return Ok(());
+                }
+            }
+        }
+    }
+    let _ = fs::remove_dir_all(venv);
+    Err(detail)
+}
+
+fn uv_bins() -> Vec<String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    vec![
+        "uv".to_owned(),
+        format!("{home}/.local/bin/uv"),
+        "/opt/homebrew/bin/uv".to_owned(),
+        "/usr/local/bin/uv".to_owned(),
+    ]
+}
+
+fn uv_install_pip(python: &Path) -> bool {
+    let Some(py) = python.to_str() else {
+        return false;
+    };
+    for uv in uv_bins() {
+        if uv.contains('/') && !Path::new(&uv).is_file() {
+            continue;
+        }
+        let ok = Command::new(uv)
+            .args(["pip", "install", "--python", py, "pip"])
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if ok {
+            return true;
+        }
+    }
+    false
+}
+
+fn try_uv_venv(venv: &Path) -> bool {
+    for uv in uv_bins() {
+        if uv.contains('/') && !Path::new(&uv).is_file() {
+            continue;
+        }
+        let ok = Command::new(uv)
+            .args(["venv", "--python", "3.12", "--clear"])
+            .arg(venv)
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if ok && venv_python(venv).is_some() {
+            return true;
+        }
+        let _ = fs::remove_dir_all(venv);
+    }
+    false
+}
+
+fn find_compatible_python() -> Result<String, String> {
+    for candidate in python_candidates() {
         if candidate.contains('/') && !Path::new(&candidate).is_file() {
             continue;
         }
@@ -88,8 +217,7 @@ fn find_compatible_python() -> Result<String, String> {
 
 fn mlx_python(models_root: &Path) -> Result<PathBuf, String> {
     let venv = models_root.join("mlx").join(".venv");
-    let bin = venv.join("bin").join("python");
-    if bin.is_file() {
+    if let Some(bin) = venv_python(&venv) {
         if bin
             .to_str()
             .and_then(python_minor)
@@ -99,20 +227,43 @@ fn mlx_python(models_root: &Path) -> Result<PathBuf, String> {
         }
         let _ = fs::remove_dir_all(&venv);
     }
-    let base = find_compatible_python()?;
     fs::create_dir_all(venv.parent().unwrap())
         .map_err(|e| format!("Could not create the MLX helper directory: {e}"))?;
-    let status = Command::new(&base)
-        .args(["-m", "venv"])
-        .arg(&venv)
-        .status()
-        .map_err(|e| format!("Could not create the MLX Python environment: {e}"))?;
-    if !status.success() || !bin.is_file() {
-        return Err(
-            "Could not create a Python 3.10–3.12 environment for Chatterbox and Qwen3.".to_owned(),
-        );
+    let mut errors = Vec::new();
+    for candidate in python_candidates() {
+        if candidate.contains('/') && !Path::new(&candidate).is_file() {
+            continue;
+        }
+        if !python_minor(&candidate).is_some_and(mlx_python_ok) {
+            continue;
+        }
+        match create_venv(&candidate, &venv) {
+            Ok(()) => {
+                if let Some(bin) = venv_python(&venv) {
+                    return Ok(bin);
+                }
+            }
+            Err(err) => {
+                let _ = fs::remove_dir_all(&venv);
+                errors.push(format!("{candidate}: {err}"));
+            }
+        }
     }
-    Ok(bin)
+    if try_uv_venv(&venv) {
+        if let Some(bin) = venv_python(&venv) {
+            return Ok(bin);
+        }
+    }
+    if errors.is_empty() {
+        find_compatible_python()?;
+    }
+    Err(format!(
+        "Could not create a Python 3.10–3.12 environment for Chatterbox and Qwen3. {}",
+        errors
+            .last()
+            .map(String::as_str)
+            .unwrap_or("Install Python 3.12 with brew install python@3.12, then try again.")
+    ))
 }
 
 pub fn install_mlx(

@@ -1,6 +1,6 @@
 import type { DoctorReport } from '@sandwalk/agent-ui-core'
 import { Loader, RefreshCw } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -35,24 +35,24 @@ export function DoctorView({
   const [error, setError] = useState<string | null>(null)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
 
-  const runDoctor = useCallback(
-    async (signal?: AbortSignal) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const next = await onRun(signal)
-        if (!signal?.aborted) setReport(next)
-      } catch (err) {
-        if (signal?.aborted) return
-        setError(
-          err instanceof Error ? err.message : 'Unable to run doctor checks.'
-        )
-      } finally {
-        if (!signal?.aborted) setLoading(false)
-      }
-    },
-    [onRun]
-  )
+  const onRunRef = useRef(onRun)
+  onRunRef.current = onRun
+
+  const runDoctor = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await onRunRef.current(signal)
+      if (!signal?.aborted) setReport(next)
+    } catch (err) {
+      if (signal?.aborted) return
+      setError(
+        err instanceof Error ? err.message : 'Unable to run doctor checks.'
+      )
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [])
 
   const downloadLogs = useCallback(async () => {
     setExporting(true)

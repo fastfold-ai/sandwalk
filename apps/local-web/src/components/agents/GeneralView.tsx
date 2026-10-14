@@ -23,8 +23,10 @@ import {
   platformOS
 } from '@/lib/desktop'
 
+import { CapyShortcutSetting } from './capy/CapyShortcutSetting'
 import { GeneralViewAccountSection } from './general-view-account'
 import { GeneralViewNotificationsSection } from './general-view-notifications'
+import { GeneralViewResetSection, clearLocalAppPreferences } from './general-view-reset'
 import { GeneralViewServerSection } from './general-view-server'
 import { GeneralViewVersionSection } from './general-view-version'
 
@@ -35,6 +37,7 @@ export function GeneralView({
   onLoadAccount,
   onLogoutAccount,
   onOpenSetupWizard,
+  onResetSettings,
   onChangeBackend,
   onDisconnectBackend
 }: {
@@ -47,6 +50,7 @@ export function GeneralView({
   }) => Promise<AccountSummary>
   onLogoutAccount: (signal?: AbortSignal) => Promise<AccountSummary>
   onOpenSetupWizard?: () => void
+  onResetSettings: () => Promise<void>
   onChangeBackend: (url: string, apiKey?: string) => void | Promise<void>
   onDisconnectBackend: () => void | Promise<void>
 }) {
@@ -55,6 +59,8 @@ export function GeneralView({
   const [loading, setLoading] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [hasCheckedUpdates, setHasCheckedUpdates] = useState(false)
   const [advisoryUpToDate, setAdvisoryUpToDate] = useState<boolean | null>(null)
   const [advisoryLatest, setAdvisoryLatest] = useState<string | null>(null)
@@ -183,6 +189,20 @@ export function GeneralView({
     }
   }
 
+  const resetApp = async () => {
+    setResetting(true)
+    setError(null)
+    try {
+      await onResetSettings()
+      clearLocalAppPreferences()
+      window.location.assign('/onboarding/welcome')
+    } catch (err) {
+      setResetting(false)
+      setConfirmReset(false)
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const about = account?.about
   const upToDate = useDesktopUpdater
     ? desktopUpdate.upToDate
@@ -251,7 +271,14 @@ export function GeneralView({
           onOpenSetupWizard={onOpenSetupWizard}
         />
 
+        <CapyShortcutSetting />
+
         <GeneralViewNotificationsSection />
+
+        <GeneralViewResetSection
+          resetting={resetting}
+          onReset={() => setConfirmReset(true)}
+        />
       </div>
 
       <AlertDialog
@@ -279,6 +306,36 @@ export function GeneralView({
               }}
             >
               {signingOut ? 'Signing out…' : 'Sign out'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmReset}
+        onOpenChange={open => {
+          if (!open && !resetting) setConfirmReset(false)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Sandwalk?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Models, API keys, and app settings go back to a fresh install.
+              Onboarding opens next. Chats on this Mac stay.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resetting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={event => {
+                event.preventDefault()
+                void resetApp()
+              }}
+            >
+              {resetting ? 'Resetting…' : 'Reset'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

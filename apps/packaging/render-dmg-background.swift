@@ -1,52 +1,63 @@
 import AppKit
 import Foundation
 
-// Retina background for the DMG install window (660×380 pt → 1320×760 px).
-// Icons sit on the left and right; this only paints the canvas and the arrow.
+// Finder window content is 760×460 pt. The background is a 1520×920 px
+// bitmap (2×) so it stays sharp on a Retina display. Plain white only.
 
-let width = 1320
-let height = 760
-let image = NSImage(size: NSSize(width: width, height: height))
-image.lockFocus()
-
-NSColor(calibratedRed: 0.965, green: 0.965, blue: 0.97, alpha: 1).setFill()
-NSBezierPath(rect: NSRect(x: 0, y: 0, width: width, height: height)).fill()
-
-let arrow = NSBezierPath()
-arrow.move(to: NSPoint(x: 520, y: 390))
-arrow.line(to: NSPoint(x: 760, y: 390))
-arrow.lineWidth = 6
-arrow.lineCapStyle = .round
-NSColor(calibratedWhite: 0.72, alpha: 1).setStroke()
-arrow.stroke()
-
-let head = NSBezierPath()
-head.move(to: NSPoint(x: 760, y: 390))
-head.line(to: NSPoint(x: 728, y: 414))
-head.line(to: NSPoint(x: 728, y: 366))
-head.close()
-NSColor(calibratedWhite: 0.72, alpha: 1).setFill()
-head.fill()
-
-let caption = "Drag Sandwalk to Applications" as NSString
-let font = NSFont.systemFont(ofSize: 28, weight: .medium)
-let attrs: [NSAttributedString.Key: Any] = [
-  .font: font,
-  .foregroundColor: NSColor(calibratedWhite: 0.45, alpha: 1)
-]
-let captionSize = caption.size(withAttributes: attrs)
-caption.draw(
-  at: NSPoint(x: (CGFloat(width) - captionSize.width) / 2, y: 92),
-  withAttributes: attrs
-)
-
-image.unlockFocus()
+let pointsW: CGFloat = 760
+let pointsH: CGFloat = 460
+let pixelsW = 1520
+let pixelsH = 920
 
 guard
-  let tiff = image.tiffRepresentation,
-  let rep = NSBitmapImageRep(data: tiff),
-  let png = rep.representation(using: .png, properties: [:])
+  let rep = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: pixelsW,
+    pixelsHigh: pixelsH,
+    bitsPerSample: 8,
+    samplesPerPixel: 4,
+    hasAlpha: true,
+    isPlanar: false,
+    colorSpaceName: .deviceRGB,
+    bytesPerRow: 0,
+    bitsPerPixel: 0
+  )
 else {
+  fputs("error: could not allocate DMG background\n", stderr)
+  exit(1)
+}
+rep.size = NSSize(width: pointsW, height: pointsH)
+
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+NSColor.white.setFill()
+NSBezierPath(rect: NSRect(x: 0, y: 0, width: pointsW, height: pointsH)).fill()
+
+// Between Sandwalk.app (center 210, 200) and Applications (center 550, 200).
+// A short, light hint — clear of both 128 pt icons.
+let y = pointsH - 200
+let left: CGFloat = 348
+let shaftW: CGFloat = 64
+let shaftH: CGFloat = 2.5
+let ink = NSColor(calibratedWhite: 0.78, alpha: 1)
+ink.setFill()
+let shaft = NSBezierPath(
+  roundedRect: NSRect(x: left, y: y - shaftH / 2, width: shaftW, height: shaftH),
+  xRadius: shaftH / 2,
+  yRadius: shaftH / 2
+)
+shaft.fill()
+let neck = left + shaftW - 2
+let head = NSBezierPath()
+head.move(to: NSPoint(x: neck, y: y - 7))
+head.line(to: NSPoint(x: neck + 12, y: y))
+head.line(to: NSPoint(x: neck, y: y + 7))
+head.close()
+head.fill()
+
+NSGraphicsContext.restoreGraphicsState()
+
+guard let png = rep.representation(using: .png, properties: [:]) else {
   fputs("error: could not render DMG background\n", stderr)
   exit(1)
 }

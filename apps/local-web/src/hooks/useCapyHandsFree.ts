@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
-  createDoubleTap,
   isCapyHandsFreeKey,
   requestRevealCapyMinimized
 } from '@/lib/capy-ui'
@@ -115,7 +114,6 @@ export function useCapyHandsFree({
 
   useEffect(() => {
     if (!enabled) return
-    const tapped = createDoubleTap()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && recordingRef.current) {
         event.preventDefault()
@@ -123,7 +121,6 @@ export function useCapyHandsFree({
         return
       }
       if (!isCapyHandsFreeKey(event)) return
-      if (!tapped()) return
       event.preventDefault()
       event.stopPropagation()
       requestRevealCapyMinimized()

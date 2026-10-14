@@ -18,7 +18,7 @@ swift "${SCRIPT_DIR}/render-dmg-background.swift" "${BG_PNG}"
 
 # Finder's "disk" name is the /Volumes entry, which matches the volume name
 # only when we mount in /Volumes.
-MOUNT="/Volumes/Sandwalk"
+MOUNT="/Volumes/Sandwalk Installer"
 if mount | grep -q " on ${MOUNT} "; then
   hdiutil detach "${MOUNT}" >/dev/null 2>&1 || true
 fi
@@ -35,23 +35,31 @@ mkdir -p "${MOUNT}/.background"
 cp -f "${BG_PNG}" "${MOUNT}/.background/background.png"
 chflags hidden "${MOUNT}/.background" || true
 
+# Finder shows this as the disk icon (same artwork as Sandwalk.app).
+ICON_ICNS="${SCRIPT_DIR}/../local-web/src-tauri/icons/icon.icns"
+if [[ -f "${ICON_ICNS}" ]]; then
+  cp -f "${ICON_ICNS}" "${MOUNT}/.VolumeIcon.icns"
+  SetFile -a C "${MOUNT}"
+  SetFile -a V "${MOUNT}/.VolumeIcon.icns" || chflags hidden "${MOUNT}/.VolumeIcon.icns" || true
+fi
+
 # Finder addresses the volume by its name, not the mount path.
 osascript <<'APPLESCRIPT'
 tell application "Finder"
-  tell disk "Sandwalk"
+  tell disk "Sandwalk Installer"
     open
     set current view of container window to icon view
     set toolbar visible of container window to false
     set statusbar visible of container window to false
-    set the bounds of container window to {140, 120, 800, 500}
+    set the bounds of container window to {140, 90, 900, 550}
     set viewOptions to the icon view options of container window
     set arrangement of viewOptions to not arranged
-    set icon size of viewOptions to 112
+    set icon size of viewOptions to 128
     set text size of viewOptions to 13
     set background picture of viewOptions to file ".background:background.png"
     delay 1
-    set position of item "Sandwalk.app" of container window to {180, 175}
-    set position of item "Applications" of container window to {480, 175}
+    set position of item "Sandwalk.app" of container window to {210, 200}
+    set position of item "Applications" of container window to {550, 200}
     update without registering applications
     delay 1
     close

@@ -21,6 +21,37 @@ def test_supports_llm_key_probe_known_providers():
     assert not supports_llm_key_probe("slack")
 
 
+def test_probe_chat_completions_gpt5_uses_max_completion_tokens(monkeypatch):
+    seen: dict = {}
+
+    class _Resp:
+        status_code = 200
+        text = '{"choices":[{"message":{"content":"pong"}}]}'
+
+        def json(self):
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    def post(*_args, **kwargs):
+        seen["json"] = kwargs.get("json")
+        return _Resp()
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "httpx",
+        SimpleNamespace(post=post),
+    )
+    result = probe_chat_completions(
+        "https://api.openai.com/v1/chat/completions",
+        {"Authorization": "Bearer sk-test"},
+        label="OpenAI",
+        model="gpt-5-nano",
+    )
+    assert result.ok is True
+    assert seen["json"]["max_completion_tokens"] == 1
+    assert "max_tokens" not in seen["json"]
+    assert "temperature" not in seen["json"]
+
+
 def test_probe_chat_completions_invalid_key(monkeypatch):
     class _Resp:
         status_code = 403

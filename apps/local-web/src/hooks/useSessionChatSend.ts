@@ -11,6 +11,7 @@ import {
 
 import { buildSendContent, finalizePendingTools } from '@/lib/chat-actions'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
+import { randomUUID } from '@/lib/random-uuid'
 import { isSessionBusyError } from '@/lib/session-busy'
 import type { SessionChatState } from '@/lib/sessions'
 
@@ -113,7 +114,7 @@ export function useSessionChatSend({
       runActive: true,
       queuedMessages: prev.queuedMessages.some(item => item.text === text)
         ? prev.queuedMessages
-        : [...prev.queuedMessages, { id: crypto.randomUUID(), text }]
+        : [...prev.queuedMessages, { id: randomUUID(), text }]
     }))
   }
 
@@ -275,7 +276,7 @@ export function useSessionChatSend({
         ...prev,
         queuedMessages: [
           ...prev.queuedMessages,
-          { id: crypto.randomUUID(), text }
+          { id: randomUUID(), text }
         ]
       }))
       clearComposerDraft(sessionId)

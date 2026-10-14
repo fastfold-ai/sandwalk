@@ -7,13 +7,14 @@ import type {
   RuntimeSettings
 } from '@sandwalk/agent-ui-core'
 import { isSessionGroupId } from '@sandwalk/agent-ui-core'
-import { Archive, Minus, Pin, Upload, X } from 'lucide-react'
+import { Archive, Minus, Pin, Square, Upload, X } from 'lucide-react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 
 import capyLogo from '@/assets/capy-logo.png'
 import '@/components/agents/capy/CapyOverlay.css'
 import { CapyChat } from '@/components/agents/capy/CapyChat'
+import { useCapyShortcut } from '@/components/agents/capy/CapyShortcutKeys'
 import { CapyComposer } from '@/components/agents/capy/CapyComposer'
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
 import { useCapyHandsFree } from '@/hooks/useCapyHandsFree'
@@ -21,8 +22,8 @@ import { useCapySession } from '@/hooks/useCapySession'
 import { useCapyVoiceReply } from '@/hooks/useCapyVoiceReply'
 import { useCapyWindow } from '@/hooks/useCapyWindow'
 import { readCapySpeakAll } from '@/lib/capy-voice'
+import { capyShortcutSymbols, CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
 import { usableVoiceTranscript } from '@/lib/desktop-voice'
-import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
 import type { ComposerModelOption } from '@/lib/composer-models'
 import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
 import { cn } from '@/lib/utils'
@@ -70,6 +71,7 @@ export function CapyOverlay({
   activeChatId?: string | null
 }) {
   const { state, persist } = useCapyWindow()
+  const shortcutLabel = capyShortcutSymbols(useCapyShortcut()).join('')
   const enabled = Boolean(health)
   const capy = useCapySession({ client, enabled })
   const [unreadCount, setUnreadCount] = useState(0)
@@ -291,20 +293,18 @@ export function CapyOverlay({
           aria-busy={working}
           aria-label={
             listening
-              ? 'Capy is listening. Double-tap Control to send.'
+              ? `Capy is listening. Press ${shortcutLabel} to send.`
               : working
                 ? 'Capy is working.'
                 : unreadLabel
                   ? `Open Capy. ${unreadCount} new ${unreadCount === 1 ? 'reply' : 'replies'}.`
-                  : 'Open Capy. Double-tap Control for hands-free voice.'
+                  : `Open Capy. Press ${shortcutLabel} for hands-free voice.`
           }
           title={
             listening
-              ? 'Listening — double-tap Control to send'
+              ? `Listening — press ${shortcutLabel} to send`
               : voiceReply.speakStatus ||
-                (working
-                  ? 'Capy is working'
-                  : 'Double-tap Control to talk to Capy')
+                (working ? 'Capy is working' : `Press ${shortcutLabel} to talk to Capy`)
           }
         >
           <img
@@ -406,8 +406,20 @@ export function CapyOverlay({
           <img src={capyLogo} alt="" className="size-5 rounded-full object-cover" />
           <div className="text-sm font-medium">Capy</div>
           {voiceReply.speakStatus ? (
-            <span className="text-muted-foreground max-w-[14rem] truncate text-[11px] font-normal">
-              {voiceReply.speakStatus}
+            <span className="pointer-events-auto flex items-center gap-1">
+              <span className="text-muted-foreground max-w-[10rem] truncate text-[11px] font-normal">
+                {voiceReply.speakStatus}
+              </span>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground rounded-full p-0.5"
+                title="Stop speech"
+                aria-label="Stop speech"
+                onPointerDown={event => event.stopPropagation()}
+                onClick={() => voiceReply.stopSpeaking()}
+              >
+                <Square className="size-3 fill-current" />
+              </button>
             </span>
           ) : null}
         </div>

@@ -35,7 +35,7 @@
 |----------|------|
 | macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
 
-Requires macOS 12.0+ and Apple Silicon.
+Requires macOS 12.0+ and Apple Silicon. Open the disk image and drag Sandwalk to Applications.
 
 ### CLI
 
@@ -79,7 +79,7 @@ A new agent is one composer on an empty pane. The project scope is above it, the
 
 ### Capy
 
-Capy is a meta agent that floats over whatever you are doing. It does not take a sidebar row and it never interrupts the session underneath. Open it from the bottom of the sidebar or press **Ctrl + Ctrl** from anywhere in the app.
+Capy is a meta agent that floats over whatever you are doing. It does not take a sidebar row and it never interrupts the session underneath. Open it from the bottom of the sidebar or press **⌃⌥** (Control-Option). Change that shortcut in General.
 
 Capy works on Sandwalk itself rather than on your research question. Ask it to start chats and it spawns them, seeds each one with a brief, and can lay them out as a grid. Ask about state and it reads Doctor, lists Bench suites, starts a run, or pulls the last results and token use. It has its own model picker, so you can run it on something fast and cheap while the worker chats use a stronger model. Minimize it and keep talking; a badge counts replies you have not opened.
 

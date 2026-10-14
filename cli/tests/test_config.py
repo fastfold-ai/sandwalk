@@ -48,6 +48,14 @@ def test_load_invalid_json_does_not_crash(monkeypatch, tmp_path):
     bad_backup = tmp_path / "config.json.bak"
     bad_config.write_text("{ not valid json")
 
+    for name in (
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_FOUNDRY_API_KEY",
+        "OPENAI_API_KEY",
+        "CT_LLM_PROVIDER",
+        "CT_LLM_MODEL",
+    ):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(config_mod, "CONFIG_FILE", bad_config)
     monkeypatch.setattr(config_mod, "CONFIG_BACKUP_FILE", bad_backup)
 
@@ -97,6 +105,39 @@ def test_llm_preflight_error_mentions_foundry(monkeypatch):
     cfg = Config(data={"llm.provider": "anthropic"})
     issue = cfg.llm_preflight_issue()
     assert "Foundry" in issue
+
+
+def test_model_setup_message_when_key_missing():
+    cfg = Config(data={"llm.provider": "openai", "llm.model": "gpt-5.6-sol"})
+    message = cfg.model_setup_message()
+    assert message is not None
+    assert "/dashboard/models" in message
+    assert "Agent SDK error" not in message
+
+
+def test_model_setup_message_when_openai_model_on_anthropic(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    cfg = Config(
+        data={
+            "llm.provider": "anthropic",
+            "llm.anthropic_api_key": "sk-ant-test",
+            "llm.model": "gpt-5.6-sol",
+        }
+    )
+    message = cfg.model_setup_message()
+    assert message is not None
+    assert "/dashboard/models" in message
+
+
+def test_model_setup_message_ready_for_matching_model():
+    cfg = Config(
+        data={
+            "llm.provider": "openai",
+            "llm.openai_api_key": "test-openai-key",
+            "llm.model": "gpt-5.6-sol",
+        }
+    )
+    assert cfg.model_setup_message() is None
 
 
 def test_llm_preflight_requires_openai_key():
@@ -711,11 +752,22 @@ def test_agent_profile_invalid_raises():
         cfg.set("agent.profile", "unknown-profile")
 
 
-def test_default_output_dir_is_cwd_outputs_when_missing(tmp_path, monkeypatch):
+def test_default_output_dir_is_home_outputs_when_missing(tmp_path, monkeypatch):
     cfg_path = tmp_path / "missing_config.json"
     monkeypatch.setattr(config_mod, "CONFIG_FILE", cfg_path)
     cfg = Config.load()
-    assert cfg.get("sandbox.output_dir") == config_mod.DEFAULTS["sandbox.output_dir"]
+    output_dir = cfg.get("sandbox.output_dir")
+    assert output_dir == config_mod.DEFAULTS["sandbox.output_dir"]
+    assert output_dir.endswith("/.sandwalk/outputs")
+    assert output_dir != "/outputs"
+
+
+def test_load_rewrites_root_outputs_dir(tmp_path, monkeypatch):
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({"sandbox.output_dir": "/outputs"}), encoding="utf-8")
+    monkeypatch.setattr(config_mod, "CONFIG_FILE", cfg_path)
+    cfg = Config.load()
+    assert cfg.get("sandbox.output_dir") == str(config_mod.CONFIG_DIR / "outputs")
 
 
 def test_load_migrates_legacy_home_output_dir(tmp_path, monkeypatch):
@@ -724,10 +776,9 @@ def test_load_migrates_legacy_home_output_dir(tmp_path, monkeypatch):
     cfg_path.write_text(json.dumps({"sandbox.output_dir": legacy}), encoding="utf-8")
     monkeypatch.setattr(config_mod, "CONFIG_FILE", cfg_path)
 
-    with patch("agent.config.Path.cwd", return_value=tmp_path):
-        cfg = Config.load()
+    cfg = Config.load()
 
-    assert cfg.get("sandbox.output_dir") == str(tmp_path / "outputs")
+    assert cfg.get("sandbox.output_dir") == str(config_mod.CONFIG_DIR / "outputs")
 
 
 # ── Config Schema Validation ──────────────────────────────────────────

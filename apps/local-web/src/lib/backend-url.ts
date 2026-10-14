@@ -196,6 +196,26 @@ export function injectedDesktopApiKeyFor(
   return injectedDesktopApiKey()
 }
 
+/**
+ * When the dashboard is served by the API itself (production on :8787), a
+ * browser on another machine must call that host — not 127.0.0.1, which is
+ * the other machine. Vite (:1420 / :5173) and the Tauri webview are excluded.
+ */
+export function backendUrlFromPage(location: {
+  protocol: string
+  hostname: string
+  origin: string
+  port: string
+}): string | null {
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return null
+  if (location.port === '1420' || location.port === '5173') return null
+  const host = location.hostname.trim().toLowerCase()
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1') {
+    return null
+  }
+  return location.origin.replace(/\/+$/, '')
+}
+
 export function isLocalBackendUrl(url: string): boolean {
   return /127\.0\.0\.1|localhost/i.test(url)
 }
@@ -209,6 +229,10 @@ export function normalizeBackendUrl(url: string): string {
 export function readStoredBackendUrl(): string {
   const fromDesktop = injectedBackendUrl()
   if (fromDesktop) return normalizeBackendUrl(fromDesktop)
+  if (typeof window !== 'undefined') {
+    const fromPage = backendUrlFromPage(window.location)
+    if (fromPage) return normalizeBackendUrl(fromPage)
+  }
   try {
     const stored = localStorage.getItem(BACKEND_URL_STORAGE_KEY)
     if (stored?.trim()) return normalizeBackendUrl(stored)

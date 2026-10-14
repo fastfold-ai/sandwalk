@@ -2,6 +2,7 @@ import type { McpCatalogEntry } from '@sandwalk/agent-ui-core'
 import { Plug } from 'lucide-react'
 import { useState } from 'react'
 
+import { randomUUID } from '@/lib/random-uuid'
 import { cn } from '@/lib/utils'
 
 import { faviconCandidatesForUrl } from './mcp-favicon'
@@ -10,7 +11,7 @@ export type HeaderRow = { id: string; name: string; value: string }
 export type CustomMode = 'remote' | 'local'
 
 export function newHeaderRow(): HeaderRow {
-  return { id: crypto.randomUUID(), name: '', value: '' }
+  return { id: randomUUID(), name: '', value: '' }
 }
 
 export function headersFromRows(rows: HeaderRow[]): Record<string, string> | null {

@@ -28,6 +28,7 @@ import { createPortal } from 'react-dom'
 
 import { HomeProjectBenchLinks } from '@/components/agents/home-project-bench-links'
 import { Button } from '@/components/ui/button'
+import { randomUUID } from '@/lib/random-uuid'
 import { cn } from '@/lib/utils'
 
 import {
@@ -158,7 +159,7 @@ export function WidgetBoard({
       widgets: [
         ...layout.widgets,
         {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           type,
           size: entry.defaultSize
         }

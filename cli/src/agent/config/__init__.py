@@ -94,6 +94,16 @@ def _rewrite_legacy_config_paths(data: dict[str, Any]) -> None:
                 break
 
 
+def _is_root_output_dir(value: object) -> bool:
+    """True for the `/outputs` path a GUI launch writes when cwd is `/`."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        return Path(value).expanduser().resolve() == Path("/outputs")
+    except OSError:
+        return False
+
+
 _migrate_tree(LEGACY_CT_DIR, LEGACY_FASTFOLD_DIR, label="ct→fastfold-cli")
 _migrate_tree(LEGACY_FASTFOLD_DIR, CONFIG_DIR, label="fastfold-cli→sandwalk")
 _migrate_tree(LEGACY_CT_DIR, CONFIG_DIR, label="ct→sandwalk")
@@ -133,8 +143,10 @@ class Config(
             str(LEGACY_CT_DIR / "outputs"),
             str(CONFIG_DIR / "outputs"),
         }
-        if data.get("sandbox.output_dir") in legacy_output_dirs:
-            data["sandbox.output_dir"] = str(Path.cwd() / "outputs")
+        if data.get("sandbox.output_dir") in legacy_output_dirs or _is_root_output_dir(
+            data.get("sandbox.output_dir")
+        ):
+            data["sandbox.output_dir"] = str(CONFIG_DIR / "outputs")
 
         env_mappings = env_var_mappings(API_KEYS)
         apply_env_overrides(data, env_mappings)

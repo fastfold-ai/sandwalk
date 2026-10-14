@@ -17,11 +17,28 @@ fi
 : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required}"
 
 echo "==> Notarizing ${DMG_PATH}..."
+NOTARY_LOG="$(mktemp)"
+set +e
 xcrun notarytool submit "${DMG_PATH}" \
   --apple-id "${APPLE_ID}" \
   --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
   --team-id "${APPLE_TEAM_ID}" \
-  --wait
+  --wait | tee "${NOTARY_LOG}"
+NOTARY_RC="${PIPESTATUS[0]}"
+set -e
+SUBMISSION_ID="$(sed -n 's/^  id: //p' "${NOTARY_LOG}" | head -1)"
+if [[ "${NOTARY_RC}" -ne 0 ]] || ! grep -q "status: Accepted" "${NOTARY_LOG}"; then
+  echo "error: notarization was not accepted" >&2
+  if [[ -n "${SUBMISSION_ID}" ]]; then
+    xcrun notarytool log "${SUBMISSION_ID}" \
+      --apple-id "${APPLE_ID}" \
+      --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+      --team-id "${APPLE_TEAM_ID}" >&2 || true
+  fi
+  rm -f "${NOTARY_LOG}"
+  exit 1
+fi
+rm -f "${NOTARY_LOG}"
 
 echo "==> Stapling notarization ticket..."
 xcrun stapler staple "${DMG_PATH}"
