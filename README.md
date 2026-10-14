@@ -7,8 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>An agent harness for ambitious work.</strong><br>
-  Self-hosted. Many tools, many models, many agents at once — in one window, one terminal, one session list.
+  <strong>An agent harness for ambitious work.</strong>
 </p>
 
 <p align="center">
