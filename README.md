@@ -100,6 +100,16 @@ The **+** button opens one menu for everything a turn can use. Top rows switch b
   <img alt="The plus menu with Skills selected and the installed skills flyout open" src="images/skills.png">
 </p>
 
+### Skills manager and skills.sh
+
+Dashboard → Skills is where you manage the catalog. Flip the **Skills.sh** toggle in the search bar and the page becomes the public [skills.sh](https://skills.sh) leaderboard — 1.3 million installs, ranked All Time, Trending (24h), or Hot. Each row is a skill, its source repo, install count, and a **View** link. `find-skills` from vercel-labs sits at the top; Matt Pocock's `grill-me`, `tdd`, and `handoff` follow. **Add skill** installs from here, from GitHub, or from a local path.
+
+The catalog search is authenticated through Vercel. Dashboard → Integrations → **Vercel** has an **Add** button that opens a setup terminal in `~/.sandwalk/vercel-integration` and runs `vercel login`, `vercel link`, and `vercel env pull`. That pulls an OIDC token and saves it as `VERCEL_OIDC_TOKEN`. Once it is set, the skills.sh toggle lights up and the leaderboard loads. There is also a manual path: paste the token into **Add Vercel OIDC** from the dropdown next to Add.
+
+<p align="center">
+  <img alt="Skills manager with the Skills.sh toggle on, showing the public leaderboard ranked by installs" src="images/skills-sh.png">
+</p>
+
 ### CLI
 
 The same agent runs in a terminal, including a terminal pane inside the app. The banner reports the model, 192 tools, and 307 skills. Typing `/` opens the command list: `/tools`, `/data`, `/skills`, `/skills-add`, `/specialist`, `/sandbox`, `/models`, `/effort`. The status line at the bottom shows the active model, provider, sandbox, and context use.
