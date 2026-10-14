@@ -37,6 +37,7 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { randomUUID } from '@/lib/random-uuid'
 import { relativeTime } from '@/lib/sessions'
 
 export function HomeEmptySessions({
@@ -117,7 +118,7 @@ export function HomeProjectView({
       widgets: [
         ...layout.widgets,
         {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           type,
           size: entry.defaultSize
         }

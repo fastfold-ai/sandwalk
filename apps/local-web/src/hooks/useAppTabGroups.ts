@@ -11,6 +11,7 @@ import {
 } from 'react'
 
 import { writeTabGroups } from '@/lib/app-storage'
+import { randomUUID } from '@/lib/random-uuid'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
 /**
@@ -37,11 +38,7 @@ type SetOpenTabIds = (
 ) => void
 
 function generateGroupId(): string {
-  const rand =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
-      : Math.random().toString(36).slice(2, 14)
-  return `grp_${rand}`
+  return `grp_${randomUUID().replace(/-/g, '').slice(0, 12)}`
 }
 
 /*

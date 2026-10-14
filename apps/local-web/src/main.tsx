@@ -1,3 +1,4 @@
+import './lib/random-uuid'
 import './index.css'
 
 import { StrictMode } from 'react'

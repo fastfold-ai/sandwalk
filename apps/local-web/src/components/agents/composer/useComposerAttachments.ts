@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import type { ComposerAttachmentItem } from '@/components/agents/composer/ComposerAttachments'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { randomUUID } from '@/lib/random-uuid'
 import { formatWorkspaceUploadError } from '@/lib/workspace-upload'
 
 export type UploadedComposerFile = {
@@ -48,7 +49,7 @@ export function useComposerAttachments(
       setAttachments(current => [
         ...current,
         ...items.map(item => ({
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           name: item.name || item.path.split('/').at(-1) || item.path,
           contentType: item.contentType || 'application/octet-stream',
           previewUrl: item.previewUrl,
@@ -86,7 +87,7 @@ export function useComposerAttachments(
           file.type.startsWith('audio/') ||
           byExt
         return {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           name: file.name,
           contentType: file.type || 'application/octet-stream',
           previewUrl: media ? URL.createObjectURL(file) : undefined,

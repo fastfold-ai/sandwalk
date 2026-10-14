@@ -1,5 +1,7 @@
 import type { WidgetLayout, WidgetLayoutItem, WidgetSize } from '@sandwalk/agent-ui-core'
 
+import { randomUUID } from '@/lib/random-uuid'
+
 import { catalogEntry } from './catalog'
 import type { WidgetType } from './types'
 
@@ -11,7 +13,7 @@ export const OVERVIEW_LAYOUT_VERSION = 7
 function item(type: WidgetType, size?: WidgetSize): WidgetLayoutItem {
   const entry = catalogEntry(type)
   return {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     type,
     size: size || entry?.defaultSize || 'sm'
   }
@@ -70,7 +72,7 @@ export function normalizeLayout(
   const widgets = layout.widgets
     .filter(widget => catalogEntry(widget.type))
     .map(widget => ({
-      id: widget.id || crypto.randomUUID(),
+      id: widget.id || randomUUID(),
       type: widget.type,
       size: widget.size || catalogEntry(widget.type)?.defaultSize || 'sm'
     }))
