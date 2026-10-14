@@ -70,10 +70,16 @@ echo "==> Installing sandwalk (core deps) into runtime…"
     .
 )
 
+# Precompile every module now. The runtime ships inside a signed, sealed
+# bundle; if Python writes __pycache__ at first launch the seal breaks and
+# Gatekeeper reports "a sealed resource is missing or invalid".
+echo "==> Precompiling bytecode…"
+"${RUNTIME_PY}" -m compileall -q -j 0 "${DEST}/lib" >/dev/null
+
 if [[ "${SKIP_SMOKE:-0}" != "1" ]]; then
   echo "==> Smoke-testing runtime imports…"
-  "${RUNTIME_PY}" -c "import cli, agent_server, fastapi; print('ok', cli.__name__)"
-  "${RUNTIME_PY}" -m cli --version >/dev/null
+  PYTHONDONTWRITEBYTECODE=1 "${RUNTIME_PY}" -c "import cli, agent_server, fastapi; print('ok', cli.__name__)"
+  PYTHONDONTWRITEBYTECODE=1 "${RUNTIME_PY}" -m cli --version >/dev/null
 fi
 
 echo "OK: agent runtime at ${DEST}"

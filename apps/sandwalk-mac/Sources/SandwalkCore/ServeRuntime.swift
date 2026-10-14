@@ -125,6 +125,13 @@ struct ServeRuntime {
             // Slack App Home builder link to the right place (e.g. "Open
             // Sandwalk", session links) instead of assuming the API port.
             "SANDWALK_DASHBOARD_BASE_URL": config.dashboardURL.absoluteString,
+            // The bundled runtime is inside a signed bundle. Bytecode written
+            // next to the sources would break the code-signature seal, so
+            // send it to Caches instead.
+            "PYTHONPYCACHEPREFIX": FileManager.default
+                .urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Sandwalk/pycache", isDirectory: true)
+                .path,
         ])
         if let venvBinDirectory {
             let venvBin = venvBinDirectory.path
