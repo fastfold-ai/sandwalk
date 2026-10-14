@@ -11,9 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="#why-sandwalk-exists">Why Sandwalk exists</a> ·
-  <a href="#what-sandwalk-does">What Sandwalk does</a> ·
-  <a href="#a-look-inside">A look inside</a> ·
   <a href="#install">Install</a> ·
   <a href="#models">Models</a> ·
   <a href="#cli">CLI</a> ·
