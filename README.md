@@ -64,7 +64,7 @@ See [Development](#development) for the test and packaging loop.
 
 ### macOS App
 
-The first window asks where the agent runs. **Connect locally** uses this Mac. **Open remote** finds a Sandwalk server on the LAN or takes a pasted URL and API key. Under that, Recent lists every server you have opened — a MacBook, a Mac mini at `192.168.2.178`, a Linux box called `ai-server` — so getting back onto a machine is one click.
+The first window asks where the agent runs. **Connect locally** uses this Mac; the bundled server starts on its own. **Open remote** finds a Sandwalk server on the LAN or takes a pasted URL and API key. Under that, Recent lists every server you have opened before, with its hostname, address, and platform, so getting back onto a machine is one click.
 
 <p align="center">
   <img alt="Welcome window: Connect locally, Open remote, and a list of recent servers" src="images/welcome.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -90,9 +90,9 @@ Sessions started in the terminal show up in the Mac app, and the other way round
 
 ### Capy
 
-Capy is a meta agent that floats over whatever you are doing. It does not take a sidebar row. Open it from the bottom of the sidebar or press **Ctrl + Ctrl**. It can start chats, lay them out in a grid, run Doctor, start a Bench suite, and read the last results, all while the session behind it keeps going.
+Capy is a meta agent that floats over whatever you are doing. It does not take a sidebar row and it never interrupts the session underneath. Open it from the bottom of the sidebar or press **Ctrl + Ctrl** from anywhere in the app.
 
-In this shot the chat underneath has just run `nvidia-smi` in a Modal sandbox and printed a Tesla T4 table. Capy sits on top with its own model and four starter prompts.
+Capy works on Sandwalk itself rather than on your research question. Ask it to start chats and it spawns them, seeds each one with a brief, and can lay them out as a grid. Ask about state and it reads Doctor, lists Bench suites, starts a run, or pulls the last results and token use. It has its own model picker, so you can run it on something fast and cheap while the worker chats use a stronger model. Minimize it and keep talking; a badge counts replies you have not opened.
 
 <p align="center">
   <img alt="Capy panel floating over a chat that ran nvidia-smi in a Modal sandbox" src="images/capy.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -100,9 +100,9 @@ In this shot the chat underneath has just run `nvidia-smi` in a Modal sandbox an
 
 ### Grid
 
-A group is a real grid of sessions, not a stack of tabs. Split the focused pane with **⌘D** (right) or **⇧⌘D** (down), or ask Capy to build the layout for you.
+A group is a real grid of sessions, not a stack of tabs. Split the focused pane with **⌘D** (right) or **⇧⌘D** (down), drag the dividers, and close a cell without losing the rest. Each cell is a full session with its own transcript, model, composer, and files, and cells can come from different projects.
 
-Here Capy was told to start a 4×2 grid on the latest in protein design. The panel on the right shows the `capy.spawn_sessions` call and its reply: eight worker chats, four across by two down, each seeded with the same brief. Every cell is a full session with its own stream, model, and composer. One is still searching while the others are already summarizing RFdiffusion, AlphaFold 3, and the validation bottleneck.
+The grid is how you work a question from several angles at once. Give eight agents the same brief and different slices of it, or the same slice and different models, and read them side by side instead of one tab at a time. Capy can build the layout for you — ask for a 4×2 on a topic and it spawns the chats, seeds each one, and opens the split. `⌘⇧T` adds a terminal as a cell in the same grid.
 
 <p align="center">
   <img alt="Capy spawned a 4 by 2 grid of chats, each researching protein design" src="images/grid.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -110,9 +110,9 @@ Here Capy was told to start a 4×2 grid on the latest in protein design. The pan
 
 ### Plan mode
 
-With the gold **Plan** chip on, the agent writes a plan before it touches anything. The plan is a markdown file under `plans/` with the steps and a Mermaid flowchart, and it opens in the file pane next to the chat. **Build** turns it into a run.
+Plan mode makes the agent draft before it acts. Toggle it with the **Plan** chip or Shift-Tab, or with `/plan` in the CLI. In this mode the agent does not run heavy tools; it writes a plan instead — a markdown file under `plans/` with the numbered steps, a to-do list, and a Mermaid flowchart of the workflow — and asks you the questions it needs answered before starting. The plan opens in the file pane beside the chat so you can read and edit it.
 
-The user asked for a small-molecule screening campaign in Boltz. The left side shows the plan card, a to-do, and the agent asking which target and library to use. The right side is `boltz_screening_campaign.md` with the step list and the flowchart from User Query down to Done.
+When it looks right, **Build** switches back to Agent mode and executes the plan, checking off to-dos as it goes. This is the safe way to start anything long or expensive: a screening campaign, a multi-stage analysis, a batch of jobs on a GPU.
 
 <p align="center">
   <img alt="Plan mode: a Boltz screening plan on the left, its markdown and Mermaid flowchart on the right with a Build button" src="images/plan-mode.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -128,7 +128,7 @@ A **specialist** is a saved profile that pins a set of skills, MCP servers, and 
   <img alt="The plus menu with Skills selected and the installed skills flyout open" src="images/skills.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
-Dashboard → Skills is the manager. Flip the **Skills.sh** toggle and the page becomes the public [skills.sh](https://skills.sh) leaderboard: 1.3 million installs, ranked All Time, Trending (24h), or Hot. Each row is a skill, its source repo, and an install count. **Add skill** installs from there, from any GitHub repo, or from a local path.
+Dashboard → Skills is the manager. It lists what is installed, lets you enable or disable each skill, and filters by status, category, and author. Flip the **Skills.sh** toggle and the page becomes the public [skills.sh](https://skills.sh) leaderboard, ranked All Time, Trending (24h), or Hot, with each skill's source repo and install count. **Add skill** installs from there, from any GitHub repo, or from a local path, and the agent can do the same with `/skills-add` or by asking it to find and try a skill.
 
 The catalog search authenticates through Vercel. Dashboard → Integrations → **Vercel** → **Add** opens a setup terminal in `~/.sandwalk/vercel-integration` and runs `vercel login`, `vercel link`, and `vercel env pull`. That saves `VERCEL_OIDC_TOKEN`, the toggle lights up, and the leaderboard loads. The dropdown next to Add takes a pasted token instead.
 
@@ -144,9 +144,9 @@ Code the agent runs goes through a sandbox. **Local Sandbox** is this machine. *
 
 ### Artifacts
 
-Every session has a workspace on disk, and **Artifacts** is the view of it. Anything the agent produces lands there — whether it ran locally, in the local sandbox, or on a Modal GPU — and comes back to the same folder. Files are grouped by origin: **Your uploads**, **Generated outputs**, **Project folder**, and whatever a tool wrote. CIF and PDB render in 3D. CSV, YAML, PPTX, and PDF show a preview card. The workspace path is printed at the bottom so you can open it in Finder or a terminal.
+Every session has a workspace on disk, and **Artifacts** is the view of it. Anything the agent produces lands there — whether it ran locally, in the local sandbox, or on a Modal GPU — and comes back to the same folder. Files are grouped by origin: **Your uploads**, **Generated outputs**, **Project folder**, and whatever a tool wrote. CIF and PDB render in 3D. CSV, YAML, PPTX, and PDF show a preview card. Click a file and it opens in a tab beside the chat; `@` mentions one in the composer. The workspace path is printed at the bottom so you can open it in Finder or a terminal.
 
-Here the agent ran a binder design on Modal. The chat on the left is its Go/No-Go assessment with iPTM, pTM, and PAE. The Artifacts pane on the right holds what the run produced: `workflow.yml`, `gfp_binder.yaml`, a rendered `1ema.cif`, a PowerPoint overview, and a CSV of lysozyme variants.
+Artifacts is what makes a sandbox run usable afterward. A job can execute on a remote GPU, but its structures, metrics, and reports are on your disk when it finishes, next to the conversation that produced them.
 
 <p align="center">
   <img alt="Artifacts pane listing the files a sandbox binder run produced, including a rendered CIF structure" src="images/artifacts.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -154,7 +154,7 @@ Here the agent ran a binder design on Modal. The chat on the left is its Go/No-G
 
 ### Structures
 
-Structure files are first-class artifacts. A BoltzGen GFP binder run: the chat ranks the designed sequences, links each candidate to its structure, and gives a Go/no-go — the workflow completed, but interface confidence is too weak for immediate biological interpretation. On the right the Artifacts pane renders `rank1_2.cif` and `rank2_0.cif` in 3D next to the metrics CSVs and a results overview PDF.
+Structure files are first-class artifacts. CIF and PDB from a prediction or design run render in 3D in the Artifacts pane, PAE and pLDDT plots open beside them, and the chat can link each ranked candidate to its structure. The built-in `fold` and `boltz` skills submit folding, binder design, and screening jobs to FastFold and Boltz, pull the results back as artifacts, and summarize confidence metrics and a go/no-go in the transcript, so a design round is readable without leaving the window.
 
 <p align="center">
   <img alt="BoltzGen binder chat with ranked candidates, and two rendered CIF structures in the Artifacts pane" src="images/structures.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -162,9 +162,9 @@ Structure files are first-class artifacts. A BoltzGen GFP binder run: the chat r
 
 ### Sites
 
-Sites turns a result into a page you can send someone. Ask for a report, a dashboard, or a landing page and the agent uses the built-in `sites-building` skill: a static site from a report shell with charts, math, Mermaid, and a theme toggle already wired in. It builds a clean `dist/`, validates it, and previews it in the right pane. When you are happy, `sites-hosting` packages that exact output and publishes it to `https://<slug>.sandwalk.site`. **Sites** in the sidebar lists everything you have built, published or not.
+Sites turns a result into a page you can send someone. Ask for a report, a dashboard, or a landing page and the agent uses the built-in `sites-building` skill: a static site from a report shell with charts, math, Mermaid, and a theme toggle already wired in. It builds a clean `dist/`, validates it, and previews it in the right pane. When you are happy, `sites-hosting` packages that exact output and publishes it to `https://<slug>.sandwalk.site`. Publishing is a confirmed step; nothing goes public until you say so.
 
-The user asked, through the Paperclip MCP, which open-weight model is most referenced in arXiv methods sections since 2024, with a top-five line plot. The left side is the chat: tool calls, the Result, a proxy-count table. The right side is the published site — the **Published** badge and URL are in its header — with the monthly chart for Qwen, Llama, Gemma, GLM, and DeepSeek and a family comparison below. That page is live.
+**Sites** in the sidebar lists everything you have built, published or not, with Preview and Open. Update a site by asking the agent to change it and publish again; the slug stays the same. Static only — HTML, CSS, client-side JavaScript, images — so a page is cheap to host and safe to share with someone who has no Sandwalk account.
 
 <p align="center">
   <img alt="A published Sandwalk Site beside the chat that produced it, showing a model trends line chart" src="images/sites.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -172,7 +172,9 @@ The user asked, through the Paperclip MCP, which open-weight model is most refer
 
 ### Benchmarking
 
-Bench runs question suites through real agent sessions, so a score reflects the whole harness and not just the model. Pick a suite, a model, and an optional specialist; set the sample size and how many runs go out in parallel. Suites in the box: MMLU, MMLU-Pro, ARC-C, MBPP, LiveCodeBench, BixBench-Verified-50, and Bio-Capybara-full. Results list every run with its score, duration, correct count, provider, token use, and date. **Compare** puts two runs side by side. Runs stay off the chat list. From the terminal: `sandwalk eval`.
+Bench runs question suites through real agent sessions, so a score reflects the whole harness — model, skills, tools, sandbox — and not just the model. Pick a suite, a model, and an optional specialist; set the sample size and how many runs go out in parallel; queue more while one is in progress. Suites in the box: MMLU, MMLU-Pro, ARC-C, MBPP, LiveCodeBench, BixBench-Verified-50, and Bio-Capybara-full, with cached questions so repeat runs start fast.
+
+Results keep every run with its score, duration, correct count, provider, token use, and date, filterable by suite, status, and provider. **Compare** puts two runs side by side to see where one model or specialist beats another. LLM judges score open-ended answers. Bench sessions stay off the chat list. The same suites run headlessly from the terminal with `sandwalk eval`, which is how we gate releases.
 
 <p align="center">
   <img alt="Benchmarking results table with the suite filter open" src="images/bench.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -180,7 +182,7 @@ Bench runs question suites through real agent sessions, so a score reflects the 
 
 ### Overview
 
-Dashboard Overview is the usage board. Lifetime tokens at the top, cards for the longest agent run, chat count, and streaks, an activity heatmap by day, and a 30-day chart of which models you actually ran. **Add widget** rearranges the board. Project Home has the same board scoped to one project.
+Dashboard Overview is the usage board for this server. Widgets cover lifetime tokens, tokens in and out, cache hit rate, the longest agent run, chat and message counts, streaks, an activity heatmap by day, and a 30-day chart of which models you actually ran. **Add widget** adds, removes, and rearranges them, and the layout persists. Project Home has the same board scoped to one project, with its library size and description alongside.
 
 <p align="center">
   <img alt="Dashboard overview: lifetime tokens, streak cards, an activity heatmap, and a models chart" src="images/overview.png" width="1024" style="max-width:100%; border-radius:8px;">
@@ -213,10 +215,10 @@ Local endpoints are discovered from `/v1/models` or Ollama's `/api/tags`. Add on
 
 `sandwalk` is the same agent in a terminal. Run it two ways:
 
-- **Standalone.** Open Terminal, iTerm, Warp, or whatever you use, and type `sandwalk`. The first screenshot is that: Warp, a fresh session, GPT-6 Astra on OpenAI, 192 tools and 307 skills loaded.
-- **Inside the app.** Press **⌘⇧T** or pick **Terminal** on a blank pane and a terminal opens in the grid next to your chats. Type `sandwalk` there and it is the same session list, the same `~/.sandwalk/`, the same artifacts. The second screenshot is that: the terminal is a pane in Sandwalk, with the sidebar and the other tabs around it.
+- **Standalone.** Open Terminal, iTerm, Warp, or whatever you use, and type `sandwalk`. The banner reports the model, the provider, and how many tools and skills are loaded.
+- **Inside the app.** Press **⌘⇧T** or pick **Terminal** on a blank pane and a terminal opens as a cell in the grid next to your chats. Type `sandwalk` there and it is the same session list, the same `~/.sandwalk/`, the same artifacts; a run started in that pane is a session in the sidebar.
 
-Either way, typing `/` opens the command list. `/help` shows the full reference with examples. The status line at the bottom reports the mode, model, provider, sandbox, and context use.
+Either way, typing `/` opens the command list with inline descriptions. `/help` shows the full reference with examples. The status line at the bottom reports the mode, model, provider, sandbox, and context use.
 
 <p align="center">
   <img alt="Sandwalk CLI in a standalone terminal with the slash command list open" src="images/cli-terminal.png" width="1024" style="max-width:100%; border-radius:8px;">
