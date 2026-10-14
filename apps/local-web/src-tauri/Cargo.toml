@@ -14,15 +14,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [features]
-# FAS-107 · Fase 1j · `devtools` de Tauri (Cmd+Option+I dentro de la
-# webview) DEBE ir solo en dev builds. En release firmado, expone
-# tokens, state, paths y superficie de ataque via APIs Tauri. Se
-# activaba con `default = ["devtools"]` por descuido — quedó desde
-# el debug del deep link banners.
-#
-# Uso: `tauri:dev` en `package.json` pasa `--features devtools` para
-# activar en dev. `tauri build` (release) NO lo pasa, por lo tanto
-# queda desactivado en el DMG firmado.
+# Production loads the UI from files embedded in the binary. Without
+# this, a release app opens the dev URL (Vite on :1420) and the window
+# stays an empty glass pane once that server is stopped.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+# DevTools stay off the signed build. `tauri dev` passes `--features devtools`
+# and drops default features, so the dev window still talks to Vite.
 devtools = ["tauri/devtools"]
 
 [dependencies]
