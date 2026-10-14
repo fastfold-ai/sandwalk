@@ -66,7 +66,7 @@ Agents run on your machine or in the cloud: OpenRouter, frontier APIs, or local 
 
 ### Capy
 
-Capy is the overlay agent. It is not a chat in the sidebar. It starts and steers other chats, and it can open Bench, Doctor, skills, MCP servers, and projects.
+Capy is the overlay agent. It is not a chat in the sidebar. It starts and steers other chats, and it can open Bench, skills, MCP servers, and projects.
 
 - Open it from the sidebar, or press **Ctrl + Ctrl** to show the minimized icon and talk hands-free.
 - Spawn chats, `#` mention them, seed context, and open a split when you start two or more.
@@ -82,7 +82,7 @@ Session tabs work like a browser. Split the focused pane right or down (**⌘D**
 
 ### CLI
 
-The same sessions, from a terminal. `sandwalk` opens the interactive TUI. `sandwalk serve` runs the local API the Mac app talks to. One-shot prompts, `sandwalk setup`, and the slash commands (`/model`, `/plan`, `/sandbox`, `/doctor`) use the sessions you already have in the app.
+The same sessions, from a terminal. `sandwalk` opens the interactive TUI. `sandwalk serve` runs the local API the Mac app talks to. One-shot prompts, `sandwalk setup`, and the slash commands (`/model`, `/plan`, `/sandbox`) use the sessions you already have in the app.
 
 <!-- screenshot: images/cli.png — Interactive sandwalk TUI -->
 <p align="center"><em>Placeholder: Interactive CLI (TUI). Save as <code>images/cli.png</code></em></p>
@@ -107,17 +107,6 @@ Bench runs question suites through real Sandwalk sessions. Pick a suite, a model
 
 <!-- screenshot: images/bench.png — Bench results with scores / judges -->
 <p align="center"><em>Placeholder: Bench results. Save as <code>images/bench.png</code></em></p>
-
-### Doctor
-
-Doctor checks that this machine can actually run an agent. One scan covers runtime tools, the skills inventory, environment keys, and LLM config — the same checks as `sandwalk doctor` and `/doctor`. Open it from the Dashboard, or ask Capy to run it. Failures name the check and what to fix.
-
-### Human-in-the-loop
-
-Installing or removing a skill pauses for you. The desktop chat and the interactive CLI show **Approve / Edit / Reject** before the change lands. Nothing in that path is applied until you answer.
-
-<!-- screenshot: images/hitl.png — Approval card in chat -->
-<p align="center"><em>Placeholder: Approval card. Save as <code>images/hitl.png</code></em></p>
 
 ### Projects and widgets
 
