@@ -377,12 +377,92 @@ def test_handoff_markdown_and_launch_argv(tmp_path: Path):
     assert launch_argv("claude", "/bin/claude", prompt="go") == ["/bin/claude", "go"]
     assert launch_argv("opencode", "/bin/opencode", prompt="go") == ["/bin/opencode", "--prompt", "go"]
     assert launch_argv("fx", "/bin/fx") == ["/bin/fx"]
+    assert launch_argv("hermes", "/bin/hermes", prompt="go") == ["/bin/hermes", "chat", "-q", "go"]
+    assert launch_argv("hermes", "/bin/hermes") == ["/bin/hermes"]
 
 
-@pytest.mark.parametrize("kind", ["claude", "codex", "opencode", "fx"])
+@pytest.mark.parametrize("kind", ["claude", "codex", "opencode", "fx", "hermes"])
 def test_installed_agents_reports_every_kind(kind):
     kinds = [row["kind"] for row in ea.installed_agents()]
     assert kind in kinds
+
+
+# --- Hermes -----------------------------------------------------------------
+
+
+def _hermes_fixture(db: Path, cwd: str) -> str:
+    connection = sqlite3.connect(db)
+    connection.executescript(
+        """
+        CREATE TABLE sessions (
+            id TEXT PRIMARY KEY, source TEXT, title TEXT, cwd TEXT, model TEXT,
+            started_at REAL, last_activity_at REAL, message_count INTEGER,
+            archived INTEGER, hidden INTEGER
+        );
+        CREATE TABLE messages (
+            id INTEGER PRIMARY KEY, session_id TEXT, role TEXT, content TEXT,
+            tool_calls TEXT, tool_name TEXT, timestamp REAL, active INTEGER, compacted INTEGER
+        );
+        """
+    )
+    sid = "local-fixturehermes"
+    connection.execute(
+        "INSERT INTO sessions VALUES (?, 'cli', 'Pelican', ?, 'gpt-6-luna', 1792071400, 1792071408, 3, 0, 0)",
+        (sid, cwd),
+    )
+    connection.execute(
+        "INSERT INTO messages VALUES (1, ?, 'user', 'Reply with PELICAN', NULL, NULL, 1792071407.1, 1, 0)",
+        (sid,),
+    )
+    connection.execute(
+        "INSERT INTO messages VALUES (2, ?, 'assistant', 'Looking.', ?, NULL, 1792071408.0, 1, 0)",
+        (sid, json.dumps([{"function": {"name": "read", "arguments": json.dumps({"path": "notes.txt"})}}])),
+    )
+    connection.execute(
+        "INSERT INTO messages VALUES (3, ?, 'assistant', 'PELICAN', NULL, NULL, 1792071408.9, 1, 0)",
+        (sid,),
+    )
+    # Messaging-gateway history must not appear in the picker.
+    connection.execute(
+        "INSERT INTO sessions VALUES ('tg-1', 'telegram', 'Chat', ?, 'm', 1, 2, 1, 0, 0)",
+        (cwd,),
+    )
+    connection.commit()
+    connection.close()
+    return sid
+
+
+def test_hermes_reader_lists_and_reads(tmp_path: Path, monkeypatch):
+    from agent.external_agents import hermes
+
+    db = tmp_path / "state.db"
+    monkeypatch.setenv("HERMES_STATE_DB", str(db))
+    cwd = "/private/tmp/sandwalk-hermes-probe"
+    sid = _hermes_fixture(db, cwd)
+
+    rows = hermes.list_sessions(cwd)
+    assert [r.id for r in rows] == [sid]
+    assert rows[0].title == "Pelican"
+    assert hermes.list_sessions("/other") == []
+
+    session = hermes.read_session(sid)
+    assert session is not None
+    assert session.model == "gpt-6-luna"
+    assert [(t.role, t.text) for t in session.turns] == [
+        ("user", "Reply with PELICAN"),
+        ("assistant", "Looking."),
+        ("tool", "read notes.txt"),
+        ("assistant", "PELICAN"),
+    ]
+    assert hermes.read_session("tg-1") is None
+
+
+def test_hermes_missing_db_is_empty(tmp_path: Path, monkeypatch):
+    from agent.external_agents import hermes
+
+    monkeypatch.setenv("HERMES_STATE_DB", str(tmp_path / "missing.db"))
+    assert hermes.list_sessions(None) == []
+    assert hermes.read_session("x") is None
 
 
 # --- native writers (Claude / Codex) ----------------------------------------

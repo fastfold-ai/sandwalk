@@ -6,9 +6,10 @@ import { cn } from '@/lib/utils'
 import { EXTERNAL_AGENT_LABELS, ExternalAgentIcon } from './ExternalAgentIcon'
 
 /**
- * Terminal chip / sidebar icon. Plain shell: orange terminal glyph. While a
- * coding-agent CLI (Claude Code, Codex, OpenCode, fx) is in the foreground
- * of that PTY, the agent's own mark replaces it — the same cue Warp gives.
+ * Terminal chip / sidebar icon. Plain shell: terminal glyph in the same
+ * muted gray as a chat's status check. While a coding-agent CLI (Claude
+ * Code, Codex, OpenCode, fx) is in the foreground of that PTY, the agent's
+ * own logo replaces it — the same cue Warp gives.
  */
 export function TerminalTypeIcon({
   terminalId,
@@ -32,7 +33,7 @@ export function TerminalTypeIcon({
   }
   return (
     <SquareTerminal
-      className={cn('size-3.5 shrink-0 text-orange-500', className)}
+      className={cn('text-muted-foreground/70 size-3.5 shrink-0', className)}
       aria-hidden
     />
   )

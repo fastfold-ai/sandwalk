@@ -19,7 +19,8 @@ const INSTALL_HINT: Record<ExternalAgentKind, string> = {
   claude: 'npm i -g @anthropic-ai/claude-code',
   codex: 'npm i -g @openai/codex',
   opencode: 'curl -fsSL https://opencode.ai/install | bash',
-  fx: 'curl -fsSL https://fx.sh/setup.sh | bash'
+  fx: 'curl -fsSL https://fx.sh/setup.sh | bash',
+  hermes: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash'
 }
 
 function folderName(cwd: string | null): string {

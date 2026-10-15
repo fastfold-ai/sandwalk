@@ -144,7 +144,21 @@ def _isolate_cli_config(tmp_path, monkeypatch):
     ):
         for var in _PROVIDER_KEY_ENV_VARS:
             monkeypatch.setenv(var, "")
+    # App startup (`create_app` → `sync_process_env_from_config`) writes
+    # SANDWALK_CONFIG_DIR / SANDWALK_SKILLS_DIR and provider keys straight
+    # into os.environ; monkeypatch never sees those. On an xdist worker the
+    # next test then read a config dir that pointed at a deleted tmp_path.
+    # Restore the whole environment, not just the keys we pinned.
+    monkeypatch.delenv("SANDWALK_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("SANDWALK_SKILLS_DIR", raising=False)
+    env_snapshot = dict(os.environ)
     yield
+    for key in list(os.environ):
+        if key not in env_snapshot:
+            del os.environ[key]
+    for key, value in env_snapshot.items():
+        if os.environ.get(key) != value:
+            os.environ[key] = value
 
 
 def has_api_key():

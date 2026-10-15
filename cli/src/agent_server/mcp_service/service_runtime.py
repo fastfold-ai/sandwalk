@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from agent.config import Config
@@ -11,6 +12,8 @@ from agent_server.mcp_service.custom_server import (
     custom_server_credentials_configured,
     resolve_custom_server_headers,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RuntimeMixin:
@@ -34,6 +37,15 @@ class RuntimeMixin:
                     headers = resolve_auth_headers(entry, cfg)
                     if headers:
                         payload["headers"] = headers
+                    elif entry.transport != "stdio" and entry.auth_mode != "none":
+                        # Expired OAuth / missing key: the Dashboard already shows
+                        # "Needs authentication". Shipping it anyway made every
+                        # run connect unauthenticated, eat the 5 s timeout, and
+                        # retry after each cooldown. Skip until it is reconnected.
+                        logger.info(
+                            "MCP %s skipped for this run: needs authentication", entry.name or entry.id
+                        )
+                        continue
             else:
                 headers = resolve_custom_server_headers(server, config=cfg)
                 if headers:

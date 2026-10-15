@@ -3,13 +3,6 @@ import type { ReactNode } from 'react'
 
 import { SandwalkMark } from '@/components/SandwalkMark'
 import {
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger
-} from '@/components/ui/dropdown-menu'
-import {
   CLI_HARNESS_PRESETS,
   type PaneSplitDirection,
   type PaneSplitTarget
@@ -75,56 +68,6 @@ export function SplitMenuBlock({
         {flyout('horizontal')}
       </TabContextSubmenu>
       {trailingSeparator ? <TabContextSeparator /> : null}
-    </>
-  )
-}
-
-/** Same Split Down / Split Right choices, for Radix dropdown menus. */
-export function SplitMenuDropdown({
-  sourceId,
-  onSplitPane
-}: {
-  sourceId: string
-  onSplitPane: (
-    sourceId: string,
-    direction: PaneSplitDirection,
-    target: PaneSplitTarget
-  ) => void
-}) {
-  const flyout = (direction: PaneSplitDirection) =>
-    TARGETS.map(target => (
-      <DropdownMenuItem
-        key={target.id}
-        className="gap-2 text-[13px]"
-        onSelect={() => onSplitPane(sourceId, direction, target.id)}
-      >
-        {targetIcon(target.id)}
-        {target.label}
-      </DropdownMenuItem>
-    ))
-
-  return (
-    <>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="gap-2 text-[13px] [&_svg]:size-3.5">
-          <SplitDownIcon />
-          Split Down
-          <DropdownMenuShortcut>⇧⌘D</DropdownMenuShortcut>
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="min-w-[11rem]">
-          {flyout('vertical')}
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className="gap-2 text-[13px] [&_svg]:size-3.5">
-          <SplitRightIcon />
-          Split Right
-          <DropdownMenuShortcut>⌘D</DropdownMenuShortcut>
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="min-w-[11rem]">
-          {flyout('horizontal')}
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
     </>
   )
 }

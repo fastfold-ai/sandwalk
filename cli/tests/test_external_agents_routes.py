@@ -28,6 +28,7 @@ def api(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
     monkeypatch.setenv("OPENCODE_DB", str(tmp_path / "none.db"))
+    monkeypatch.setenv("HERMES_STATE_DB", str(tmp_path / "hermes-none.db"))
     monkeypatch.setattr(fx, "binary", lambda: None)
     # System dirs only: the developer's real claude/codex/fx must not leak in.
     # Tests that need an "agent" prepend a fake one.
@@ -87,7 +88,7 @@ def test_list_reports_installed_agents_and_sessions_for_cwd(api, tmp_path: Path)
 
     body = api.get("/v1/external-agents", params={"cwd": str(cwd)}).json()
     kinds = {a["kind"]: a for a in body["agents"]}
-    assert set(kinds) == {"claude", "codex", "opencode", "fx"}
+    assert set(kinds) == {"claude", "codex", "opencode", "fx", "hermes"}
     assert kinds["fx"]["installed"] is False
     assert [s["kind"] for s in body["sessions"]] == ["claude"]
     assert body["sessions"][0]["title"] == "summarize the repo"
@@ -111,7 +112,7 @@ def test_import_creates_seeded_session_in_same_folder(api, tmp_path: Path):
     session = resp.json()
     assert session["source"] == "claude"
     assert session["sourceLabel"].startswith("Claude Code · ")
-    assert session["title"] == "summarize the repo"
+    assert session["title"] == "Claude Code · summarize the repo"
     assert session["titleSource"] == "user"
     assert Path(session["workspacePath"]).resolve() == cwd.resolve()
 
@@ -123,6 +124,27 @@ def test_import_creates_seeded_session_in_same_folder(api, tmp_path: Path):
     # Order is preserved by created_at even when source timestamps collide.
     stamps = [m["createdAt"] for m in messages]
     assert stamps == sorted(stamps)
+
+
+def test_import_from_home_directory_gets_a_private_workspace(api, tmp_path: Path, monkeypatch):
+    """A CLI session run from ``~`` must not make ~ the chat's workspace.
+
+    The Files panel lists the workspace recursively; on a home directory that
+    walk starved the whole server. Fall back to Sandwalk's own per-session
+    folder instead.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+    # Patch the service's own seam, not `Path.home`: a global patch leaks into
+    # `agent.config.CONFIG_DIR` when that module first imports on this worker.
+    monkeypatch.setattr(svc, "_home_dir", lambda: home.resolve())
+    _claude_session(tmp_path / "claude", str(home), sid="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+    sid = api.get("/v1/external-agents", params={"cwd": str(home)}).json()["sessions"][0]["id"]
+
+    session = api.post("/v1/external-agents/import", json={"kind": "claude", "sessionId": sid}).json()
+    ws = Path(session["workspacePath"]).resolve()
+    assert ws != home.resolve()
+    assert session["id"] in str(ws)  # Sandwalk's default per-session workspace
 
     # The imported chat shows up in the normal session list.
     listed = api.get("/v1/sessions").json()["data"]
@@ -233,6 +255,8 @@ def test_startup_command_resume_variants(monkeypatch):
     assert svc.startup_command("opencode", resume_id="abc") == "/bin/opencode -s abc"
     assert svc.startup_command("fx", resume_id="abc") == "/bin/fx resume abc"
     assert svc.startup_command("fx", prompt="hi there") == "/bin/fx 'hi there'"
+    assert svc.startup_command("hermes", resume_id="abc") == "/bin/hermes --resume abc"
+    assert svc.startup_command("hermes", prompt="hi there") == "/bin/hermes chat -q 'hi there'"
 
 
 def test_pty_agent_detection_sees_foreground_process(api, tmp_path: Path, monkeypatch):

@@ -9,13 +9,19 @@ import {
   Trash2
 } from 'lucide-react'
 
-import { ContinueInRows } from '@/components/agents/ExternalAgentMenuBlocks'
+import { ContinueInSubmenu } from '@/components/agents/ExternalAgentMenuBlocks'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import {
+  TabContextItem,
   TabContextSeparator,
   TabInlineColorRow
 } from '@/components/agents/tab-context-menu'
 
+/**
+ * Sidebar ⋯ menu for a chat. Same primitives and row density as the tab
+ * context menu (`TabContextItem`, flyout for Continue in…) so the two
+ * surfaces look and behave identically.
+ */
 export function SessionActionsMenu({
   session,
   projects,
@@ -46,14 +52,7 @@ export function SessionActionsMenu({
 }) {
   return (
     <>
-      <button
-        type="button"
-        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-        onClick={onRename}
-      >
-        <Pencil className="h-3.5 w-3.5" />
-        Rename chat…
-      </button>
+      <TabContextItem icon={<Pencil />} label="Rename chat…" onClick={onRename} />
       <ProjectPicker
         projects={projects}
         value={session.projectId}
@@ -61,24 +60,22 @@ export function SessionActionsMenu({
         trigger={
           <button
             type="button"
-            className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+            role="menuitem"
+            className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3"
           >
-            <Folder className="h-3.5 w-3.5" />
-            Move to project…
+            <Folder />
+            <span className="min-w-0 flex-1 truncate">Move to project…</span>
           </button>
         }
         onChange={onMoveToProject}
       />
-      <button
-        type="button"
-        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+      <TabContextItem
+        icon={<Pin />}
+        label={session.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
         onClick={onTogglePin}
-      >
-        <Pin className="h-3.5 w-3.5" />
-        {session.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
-      </button>
+      />
       <TabContextSeparator />
-      <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
+      <div className="text-muted-foreground/80 px-2 pb-0.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wide">
         Color
       </div>
       <TabInlineColorRow
@@ -87,41 +84,16 @@ export function SessionActionsMenu({
         onClear={() => onSetTabColor(null)}
       />
       <TabContextSeparator />
-      <button
-        type="button"
-        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-        onClick={onExport}
-      >
-        <Download className="h-3.5 w-3.5" />
-        Export transcript
-      </button>
-      <button
-        type="button"
-        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-        onClick={onInspect}
-      >
-        <Search className="h-3.5 w-3.5" />
-        Inspect chat
-      </button>
-      <TabContextSeparator />
-      <ContinueInRows session={session} onDone={onContinueIn} />
-      <TabContextSeparator />
-      <button
-        type="button"
-        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
+      <TabContextItem icon={<Download />} label="Export transcript" onClick={onExport} />
+      <TabContextItem icon={<Search />} label="Inspect chat" onClick={onInspect} />
+      <ContinueInSubmenu session={session} onClose={() => onContinueIn?.()} />
+      <TabContextItem
+        icon={<Archive />}
+        label={session.organizeLabel === 'archive' ? 'Unarchive' : 'Archive'}
         onClick={onArchive}
-      >
-        <Archive className="h-3.5 w-3.5" />
-        {session.organizeLabel === 'archive' ? 'Unarchive' : 'Archive'}
-      </button>
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-        onClick={onDelete}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-        Delete
-      </button>
+      />
+      <TabContextSeparator />
+      <TabContextItem icon={<Trash2 />} label="Delete" destructive onClick={onDelete} />
     </>
   )
 }

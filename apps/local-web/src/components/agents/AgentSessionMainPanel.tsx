@@ -18,10 +18,12 @@ import {
 } from 'react'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { matchPath, type NavigateFunction,useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { ChatTilingContainer } from '@/components/agents/ChatTilingContainer'
 import { fileChipToken } from '@/components/agents/composer-parts'
+import { SessionPanelRail } from '@/components/agents/session-panel-rail'
 import { useSessionSiteAutoPreview } from '@/components/agents/sites/use-session-site-auto-preview'
 import { TerminalPlaceholder } from '@/components/agents/terminal-layer'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
@@ -45,11 +47,12 @@ import {
 } from '@/lib/app-storage'
 import { isBlankCanvasSessionId, isDraftAgentSessionId } from '@/lib/draft-agent'
 import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
-import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
+import { cliHarnessPreset, type PaneSplitDirection, type PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { planCardFromPath, startPlanBuild } from '@/lib/plan-build'
 import { type SessionChatState } from '@/lib/sessions'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
+import { queueTerminalStartup } from '@/lib/terminal-startup'
 import { cn } from '@/lib/utils'
 
 import {
@@ -311,6 +314,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   // decides to render terminal chips).
   const {
     terminals,
+    loading: terminalsLoading,
     refresh: refreshTerminals,
     addOptimistic: addTerminalOptimistic
   } = useAppTerminals(client, activeProjectId)
@@ -475,13 +479,26 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
   const filesDefaultSize =
     filesPanelMounted && !filesPanelCollapsed ? 35 : 0
   const chatDefaultSize = filesDefaultSize === 0 ? 100 : 65
+  const closeFilesPanel = useCallback(() => {
+    setFilesPanelCollapsed(true)
+    const panel = filesPanelRef.current
+    if (!panel) return
+    // State can already say "collapsed" while the saved layout still
+    // shows the panel. Setting state again is then a no-op, so close
+    // the panel directly.
+    panel.collapse()
+    if (panel.getSize() > 1) panel.resize(0)
+  }, [filesPanelRef, setFilesPanelCollapsed])
   dropUnbalancedPanelLayouts(SESSION_PANELS_AUTO_SAVE_ID)
   useLayoutEffect(() => {
     if (!filesPanelMounted) return
     const panel = filesPanelRef.current
     if (!panel) return
     if (filesPanelCollapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
+      // isCollapsed() can already be true while the saved layout still
+      // gives the panel a width. Resize it shut in that case.
+      if (panel.getSize() > 1) panel.collapse()
+      if (panel.getSize() > 1) panel.resize(0)
     } else if (panel.isCollapsed()) {
       panel.expand()
     }
@@ -666,6 +683,38 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
     )
   }
 
+  const openTerminalBeside = () => {
+    const source = terminalId ?? sessionId
+    if (!source || !onSplitPane) return
+    // Horizontal split: this chat on the left, a new terminal on the right.
+    onSplitPane(source, 'horizontal', 'terminal')
+  }
+  const panelRail = !activeGroup && !isDraft ? (
+    <SessionPanelRail
+      filesOpen={showWorkspaceFiles && !filesPanelCollapsed && panelView === 'files'}
+      previewOpen={
+        showWorkspaceFiles && !filesPanelCollapsed && panelView === 'preview'
+      }
+      onToggleFiles={() => {
+        if (!showWorkspaceFiles) return
+        if (!filesPanelCollapsed && panelView === 'files') closeFilesPanel()
+        else {
+          setPanelView('files')
+          setFilesPanelCollapsed(false)
+        }
+      }}
+      onTogglePreview={() => {
+        if (!showWorkspaceFiles) return
+        if (!filesPanelCollapsed && panelView === 'preview') closeFilesPanel()
+        else {
+          setPanelView('preview')
+          setFilesPanelCollapsed(false)
+        }
+      }}
+      onOpenTerminal={onSplitPane ? openTerminalBeside : undefined}
+    />
+  ) : null
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/*
@@ -722,6 +771,27 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             navigate(`/terminals/${term.id}`)
           } catch (err) {
             console.error('createTerminal (dropdown) failed', err)
+            toast.error('Could not open a terminal.')
+          }
+        }}
+        onCreateAgentTerminal={async kind => {
+          // Same path as "New terminal" (the live client), then type the CLI
+          // once the shell is up. The shared launch action can no-op when its
+          // bindings were cleared by a hot reload.
+          const preset = cliHarnessPreset(kind)
+          if (!preset) return
+          try {
+            const term = await client.createTerminal({
+              title: preset.title,
+              projectId: activeProjectId ?? null
+            })
+            addTerminalOptimistic({ ...term, title: preset.title, agent: kind })
+            queueTerminalStartup(term.id, preset.command)
+            openSessionTab(term.id)
+            navigate(`/terminals/${term.id}`)
+          } catch (err) {
+            console.error('createAgentTerminal failed', err)
+            toast.error(`Could not open ${preset.title}.`)
           }
         }}
         terminals={terminals}
@@ -771,7 +841,14 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             // Terminal-as-main-pane. The chrome tab already names it, so
             // the pane itself is just the shell.
             <main className="relative flex h-full min-w-0 flex-col">
-              <TerminalPlaceholder terminalId={terminalId} />
+              {panelRail}
+              {!terminalsLoading && !terminals.some(item => item.id === terminalId) ? (
+                <div className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
+                  This terminal is closed.
+                </div>
+              ) : (
+                <TerminalPlaceholder terminalId={terminalId} />
+              )}
             </main>
           ) : activeGroup ? (
             <ChatTilingContainer
@@ -815,6 +892,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
             />
           ) : (
           <main className="relative flex h-full min-w-0 flex-col">
+            {panelRail}
             <SessionChatBody
             client={client}
             navigate={navigate}
@@ -891,7 +969,7 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               // Files / Terminal / upload / send call prepareDraftWorkspace.
               setFilesPanelCollapsed(current => (current ? true : false))
             }}
-            className="min-w-0"
+            className="relative z-30 min-w-0"
           >
             {activeGroup && workspaceSessionId ? (
               <div className="border-border/60 bg-background/95 flex items-center gap-1.5 border-b px-3 py-1.5 text-[11px]">
@@ -928,12 +1006,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                       agentComposerSlotProps.handleComposerSend
                   })
                 }}
-                onTogglePanel={() => setFilesPanelCollapsed(true)}
+                onTogglePanel={closeFilesPanel}
                 panelView={panelView}
                 siteId={requestedSiteId}
-                terminalOpen={terminalOpen}
-                onCloseTerminal={() => setTerminalOpen(false)}
-                onOpenTerminal={() => setTerminalOpen(true)}
               />
             ) : null}
           </ResizablePanel>
@@ -983,12 +1058,9 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
                     agentComposerSlotProps.handleComposerSend
                 })
               }}
-              onTogglePanel={() => setFilesPanelCollapsed(true)}
+              onTogglePanel={closeFilesPanel}
               panelView={panelView}
               siteId={requestedSiteId}
-              terminalOpen={terminalOpen}
-              onCloseTerminal={() => setTerminalOpen(false)}
-              onOpenTerminal={() => setTerminalOpen(true)}
             />
           </SheetContent>
         </Sheet>

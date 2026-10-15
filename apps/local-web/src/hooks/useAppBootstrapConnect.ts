@@ -51,6 +51,8 @@ type LoaderBundle = ReturnType<typeof useAppBootstrapLoaders>
 const SESSION_LIST_REFRESH_MS = 60_000
 /** Liveness probe cadence while connected, and misses before reconnecting. */
 const HEALTH_WATCHDOG_MS = 5_000
+/** Max wait for the connect-time health / auth probes before treating the server as down. */
+const CONNECT_PROBE_TIMEOUT_MS = 8_000
 const HEALTH_WATCHDOG_MISSES = 2
 
 type UseAppBootstrapConnectArgs = {
@@ -176,8 +178,14 @@ export function useAppBootstrapConnect({
           })
         : client
 
+      // Hard deadline. A probe sent while the server is shutting down can be
+      // accepted and then never answered (uvicorn drains open connections
+      // before exiting); `fetch` has no timeout of its own, so `connect()`
+      // never settled, `connecting` stayed true, and the retry loop in
+      // `useLocalServerWait` never installed. The UI then sat on "Server is
+      // starting" for good even after the server was back.
       const nextHealth = await dedupeAsync(`health:${scope}`, () =>
-        active.health()
+        active.health(AbortSignal.timeout(CONNECT_PROBE_TIMEOUT_MS))
       )
       if (needsAuthLoginRef.current) return
       persistBackendUrl(backendUrl)
@@ -197,7 +205,7 @@ export function useAppBootstrapConnect({
       try {
         const status = await dedupeAsync(
           `auth-status:${scope}`,
-          () => active.authStatus(),
+          () => active.authStatus(AbortSignal.timeout(CONNECT_PROBE_TIMEOUT_MS)),
           { force: true }
         )
         authEnabled = Boolean(status.authEnabled)

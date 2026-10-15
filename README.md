@@ -178,14 +178,14 @@ Models then appear under **ChatGPT plan** in the picker. The same model under **
 
 ## Other coding agents
 
-Sandwalk reads and writes the session stores of Claude Code, Codex, OpenCode, and fx.
+Sandwalk reads and writes the session stores of Claude Code, Codex, OpenCode, fx, and Hermes.
 
-| | Claude Code | Codex | OpenCode | fx |
-|---|---|---|---|---|
-| Open in a Sandwalk terminal, tab shows the agent | ✓ | ✓ | ✓ | ✓ |
-| Import a session as a Sandwalk chat | ✓ | ✓ | ✓ | ✓ |
-| Continue a Sandwalk chat there (handoff file) | ✓ | ✓ | ✓ | ✓ |
-| Continue with native history (`--resume`) | ✓ | ✓ | — | — |
+| | Claude Code | Codex | OpenCode | fx | Hermes |
+|---|---|---|---|---|---|
+| Open in a Sandwalk terminal, tab shows the agent | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Import a session as a Sandwalk chat | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Continue a Sandwalk chat there (handoff file) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Continue with native history (`--resume`) | ✓ | ✓ | — | — | — |
 
 - **Import**: onboarding offers your recent sessions; later, right-click a terminal running one of these agents and choose **Convert to chat**, or ask Capy. The chat keeps the original folder as its workspace and is history only until you send a message.
 - **Continue in…**: on any chat, pick the agent. Sandwalk writes `.sandwalk/handoff-<id>.md` in the workspace and opens the CLI on it. For Claude Code and Codex, **native history** also writes their own session file so `claude --resume` / `codex resume` open the conversation directly (experimental; the handoff file is always there as a fallback).

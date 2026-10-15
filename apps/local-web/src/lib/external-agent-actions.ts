@@ -20,6 +20,8 @@ type Bindings = {
   client: LocalAgentClient
   /** Register a chat/terminal in the tab strip and route to it. */
   openItem: (id: string) => void
+  /** Insert the imported chat into the sidebar before the full list refresh. */
+  upsertSession?: (session: AgentSession) => void
   /** Pull the session list again so an imported chat shows up at once. */
   reloadSessions: () => Promise<unknown>
 }
@@ -47,7 +49,21 @@ export const useExternalAgentActions = create<ExternalAgentActionsState>()(set =
       else delete next[key]
       return { busy: next }
     }),
-  setInstalled: installed => set({ installed })
+  setInstalled: installed =>
+    set(state => {
+      const prev = state.installed
+      if (
+        prev &&
+        prev.claude === installed.claude &&
+        prev.codex === installed.codex &&
+        prev.opencode === installed.opencode &&
+        prev.fx === installed.fx &&
+        prev.hermes === installed.hermes
+      ) {
+        return state
+      }
+      return { installed }
+    })
 }))
 
 /** Probe which agent CLIs are installed; cheap (no session scan). */
@@ -89,7 +105,38 @@ export async function newestExternalSession(
 }
 
 /**
- * Terminal tab → "Convert to Sandwalk session": import the CLI's most recent
+ * Import the CLI's most recent session for the terminal's folder as a
+ * Sandwalk chat. Shared by both convert flows; the caller owns the busy flag.
+ */
+async function importTerminalSession(
+  bindings: Bindings,
+  terminal: TerminalSession,
+  kind: ExternalAgentKind
+): Promise<AgentSession | null> {
+  const { client, reloadSessions } = bindings
+  const label = EXTERNAL_AGENT_LABELS[kind]
+  const cwd = terminal.workspacePath
+  const newest = await newestExternalSession(client, kind, cwd)
+  if (!newest) {
+    toast.message(`No ${label} session saved yet for this folder.`, {
+      description: 'Send a message in the CLI first, then convert.'
+    })
+    return null
+  }
+  const session = await client.importExternalSession({
+    kind,
+    sessionId: newest.id,
+    projectId: terminal.projectId,
+    workspacePath: cwd
+  })
+  // The full session list is large; show this chat before that refresh returns.
+  bindings.upsertSession?.(session)
+  void reloadSessions()
+  return session
+}
+
+/**
+ * Terminal tab → "Convert to… › Sandwalk chat": import the CLI's most recent
  * session for that folder as a chat and open it. The terminal stays open.
  */
 export async function convertTerminalToSession(
@@ -98,33 +145,50 @@ export async function convertTerminalToSession(
 ): Promise<AgentSession | null> {
   const bindings = bindingsOrWarn()
   if (!bindings) return null
-  const { client, openItem, reloadSessions } = bindings
   const key = `convert:${terminal.id}`
   const actions = useExternalAgentActions.getState()
   if (actions.busy[key]) return null
   actions.setBusy(key, true)
   const label = EXTERNAL_AGENT_LABELS[kind]
   try {
-    const cwd = terminal.workspacePath
-    const newest = await newestExternalSession(client, kind, cwd)
-    if (!newest) {
-      toast.message(`No ${label} session saved yet for this folder.`, {
-        description: 'Send a message in the CLI first, then convert.'
-      })
-      return null
-    }
-    const session = await client.importExternalSession({
-      kind,
-      sessionId: newest.id,
-      projectId: terminal.projectId,
-      workspacePath: cwd
-    })
-    await reloadSessions()
-    openItem(session.id)
+    const session = await importTerminalSession(bindings, terminal, kind)
+    if (!session) return null
+    bindings.openItem(session.id)
     toast.success(`Imported “${session.title}” from ${label}.`)
     return session
   } catch (error) {
     toast.error(errorText(error, `Could not import the ${label} session.`))
+    return null
+  } finally {
+    useExternalAgentActions.getState().setBusy(key, false)
+  }
+}
+
+/**
+ * Terminal tab → "Convert to… › <other CLI>": Claude Code → Codex and the
+ * like. Imports the `from` session as a Sandwalk chat (kept in the sidebar
+ * as the bridge), then hands that chat off to `to` in a new terminal.
+ */
+export async function convertTerminalToAgent(
+  terminal: TerminalSession,
+  from: ExternalAgentKind,
+  to: ExternalAgentKind
+): Promise<TerminalSession | null> {
+  const bindings = bindingsOrWarn()
+  if (!bindings) return null
+  const key = `convert:${terminal.id}`
+  const actions = useExternalAgentActions.getState()
+  if (actions.busy[key]) return null
+  actions.setBusy(key, true)
+  const fromLabel = EXTERNAL_AGENT_LABELS[from]
+  try {
+    const session = await importTerminalSession(bindings, terminal, from)
+    if (!session) return null
+    return await continueSessionIn(session, to, {
+      successMessage: `Opened ${EXTERNAL_AGENT_LABELS[to]} on the ${fromLabel} session.`
+    })
+  } catch (error) {
+    toast.error(errorText(error, `Could not import the ${fromLabel} session.`))
     return null
   } finally {
     useExternalAgentActions.getState().setBusy(key, false)
@@ -139,7 +203,7 @@ export async function convertTerminalToSession(
 export async function continueSessionIn(
   session: AgentSession,
   kind: ExternalAgentKind,
-  options: { native?: boolean } = {}
+  options: { native?: boolean; successMessage?: string } = {}
 ): Promise<TerminalSession | null> {
   const bindings = bindingsOrWarn()
   if (!bindings) return null
@@ -166,9 +230,10 @@ export async function continueSessionIn(
     useTerminalsStore.getState().addOptimistic({ ...terminal, agent: kind })
     openItem(terminal.id)
     toast.success(
-      result.native
-        ? `Opened ${label} on this chat's history.`
-        : `Opened ${label} with the handoff file.`
+      options.successMessage ??
+        (result.native
+          ? `Opened ${label} on this chat's history.`
+          : `Opened ${label} with the handoff file.`)
     )
     return terminal
   } catch (error) {
@@ -194,7 +259,8 @@ export async function importExternalSessionAsChat(
       projectId: options.projectId ?? null,
       workspacePath: summary.cwd
     })
-    await reloadSessions()
+    bindings.upsertSession?.(session)
+    void reloadSessions()
     if (options.open !== false) openItem(session.id)
     return session
   } catch (error) {

@@ -31,7 +31,8 @@ beforeEach(() => {
   useTerminalsStore.setState({
     terminals: [],
     loading: false,
-    error: null
+    error: null,
+    revision: 0
   })
 })
 
@@ -45,6 +46,31 @@ describe('useTerminalsStore', () => {
       expect(after).toBe(next)
       expect(after).not.toBe(before)
       expect(after).toHaveLength(2)
+    })
+
+    it('carries the UI-only agent mark across a server list refresh', () => {
+      useTerminalsStore.getState().setAll([term('term_1'), term('term_2')])
+      useTerminalsStore.getState().patch('term_1', { agent: 'codex' } as never)
+      // Server rows never include `agent`.
+      useTerminalsStore.getState().setAll([term('term_1'), term('term_2')])
+      const [t1, t2] = useTerminalsStore.getState().terminals
+      expect((t1 as { agent?: string }).agent).toBe('codex')
+      expect((t2 as { agent?: string }).agent).toBeUndefined()
+    })
+
+    it('lets an explicit agent from the server (or null) override the carry-over', () => {
+      useTerminalsStore.getState().setAll([term('term_1')])
+      useTerminalsStore.getState().patch('term_1', { agent: 'codex' } as never)
+      useTerminalsStore.getState().setAll([term('term_1', { agent: null } as never)])
+      expect((useTerminalsStore.getState().terminals[0] as { agent?: unknown }).agent).toBeNull()
+    })
+
+    it('keeps a terminal created while a list request was in flight', () => {
+      const seen = useTerminalsStore.getState().revision
+      const created = term('term_new')
+      useTerminalsStore.getState().addOptimistic(created)
+      useTerminalsStore.getState().setAll([], seen)
+      expect(useTerminalsStore.getState().terminals).toEqual([created])
     })
 
     it('es no-op si el array es la misma referencia', () => {

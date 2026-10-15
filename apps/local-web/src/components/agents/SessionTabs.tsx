@@ -19,6 +19,7 @@ import {
 import type {
   AgentProject,
   AgentSession,
+  ExternalAgentKind,
   SessionGroup,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
@@ -30,7 +31,6 @@ import {
   Download,
   Folder,
   LayoutGrid,
-  MessageSquare,
   Pencil,
   Pin,
   Plus,
@@ -50,12 +50,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   Popover,
@@ -78,8 +72,12 @@ import { perfCount } from '@/lib/perf-probe'
 import { relativeTime } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 
+import {
+  ContinueInSubmenu,
+  ConvertTerminalItem,
+  NewTabMenu
+} from './ExternalAgentMenuBlocks'
 import { gridLayoutChoices } from './GridArrangeControl'
-import { ContinueInSubmenu, ConvertTerminalItem } from './ExternalAgentMenuBlocks'
 import { ProjectPicker } from './ProjectPicker'
 import { useSessionTabColors } from './session-tab-colors'
 import { SessionStatusIcon } from './SessionStatusIcon'
@@ -92,6 +90,7 @@ import {
   TabContextSubmenu,
   TabInlineColorRow
 } from './tab-context-menu'
+import { TerminalTypeIcon } from './TerminalTypeIcon'
 
 /** Height of the two chrome-tab overflow buttons (all-tabs + new-agent). */
 const OVERFLOW_BTN_HEIGHT = 'h-[30px]'
@@ -134,6 +133,7 @@ export function SessionTabs({
   onCreateSplitFromSelection,
   terminals,
   onCreateTerminal,
+  onCreateAgentTerminal,
   onRenameTerminal,
   onToggleTerminalOrganizeLabel,
   onMoveTerminalToProject
@@ -192,12 +192,14 @@ export function SessionTabs({
   /**
    * Terminal-as-first-class-item chips (FAS-107). Optional. When
    * provided, ids in `openTabIds` that match a terminal render as a
-   * SessionTab with `variant="terminal"` (orange SquareTerminal icon).
+   * SessionTab with `variant="terminal"` (gray terminal icon, or the CLI logo).
    */
   terminals?: TerminalSession[]
   onCloseTerminal?: (terminalId: string) => void
   /** FAS-107 GF5: opens a new terminal from the tab-strip "+" menu. */
   onCreateTerminal?: () => void
+  /** "+" menu: open a terminal that starts Claude Code, Codex, OpenCode, or fx. */
+  onCreateAgentTerminal?: (kind: ExternalAgentKind) => void
   /** FAS-107 GF-PARITY-5: parity actions for the terminal chip context menu. */
   onRenameTerminal?: (terminalId: string) => void
   onToggleTerminalOrganizeLabel?: (
@@ -224,6 +226,27 @@ export function SessionTabs({
   const attentionIds = useSessionAttentionIds()
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const stripRef = useRef<HTMLDivElement | null>(null)
+  const newMenuButtonRef = useRef<HTMLButtonElement | null>(null)
+  const newMenuRef = useRef<HTMLDivElement | null>(null)
+  const [newMenu, setNewMenu] = useState<{ top: number; right: number } | null>(null)
+  useEffect(() => {
+    if (!newMenu) return
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (newMenuRef.current?.contains(target) || newMenuButtonRef.current?.contains(target)) return
+      setNewMenu(null)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNewMenu(null)
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [newMenu])
 
   const draggable = Boolean(onReorder)
   const sensors = useSensors(
@@ -665,34 +688,56 @@ export function SessionTabs({
             backwards compatibility.
           */}
           {onCreateTerminal ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    `sandwalk-tab-overflow-btn inline-flex ${OVERFLOW_BTN_HEIGHT} items-center justify-center gap-1 rounded-lg`,
-                    'px-2.5',
-                    'bg-black/[0.06] text-foreground/85',
-                    'hover:bg-black/[0.1] hover:text-foreground',
-                    'dark:bg-white/[0.1] dark:text-zinc-100',
-                    'dark:hover:bg-white/[0.16] dark:hover:text-white'
-                  )}
-                  aria-label="New"
-                >
-                  <Plus className="size-3.5 shrink-0" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[180px]">
-                <DropdownMenuItem onSelect={() => onCreateSession()}>
-                  <MessageSquare className="mr-2 size-3.5 text-sky-500" />
-                  <span>New agent chat</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onCreateTerminal()}>
-                  <SquareTerminal className="mr-2 size-3.5 text-orange-500" />
-                  <span>New terminal</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <>
+              <button
+                ref={newMenuButtonRef}
+                type="button"
+                data-tauri-drag-region="false"
+                className={cn(
+                  `sandwalk-tab-overflow-btn inline-flex ${OVERFLOW_BTN_HEIGHT} items-center justify-center gap-1 rounded-lg`,
+                  'px-2.5',
+                  'bg-black/[0.06] text-foreground/85',
+                  'hover:bg-black/[0.1] hover:text-foreground',
+                  'dark:bg-white/[0.1] dark:text-zinc-100',
+                  'dark:hover:bg-white/[0.16] dark:hover:text-white'
+                )}
+                aria-label="New"
+                aria-expanded={newMenu != null}
+                onPointerDown={event => {
+                  if (event.button !== 0) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  const rect = event.currentTarget.getBoundingClientRect()
+                  setNewMenu(current =>
+                    current
+                      ? null
+                      : { top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) }
+                  )
+                }}
+                onMouseDown={event => event.stopPropagation()}
+                onClick={event => event.stopPropagation()}
+              >
+                <Plus className="size-3.5 shrink-0" />
+              </button>
+              <NewTabMenu
+                open={newMenu != null}
+                top={newMenu?.top ?? 0}
+                right={newMenu?.right ?? 8}
+                menuRef={newMenuRef}
+                onCreateSession={() => {
+                  setNewMenu(null)
+                  onCreateSession()
+                }}
+                onCreateTerminal={() => {
+                  setNewMenu(null)
+                  onCreateTerminal()
+                }}
+                onCreateAgentTerminal={kind => {
+                  setNewMenu(null)
+                  onCreateAgentTerminal?.(kind)
+                }}
+              />
+            </>
           ) : (
             <TooltipProvider delayDuration={300}>
               <Tooltip>
@@ -886,7 +931,7 @@ export function SessionTabs({
                           {isGroup ? (
                             <Columns2 className="size-3.5" />
                           ) : isTerminal ? (
-                            <SquareTerminal className="size-3.5 text-orange-500" />
+                            <TerminalTypeIcon terminalId={item.id} />
                           ) : (
                             <SessionStatusIcon status={item.session.status} />
                           )}
@@ -1294,7 +1339,6 @@ export function SessionTabs({
           <TabContextSeparator />
           <ConvertTerminalItem
             terminal={menuTerminal}
-            variant="context"
             onDone={() => setMenu(null)}
           />
           <TabContextItem

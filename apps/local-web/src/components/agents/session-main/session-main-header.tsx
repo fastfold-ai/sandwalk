@@ -5,13 +5,7 @@ import type {
   SessionGroup
 } from '@sandwalk/agent-ui-core'
 import {
-  Check,
-  Copy,
-  Download,
-  Files,
-  Folder,
-  Globe2,
-  Terminal
+  Folder
 } from 'lucide-react'
 import { type Dispatch, type SetStateAction,useEffect, useRef } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
@@ -22,22 +16,8 @@ import {
   SHELL_SIDEBAR_MOTION_MS,
   ShellNavControlsSlot
 } from '@/components/ShellNavStrip'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@/components/ui/tooltip'
 import { useCrossfadeFlag } from '@/hooks/useDeferredTrue'
 import { useMacDesktopOverlay } from '@/hooks/useMacDesktopOverlay'
-import { copyText } from '@/lib/clipboard'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
 import { navigateToSession } from '@/lib/navigate-session'
 import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
@@ -82,6 +62,10 @@ export type SessionMainHeaderProps = {
   createSession?: (projectId?: string | null) => void | Promise<void>
   /** FAS-107 GF5: create + open a new terminal via the tab-strip "+". */
   onCreateTerminal?: () => void
+  /** "+" menu: terminal that starts Claude Code, Codex, OpenCode, or fx. */
+  onCreateAgentTerminal?: (
+    kind: import('@sandwalk/agent-ui-core').ExternalAgentKind
+  ) => void
   /** FAS-107 GF1/GF6: terminals so chips render with type-terminal variant. */
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
   /** FAS-107: close/kill a terminal from its chip. */
@@ -156,10 +140,10 @@ export function SessionMainHeader({
   projects,
   activeProjectId,
   selectProjectScope,
-  cliMenuOpen,
-  setCliMenuOpen,
-  copiedResumeCommand,
-  setCopiedResumeCommand,
+  cliMenuOpen: _cliMenuOpen,
+  setCliMenuOpen: _setCliMenuOpen,
+  copiedResumeCommand: _copiedResumeCommand,
+  setCopiedResumeCommand: _setCopiedResumeCommand,
   terminalOpen: _terminalOpen,
   setTerminalOpen,
   filesPanelCollapsed,
@@ -169,6 +153,7 @@ export function SessionMainHeader({
   onPrepareDraftWorkspace,
   createSession,
   onCreateTerminal,
+  onCreateAgentTerminal,
   terminals,
   onCloseTerminal,
   onRenameTerminal,
@@ -201,10 +186,7 @@ export function SessionMainHeader({
   // Collapsed: traffic-light clearance on the tab strip row.
   const padForTrafficLights = showCollapsedNav && overlay
   const isDraft = isDraftAgentSessionId(sessionId)
-  const activeProject =
-    projects.find(project => project.id === activeProjectId) || null
   const inProject = Boolean(activeProjectId)
-  const hasProjectFolder = Boolean(activeProject?.folderPath)
   // Draft: host terminal always; Files whenever a project is selected.
   const showTerminalAction = Boolean(sessionId)
   const showCliAction = Boolean(sessionId) && !isDraft
@@ -292,9 +274,6 @@ export function SessionMainHeader({
       ? projects.find(p => p.id === session.projectId)?.name || null
       : null
 
-  const floatBtn =
-    'text-muted-foreground hover:bg-background/80 hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-background/55 shadow-sm backdrop-blur-md dark:bg-zinc-900/70 dark:hover:bg-zinc-800/90'
-
   return (
     <div className="relative z-20 flex shrink-0 flex-col">
       {/* Chrome-style tab strip — floor line broken under the active tab */}
@@ -377,6 +356,7 @@ export function SessionMainHeader({
             createSession ? () => void createSession(activeProjectId) : undefined
           }
           onCreateTerminal={onCreateTerminal}
+          onCreateAgentTerminal={onCreateAgentTerminal}
           terminals={terminals}
           onCloseTerminal={onCloseTerminal}
           onRenameTerminal={onRenameTerminal}
@@ -403,7 +383,7 @@ export function SessionMainHeader({
           apagamos esta fila para no duplicar y evitar la ambigüedad de
           "cuál chat operan". */}
       {!inSplitGroup && (showFloatingActions || projectName) ? (
-        <div className="pointer-events-none absolute inset-x-0 top-full z-30 flex h-0 items-start justify-between px-2.5 pt-1.5">
+        <div className="pointer-events-none absolute inset-x-0 top-full z-30 flex h-0 items-start px-2.5 pt-1.5">
           {projectName && session?.projectId ? (
             <button
               type="button"
@@ -414,183 +394,7 @@ export function SessionMainHeader({
               <Folder className="size-3.5 shrink-0" />
               <span className="truncate">{projectName}</span>
             </button>
-          ) : (
-            <span />
-          )}
-          <div className="pointer-events-auto flex items-center gap-0.5">
-            {showCliAction ? (
-              <DropdownMenu
-                open={cliMenuOpen}
-                onOpenChange={open => {
-                  setCliMenuOpen(open)
-                  if (!open) setCopiedResumeCommand(false)
-                }}
-              >
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className={cn(floatBtn, 'size-7')}
-                          aria-label="Resume in Agent CLI"
-                        >
-                          <Terminal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      Resume in Agent CLI
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <DropdownMenuContent
-                  align="end"
-                  sideOffset={6}
-                  className="w-[22rem] overflow-hidden rounded-xl p-0"
-                  onCloseAutoFocus={event => event.preventDefault()}
-                >
-                  <div className="px-4 pt-3">
-                    <p className="text-foreground text-sm font-semibold">
-                      Resume in Agent CLI
-                    </p>
-                  </div>
-                  <div className="px-4 pb-3 pt-2">
-                    <div className="border-border/80 bg-muted/35 flex items-center gap-2 rounded-lg border p-2.5">
-                      <Terminal className="text-muted-foreground size-4 shrink-0" />
-                      <code className="min-w-0 flex-1 truncate font-mono text-[13px]">
-                        {`sandwalk --resume ${sessionId}`}
-                      </code>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 shrink-0 rounded-md"
-                        onClick={event => {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          if (!sessionId) return
-                          void copyText(`sandwalk --resume ${sessionId}`)
-                          setCopiedResumeCommand(true)
-                          window.setTimeout(
-                            () => setCopiedResumeCommand(false),
-                            2000
-                          )
-                        }}
-                        aria-label="Copy resume command"
-                        title="Copy resume command"
-                      >
-                        {copiedResumeCommand ? (
-                          <Check className="size-3.5" />
-                        ) : (
-                          <Copy className="size-3.5" />
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-muted-foreground mt-2 text-xs">
-                      Continue this session in your local sandwalk CLI.
-                    </p>
-                  </div>
-                  <div className="border-border/70 border-t px-4 py-3">
-                    <DropdownMenuItem
-                      className="h-10 cursor-pointer gap-2 rounded-lg px-3 text-sm"
-                      disabled={!session}
-                      onSelect={() => {
-                        if (!session) return
-                        void exportTranscript(session)
-                      }}
-                    >
-                      <Download className="size-4" />
-                      Export transcript
-                    </DropdownMenuItem>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-            <TooltipProvider delayDuration={300}>
-              {/*
-                Botón Terminal oculto por ahora — la terminal queda siempre
-                abierta por defecto y no se puede cerrar hasta que
-                definamos su UX final.
-              */}
-              {showFilesAction ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        floatBtn,
-                        !filesPanelCollapsed &&
-                          panelView === 'files' &&
-                          'text-foreground bg-background dark:bg-zinc-800'
-                      )}
-                      onClick={toggleFiles}
-                      aria-label={
-                        filesPanelCollapsed
-                          ? 'Show files panel'
-                          : 'Hide files panel'
-                      }
-                    >
-                      <Files className="size-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="flex items-center gap-2"
-                  >
-                    <span>
-                      {filesPanelCollapsed
-                        ? hasProjectFolder
-                          ? 'Show project folder'
-                          : 'Show files panel'
-                        : 'Hide files panel'}
-                    </span>
-                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
-                      ⌘⇧E
-                    </kbd>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-              {showPreviewAction ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn(
-                        floatBtn,
-                        !filesPanelCollapsed &&
-                          panelView === 'preview' &&
-                          'text-foreground bg-background dark:bg-zinc-800'
-                      )}
-                      onClick={togglePreview}
-                      aria-label={
-                        panelView === 'preview' && !filesPanelCollapsed
-                          ? 'Hide site preview'
-                          : 'Show site preview'
-                      }
-                    >
-                      <Globe2 className="size-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    className="flex items-center gap-2"
-                  >
-                    <span>
-                      {panelView === 'preview' && !filesPanelCollapsed
-                        ? 'Hide site preview'
-                        : 'Show site preview'}
-                    </span>
-                    <kbd className="text-muted-foreground/80 rounded border px-1 text-[10px] tabular-nums">
-                      ⌘⇧V
-                    </kbd>
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-            </TooltipProvider>
-          </div>
+          ) : null}
         </div>
       ) : null}
     </div>

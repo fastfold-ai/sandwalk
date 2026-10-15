@@ -37,6 +37,7 @@ def env(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))
     monkeypatch.setenv("OPENCODE_DB", str(tmp_path / "none.db"))
+    monkeypatch.setenv("HERMES_STATE_DB", str(tmp_path / "hermes-none.db"))
     monkeypatch.setattr(fx, "binary", lambda: None)
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
     (tmp_path / "claude").mkdir()
@@ -94,7 +95,7 @@ def test_list_and_import_round_trip(env):
     assert imported["ok"] is True, imported
     session = env.store.get_session(imported["sessionId"])
     assert session.source == "claude"
-    assert session.title == "plot the results"
+    assert session.title == "Claude Code · plot the results"
     assert [m.content for m in env.store.list_messages(session.id)] == ["plot the results", "Done, see plot.png."]
 
     missing = capy_tools.capy_import_external_session(agent="codex", session_id="nope")

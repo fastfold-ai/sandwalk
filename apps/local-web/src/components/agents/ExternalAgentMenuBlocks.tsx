@@ -3,7 +3,9 @@ import type {
   ExternalAgentKind,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
-import { ArrowRightLeft, MessageSquarePlus } from 'lucide-react'
+import { ArrowRightLeft, MessageSquare, MessageSquarePlus, SquareTerminal } from 'lucide-react'
+import type { PointerEvent, RefObject } from 'react'
+import { createPortal } from 'react-dom'
 
 import {
   TabContextItem,
@@ -12,7 +14,9 @@ import {
 } from '@/components/agents/tab-context-menu'
 import {
   continueSessionIn,
+  convertTerminalToAgent,
   convertTerminalToSession,
+  launchExternalAgent,
   useAgentInstalled,
   useExternalAgentActions
 } from '@/lib/external-agent-actions'
@@ -25,31 +29,8 @@ import {
   NATIVE_HANDOFF_KINDS
 } from './ExternalAgentIcon'
 
-/*
- * Two menu styles live in this app: the floating context menu
- * (`TabContextMenuShell` + `TabContextItem`, tiny text) and the ⋯ popover
- * (`SessionActionsMenu`, plain buttons). Each block below ships both.
- */
 
-const ROW =
-  'hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm disabled:opacity-40'
 
-function AgentRowLabel({ kind, native }: { kind: ExternalAgentKind; native?: boolean }) {
-  const installed = useAgentInstalled(kind)
-  return (
-    <>
-      <span className="min-w-0 flex-1 truncate">
-        {EXTERNAL_AGENT_LABELS[kind]}
-        {native ? ' · native history' : ''}
-      </span>
-      {!installed ? (
-        <span className="text-muted-foreground text-[10px]">not installed</span>
-      ) : native ? (
-        <span className="text-muted-foreground text-[10px]">experimental</span>
-      ) : null}
-    </>
-  )
-}
 
 /** Context-menu submenu: Continue in Claude Code / Codex / OpenCode / fx. */
 export function ContinueInSubmenu({
@@ -99,64 +80,138 @@ export function ContinueInSubmenu({
   )
 }
 
-/** ⋯ popover rows: Continue in … (one row per CLI, native rows after). */
-export function ContinueInRows({
-  session,
-  onDone
+
+const MENU_BUTTON =
+  'hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] outline-none disabled:opacity-40'
+
+/**
+ * "+" menu. Real buttons, portaled to `document.body`.
+ *
+ * The tab strip is a window-drag region. A Radix menu item's select
+ * event never arrives there, so the row highlights and the terminal
+ * is never created. `pointerdown` on a `<button>` runs immediately.
+ */
+export function NewTabMenu({
+  open,
+  top,
+  right,
+  menuRef,
+  onCreateSession,
+  onCreateTerminal,
+  onCreateAgentTerminal
 }: {
-  session: AgentSession
-  onDone?: () => void
+  open: boolean
+  top: number
+  right: number
+  menuRef: RefObject<HTMLDivElement | null>
+  onCreateSession: () => void
+  onCreateTerminal?: () => void
+  onCreateAgentTerminal?: (kind: ExternalAgentKind) => void
 }) {
-  const busy = useExternalAgentActions(state => Boolean(state.busy[`handoff:${session.id}`]))
-  const installed = useExternalAgentActions(state => state.installed)
-  const enabled = (kind: ExternalAgentKind) => installed?.[kind] ?? true
-  return (
-    <>
-      <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
-        Continue in
-      </div>
+  if (!open || typeof document === 'undefined') return null
+  // Fire on pointerdown so a native window drag (the tab strip is a
+  // drag region on macOS) cannot swallow the click, and stop the event
+  // so the strip's own drag handler never sees it.
+  const press = (event: PointerEvent, action: () => void) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    action()
+  }
+  return createPortal(
+    <div
+      ref={menuRef}
+      data-sandwalk-new-menu
+      data-tauri-drag-region="false"
+      data-no-window-drag
+      role="menu"
+      style={{ position: 'fixed', top, right, zIndex: 80 }}
+      className="sandwalk-glass-menu bg-popover text-popover-foreground min-w-[180px] rounded-md border p-1 shadow-md"
+      onPointerDown={event => event.stopPropagation()}
+      onMouseDown={event => event.stopPropagation()}
+      onClick={event => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        role="menuitem"
+        data-tauri-drag-region="false"
+        className={MENU_BUTTON}
+        onPointerDown={event => press(event, onCreateSession)}
+      >
+        <MessageSquare className="size-3.5 text-sky-500" />
+        New agent chat
+      </button>
+      {onCreateTerminal ? (
+        <button
+          type="button"
+          role="menuitem"
+          data-tauri-drag-region="false"
+          className={MENU_BUTTON}
+          onPointerDown={event => press(event, onCreateTerminal)}
+        >
+          <SquareTerminal className="text-muted-foreground/70 size-3.5" />
+          New terminal
+        </button>
+      ) : null}
+      {onCreateTerminal ? <div className="bg-border -mx-1 my-1 h-px" /> : null}
       {EXTERNAL_AGENT_KINDS.map(kind => (
-        <button
+        <AgentLaunchButton
           key={kind}
-          type="button"
-          className={ROW}
-          disabled={busy || !enabled(kind)}
-          onClick={() => {
-            onDone?.()
-            void continueSessionIn(session, kind)
-          }}
-        >
-          <ExternalAgentIcon kind={kind} className="h-3.5 w-3.5" />
-          <AgentRowLabel kind={kind} />
-        </button>
+          kind={kind}
+          press={press}
+          onLaunch={onCreateAgentTerminal}
+        />
       ))}
-      {EXTERNAL_AGENT_KINDS.filter(kind => NATIVE_HANDOFF_KINDS.has(kind)).map(kind => (
-        <button
-          key={`${kind}-native`}
-          type="button"
-          className={ROW}
-          disabled={busy || !enabled(kind)}
-          onClick={() => {
-            onDone?.()
-            void continueSessionIn(session, kind, { native: true })
-          }}
-        >
-          <ExternalAgentIcon kind={kind} className="h-3.5 w-3.5" />
-          <AgentRowLabel kind={kind} native />
-        </button>
-      ))}
-    </>
+    </div>,
+    document.body
   )
 }
 
-/** Terminal menus: Convert to Sandwalk session (only while an agent is detected). */
+function AgentLaunchButton({
+  kind,
+  press,
+  onLaunch
+}: {
+  kind: ExternalAgentKind
+  press: (event: PointerEvent, action: () => void) => void
+  onLaunch?: (kind: ExternalAgentKind) => void
+}) {
+  const installed = useAgentInstalled(kind)
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={!installed}
+      data-tauri-drag-region="false"
+      className={MENU_BUTTON}
+      onPointerDown={event => {
+        if (!installed) return
+        press(event, () => {
+          if (onLaunch) onLaunch(kind)
+          else void launchExternalAgent(kind)
+        })
+      }}
+    >
+      <ExternalAgentIcon kind={kind} />
+      <span className="min-w-0 flex-1">{EXTERNAL_AGENT_LABELS[kind]}</span>
+      {!installed ? (
+        <span className="text-muted-foreground text-[10px]">not installed</span>
+      ) : null}
+    </button>
+  )
+}
+
+/**
+ * Terminal menus: "Convert to…" flyout, shown only while a CLI agent is
+ * detected in the terminal. First row imports the CLI session as a Sandwalk
+ * chat; the rest re-open it in another CLI (Claude Code → Codex, …) via the
+ * imported chat, which stays in the sidebar as the bridge.
+ */
 export function ConvertTerminalItem({
   terminal,
-  variant,
   onDone
 }: {
   terminal: TerminalSession
-  variant: 'context' | 'popover'
   onDone?: () => void
 }) {
   // Live value from the terminals store (the `agent.changed` PTY event
@@ -166,26 +221,36 @@ export function ConvertTerminalItem({
       state.terminals.find(t => t.id === terminal.id)?.agent ?? terminal.agent ?? null
   )
   const busy = useExternalAgentActions(state => Boolean(state.busy[`convert:${terminal.id}`]))
+  const installed = useExternalAgentActions(state => state.installed)
   if (!agent) return null
-  const label = `Convert to chat (${EXTERNAL_AGENT_LABELS[agent]})`
-  const run = () => {
+  const enabled = (kind: ExternalAgentKind) => installed?.[kind] ?? true
+  const run = (action: () => Promise<unknown>) => {
     onDone?.()
-    void convertTerminalToSession(terminal, agent)
-  }
-  if (variant === 'context') {
-    return (
-      <TabContextItem
-        icon={<MessageSquarePlus />}
-        label={label}
-        disabled={busy}
-        onClick={run}
-      />
-    )
+    void action()
   }
   return (
-    <button type="button" className={ROW} disabled={busy} onClick={run}>
-      <MessageSquarePlus className="h-3.5 w-3.5" />
-      {label}
-    </button>
+    <TabContextSubmenu icon={<ArrowRightLeft />} label="Convert to…">
+      <TabContextItem
+        icon={<MessageSquarePlus />}
+        label="Sandwalk chat"
+        disabled={busy}
+        onClick={() => run(() => convertTerminalToSession(terminal, agent))}
+      />
+      <TabContextSeparator />
+      {EXTERNAL_AGENT_KINDS.filter(kind => kind !== agent).map(kind => (
+        <TabContextItem
+          key={kind}
+          icon={<ExternalAgentIcon kind={kind} />}
+          label={EXTERNAL_AGENT_LABELS[kind]}
+          disabled={busy || !enabled(kind)}
+          trailing={
+            !enabled(kind) ? (
+              <span className="text-muted-foreground text-[10px]">not installed</span>
+            ) : undefined
+          }
+          onClick={() => run(() => convertTerminalToAgent(terminal, agent, kind))}
+        />
+      ))}
+    </TabContextSubmenu>
   )
 }

@@ -74,7 +74,8 @@ export function useAppPanelPersistence({
     const panel = filesPanelRef.current
     if (!panel) return
     if (filesPanelCollapsed) {
-      if (!panel.isCollapsed()) panel.collapse()
+      if (panel.getSize() > 1) panel.collapse()
+      if (panel.getSize() > 1) panel.resize(0)
     } else if (panel.isCollapsed()) {
       panel.expand()
     }

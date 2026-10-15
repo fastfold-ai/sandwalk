@@ -26,6 +26,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
 import { openInSystemBrowser } from '@/lib/desktop'
 import {
   getStoredPalette,
@@ -69,6 +70,7 @@ export function SidebarUserMenu({
   connected?: boolean
 }) {
   const navigate = useNavigate()
+  const update = useDesktopUpdate()
   const displayName = userName?.trim() || 'Local User'
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme())
   const [palette, setPalette] = useState<ThemePaletteId>(() =>
@@ -112,19 +114,31 @@ export function SidebarUserMenu({
         if (open) void onRefreshUser?.()
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/55 flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors"
-        >
-          <span className="bg-muted text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
-            {initials}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-            {displayName}
-          </span>
-        </button>
-      </DropdownMenuTrigger>
+      <div className="flex w-full items-center gap-1.5 px-1">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/55 flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-1.5 py-2 text-left transition-colors"
+          >
+            <span className="bg-muted text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
+              {initials}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {displayName}
+            </span>
+          </button>
+        </DropdownMenuTrigger>
+        {update.available ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-[#C6A15B] px-2 py-0.5 text-[11px] font-semibold text-[#1c1408] hover:bg-[#d4b56a] disabled:opacity-70"
+            disabled={update.installing}
+            onClick={() => void update.installUpdate()}
+          >
+            {update.installing ? 'Updating…' : 'Update'}
+          </button>
+        ) : null}
+      </div>
       <DropdownMenuContent
         className="bg-card w-[var(--radix-popper-anchor-width)] min-w-0 max-w-[var(--radix-popper-anchor-width)] rounded-xl border p-1 shadow-xl"
         side="top"

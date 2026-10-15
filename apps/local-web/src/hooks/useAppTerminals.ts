@@ -37,7 +37,7 @@ export function useAppTerminals(
   const load = useCallback(
     async (signal?: AbortSignal) => {
       if (!client) return
-      const { setAll, setLoading, setError } = useTerminalsStore.getState()
+      const { setAll, setLoading, setError, revision } = useTerminalsStore.getState()
       setLoading(true)
       setError(null)
       try {
@@ -45,7 +45,9 @@ export function useAppTerminals(
           projectId: projectId ?? null,
           signal
         })
-        if (!signal?.aborted) setAll(rows)
+        // `revision` is from before the request. A create/delete in between
+        // bumps it, and applying this older list would unmount the new shell.
+        if (!signal?.aborted) setAll(rows, revision)
       } catch (err) {
         if (signal?.aborted) return
         setError((err as Error).message)

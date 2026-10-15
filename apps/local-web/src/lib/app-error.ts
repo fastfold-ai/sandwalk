@@ -210,9 +210,13 @@ export function isAuthCredentialError(error: unknown): boolean {
 export function isBackendUnavailableError(error: unknown): boolean {
   const info = normalizeAppError(error)
   if (info.status != null && info.status >= 500) return true
+  // `AbortSignal.timeout` rejects with a DOMException named TimeoutError
+  // ("signal timed out"); a probe that never answers is the server being
+  // down as far as the connect loop is concerned.
+  if (error instanceof Error && error.name === 'TimeoutError') return true
   return (
     info.title === 'Backend unreachable' ||
-    /failed to fetch|networkerror|load failed|network request failed|cors|access-control-allow-origin/i.test(
+    /failed to fetch|networkerror|load failed|network request failed|cors|access-control-allow-origin|signal timed out|timeouterror/i.test(
       info.raw
     )
   )

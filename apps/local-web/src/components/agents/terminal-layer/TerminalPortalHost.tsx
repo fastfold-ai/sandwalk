@@ -3,6 +3,7 @@ import '@xterm/xterm/css/xterm.css'
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { listen } from '@tauri-apps/api/event'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -24,6 +25,13 @@ import {
 import { isExternalAgentKind } from '@/components/agents/ExternalAgentIcon'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
+import {
+  isRespawn,
+  ptyHandleIsStale,
+  reconnectDelayMs,
+  shouldDropPtyHandle,
+  shouldShowWaitingNotice
+} from './reconnect-policy'
 import { useTerminalLayer } from './terminal-layer-registry'
 
 /**
@@ -68,12 +76,6 @@ type PtyInfo = {
   title: string
 }
 
-/** Cap del backoff en ms. Después de este techo se mantiene constante. */
-const RECONNECT_CAP_MS = 30_000
-/** Base del backoff en ms. Primer retry ~500ms. */
-const RECONNECT_BASE_MS = 500
-/** Máximo de intentos antes de dejar la conexión "muerta" sin reintentar. */
-const RECONNECT_MAX_ATTEMPTS = 12
 /**
  * FAS-107 X4 Capa 2 · intervalo de guardado throttled del snapshot.
  * Cada 30s se serializa el buffer visible y se manda al backend. Así
@@ -110,6 +112,7 @@ export function TerminalPortalHost({
   hostRef.current = hostNode
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const webglRef = useRef<WebglAddon | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const ptyRef = useRef<PtyInfo | null>(null)
   const attachedRef = useRef(false)
@@ -255,6 +258,44 @@ export function TerminalPortalHost({
    * plus style writes and runs on every scheduled frame; the expensive
    * `fit` only runs when the box actually changed size (debounced).
    */
+  /**
+   * GPU renderer only while the terminal is on screen. WebKit allows ~16
+   * WebGL contexts per page and evicts the oldest; with a dozen terminals
+   * mounted that meant constant "context lost → dispose → DOM fallback"
+   * churn. Hidden terminals keep their buffer in the DOM renderer at zero
+   * GPU cost and get WebGL back the moment they are shown.
+   */
+  const setGpuRenderer = (on: boolean) => {
+    const term = termRef.current
+    if (!term || !attachedRef.current) return
+    if (on) {
+      if (webglRef.current) return
+      try {
+        const webgl = new WebglAddon()
+        webgl.onContextLoss(() => {
+          webgl.dispose()
+          if (webglRef.current === webgl) webglRef.current = null
+          perfCount('terminal.webglLost')
+        })
+        term.loadAddon(webgl)
+        webglRef.current = webgl
+        perfCount('terminal.webglOn')
+      } catch {
+        webglRef.current = null
+        perfCount('terminal.webglUnavailable')
+      }
+      return
+    }
+    if (!webglRef.current) return
+    try {
+      webglRef.current.dispose()
+    } catch {
+      // ignore
+    }
+    webglRef.current = null
+    perfCount('terminal.webglOff')
+  }
+
   const applyPosition = () => {
     const host = hostRef.current
     if (!host) return
@@ -262,14 +303,17 @@ export function TerminalPortalHost({
     const entry = registry.getPlaceholder(terminalId)
     if (!entry || !entry.node.isConnected) {
       host.style.display = 'none'
+      setGpuRenderer(false)
       return
     }
     const rect = entry.node.getBoundingClientRect()
     if (rect.width < 1 || rect.height < 1) {
       host.style.display = 'none'
+      setGpuRenderer(false)
       return
     }
     host.style.display = ''
+    setGpuRenderer(true)
     host.style.position = 'fixed'
     host.style.top = `${rect.top}px`
     host.style.left = `${rect.left}px`
@@ -359,21 +403,58 @@ export function TerminalPortalHost({
 
     // ---- Conexión WS con reconexión automática ----
     let cancelled = false
+    /** Set when PTY bytes arrive; cleared by the periodic snapshot flush. */
+    let dirtySinceFlush = false
     let reconnectAttempts = 0
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    /** Printed once per outage so a long reconnect loop stays quiet. */
+    let noticeShown = false
 
     const connectWebSocket = async () => {
       if (cancelled) return
       try {
+        // On a reconnect, re-validate the PTY id against the server. A
+        // server restart kills every PTY, but the browser reports the dead
+        // handshake as code 1006 (not our 4404), so without this the
+        // client retried the same dead id forever and the tab stayed on
+        // "waiting for the Sandwalk server…" even after it was back.
+        if (ptyRef.current && reconnectAttempts > 0) {
+          const live = await client.listPtySessions(terminalId)
+          if (cancelled) return
+          if (
+            ptyHandleIsStale(
+              reconnectAttempts,
+              ptyRef.current.id,
+              live.map(info => info.id)
+            )
+          ) {
+            ptyRef.current = null
+          }
+        }
         if (!ptyRef.current) {
           const existing = await client.listPtySessions(terminalId)
           if (cancelled) return
+          // No live PTY: the server restarted and the shell died with it.
+          // Spawn a new one so the tab comes back instead of staying dead.
+          const respawned = isRespawn(existing.length, hydratedRef.current)
           const info = existing[0] ?? (await client.createPtySession(terminalId))
           if (cancelled) return
           ptyRef.current = {
             id: info.id,
             session_id: info.sessionId,
             title: info.title
+          }
+          if (respawned) {
+            useTerminalsStore.getState().patch(terminalId, { agent: null })
+            // Delay the notice: the new shell's startup clears the screen,
+            // so anything written before that is wiped.
+            window.setTimeout(() => {
+              if (cancelled || ptyRef.current?.id !== info.id) return
+              term.writeln(
+                '\x1b[90m[shell restarted — the server came back; the previous process ended]\x1b[0m'
+              )
+            }, 900)
           }
           // Seed the agent mark from the list response (e.g. a Capy /
           // handoff launch where the CLI was already running before the
@@ -422,6 +503,9 @@ export function TerminalPortalHost({
         ws.onopen = () => {
           if (cancelled) return
           reconnectAttempts = 0
+          noticeShown = false
+          // A plain socket drop (same PTY still alive) needs no banner; the
+          // shell is exactly where it was. Respawn prints its own notice.
           perfCount('terminal.wsOpen')
           if (pendingInput.length > 0) {
             for (const chunk of pendingInput) ws.send(chunk)
@@ -471,6 +555,7 @@ export function TerminalPortalHost({
             return
           }
           term.write(new Uint8Array(event.data as ArrayBuffer))
+          dirtySinceFlush = true
           // FAS-107 · Fix pre-fase1: antes se comparaba con
           // `window.location.pathname` — falla cuando el terminal
           // vive dentro de un group split (la URL apunta al group,
@@ -482,19 +567,19 @@ export function TerminalPortalHost({
           }
         }
 
-        ws.onclose = () => {
+        ws.onclose = event => {
           if (cancelled) return
-          if (reconnectAttempts >= RECONNECT_MAX_ATTEMPTS) {
+          // 4404: the server is up but this PTY is gone. Drop the handle so
+          // the next attempt spawns a replacement instead of retrying a
+          // dead id.
+          if (shouldDropPtyHandle(event.code)) ptyRef.current = null
+          if (shouldShowWaitingNotice(reconnectAttempts, noticeShown)) {
+            noticeShown = true
             term.writeln(
-              '\r\n\x1b[90m[terminal disconnected — max reconnect attempts reached]\x1b[0m'
+              '\r\n\x1b[90m[disconnected — waiting for the Sandwalk server…]\x1b[0m'
             )
-            return
           }
-          const delay = Math.min(
-            RECONNECT_BASE_MS * 2 ** reconnectAttempts +
-              Math.floor(Math.random() * 200),
-            RECONNECT_CAP_MS
-          )
+          const delay = reconnectDelayMs(reconnectAttempts)
           reconnectAttempts += 1
           reconnectTimer = setTimeout(() => {
             reconnectTimer = null
@@ -506,9 +591,23 @@ export function TerminalPortalHost({
           // El WS cerrará solo y disparará onclose → reconexión con backoff.
         }
       } catch (err) {
-        if (!cancelled) {
+        // The REST calls before the socket (list / create PTY) fail while
+        // the server is down. Treat like a dropped socket and retry.
+        if (cancelled) return
+        if (shouldShowWaitingNotice(reconnectAttempts, noticeShown)) {
+          noticeShown = true
+          term.writeln(
+            '\r\n\x1b[90m[disconnected — waiting for the Sandwalk server…]\x1b[0m'
+          )
+        } else if (reconnectAttempts === 0) {
           console.error('TerminalPortalHost connect failed', err)
         }
+        const delay = reconnectDelayMs(reconnectAttempts)
+        reconnectAttempts += 1
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null
+          void connectWebSocket()
+        }, delay)
       }
     }
 
@@ -582,8 +681,12 @@ export function TerminalPortalHost({
     // a disco periódicamente (por si Sandwalk crashea) y al Cmd+Q
     // (para que el disco tenga el estado final antes de que el
     // proceso Python muera).
-    const flushSnapshot = async (): Promise<void> => {
+    const flushSnapshot = async (force = false): Promise<void> => {
       if (cancelled) return
+      // Idle terminals have nothing new to persist; with many tabs open the
+      // unconditional 30 s flush was a steady drip of POSTs for no change.
+      if (!force && !dirtySinceFlush) return
+      dirtySinceFlush = false
       try {
         await client.flushSessionSnapshot(terminalId)
       } catch {
@@ -597,7 +700,7 @@ export function TerminalPortalHost({
     // pedimos flush inmediato al backend.
     let unlistenForceSave: (() => void) | null = null
     void listen(SNAPSHOT_FORCE_SAVE_EVENT, () => {
-      void flushSnapshot()
+      void flushSnapshot(true)
     }).then(unlisten => {
       if (cancelled) unlisten()
       else unlistenForceSave = unlisten
@@ -633,6 +736,12 @@ export function TerminalPortalHost({
         // ignore
       }
       try {
+        webglRef.current?.dispose()
+      } catch {
+        // ignore
+      }
+      webglRef.current = null
+      try {
         term.dispose()
       } catch {
         // ignore
@@ -660,6 +769,8 @@ export function TerminalPortalHost({
     if (!attachedRef.current) {
       term.open(host)
       attachedRef.current = true
+      // The GPU renderer is attached by `applyPosition` once the terminal is
+      // actually visible (see `setGpuRenderer`), not for every mounted tab.
     } else if (term.element && term.element.parentElement !== host) {
       // Reparent: el buffer vive en term.element; moverlo lo preserva.
       host.appendChild(term.element)

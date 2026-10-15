@@ -52,7 +52,12 @@ _MAX_OSC_PAYLOAD = 4096
 _OSC_HOLD_TIMEOUT_SEC = 5.0
 
 
-PtyEventKind = Literal["command.started", "command.finished", "notify"]
+PtyEventKind = Literal["command.started", "command.finished", "notify", "agent.hook"]
+
+# Title our own shell hooks put in OSC 777 so agent markers never surface
+# as user notifications: `777;notify;Sandwalk;agent;<kind>;started|exited`.
+_HOOK_TITLE = "Sandwalk"
+_HOOK_AGENTS = frozenset({"claude", "codex", "opencode", "fx", "hermes"})
 
 
 @dataclass
@@ -65,6 +70,8 @@ class PtyEvent:
     # OSC 9 / OSC 777
     title: str | None = None
     body: str | None = None
+    # agent.hook: which CLI, and None when it exited
+    agent: str | None = None
 
 
 @dataclass
@@ -190,5 +197,13 @@ def _parse_payload(payload: str) -> PtyEvent | None:
         if kind != "notify" or not sep2:
             return None
         title, sep3, body = tail.partition(";")
+        if title == _HOOK_TITLE and sep3 and body.startswith("agent;"):
+            # Our shell hook: `agent;<kind>;started` | `agent;<kind>;exited`.
+            parts = body.split(";", 2)
+            agent = parts[1] if len(parts) > 1 else ""
+            state = parts[2] if len(parts) > 2 else ""
+            if agent not in _HOOK_AGENTS:
+                return None
+            return PtyEvent(kind="agent.hook", agent=agent if state == "started" else None)
         return PtyEvent(kind="notify", title=title, body=body if sep3 else None)
     return None

@@ -29,7 +29,7 @@ class ExternalAgentError(ValueError):
 def _require_kind(kind: str) -> ExternalAgentKind:
     normalized = external_agents.normalize_kind(kind)
     if normalized is None:
-        raise ExternalAgentError(f"Unknown agent: {kind!r}. Use claude, codex, opencode, or fx.")
+        raise ExternalAgentError(f"Unknown agent: {kind!r}. Use claude, codex, opencode, fx, or hermes.")
     return normalized
 
 
@@ -47,6 +47,27 @@ def _existing_dir(path: str | None) -> str | None:
     if candidate.is_dir():
         return str(candidate.resolve())
     return None
+
+
+def _home_dir() -> Path:
+    """Resolved home directory; a seam so tests can point it at a temp dir."""
+    return Path.home().resolve()
+
+
+def _project_dir(path: str | None) -> str | None:
+    """Like ``_existing_dir`` but refuses the home directory and filesystem root.
+
+    CLI sessions are often started from ``~``. Making that the chat's
+    workspace turns the Files panel into a crawl of the whole home folder.
+    Returning None lets ``create_session`` allocate Sandwalk's own
+    per-session workspace instead.
+    """
+    resolved = _existing_dir(path)
+    if resolved is None:
+        return None
+    if Path(resolved) in {_home_dir(), Path("/")}:
+        return None
+    return resolved
 
 
 # --- import -----------------------------------------------------------------
@@ -102,10 +123,14 @@ def import_session(
     external = external_agents.read_session(normalized, session_id)
     if external is None or not external.turns:
         raise ExternalAgentError(f"{AGENT_LABELS[normalized]} session not found or empty: {session_id}")
-    workspace = _existing_dir(workspace_path) or _existing_dir(external.summary.cwd)
+    # An explicit workspace from the caller wins; the CLI's own cwd is used
+    # only when it looks like a project folder (not ~ or /).
+    workspace = _existing_dir(workspace_path) or _project_dir(external.summary.cwd)
     label = AGENT_LABELS[normalized]
+    # Prefix the tool so a one-word prompt ("hi") is findable among other chats.
+    title = f"{label} · {external.summary.title}".strip(" ·")
     created = service.create_session(
-        title=external.summary.title,
+        title=title,
         workspace_path=workspace,
         project_id=project_id,
         source=normalized,
@@ -114,7 +139,7 @@ def import_session(
     )
     _seed_messages(store, created.id, external.turns)
     # Imported history is a settled title, not a placeholder to auto-rename.
-    settled = store.update_session(created.id, title=external.summary.title, title_source="user")
+    settled = store.update_session(created.id, title=title, title_source="user")
     return settled or store.get_session(created.id) or created
 
 
@@ -130,6 +155,8 @@ def startup_command(kind: ExternalAgentKind, *, prompt: str | None = None, resum
             argv = [binary, "resume", resume_id]
         elif kind == "opencode":
             argv = [binary, "-s", resume_id]
+        elif kind == "hermes":
+            argv = [binary, "--resume", resume_id]
         else:
             argv = [binary, "resume", resume_id]
     else:

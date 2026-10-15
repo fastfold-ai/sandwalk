@@ -64,6 +64,9 @@ def launch_argv(kind: ExternalAgentKind, binary: str, *, prompt: str | None = No
         return [binary, "--prompt", prompt] if prompt else [binary]
     if kind == "fx":
         return [binary, prompt] if prompt else [binary]
+    if kind == "hermes":
+        # On a TTY, `chat -q` seeds an interactive session with that first turn.
+        return [binary, "chat", "-q", prompt] if prompt else [binary]
     return [binary]
 
 

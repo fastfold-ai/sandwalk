@@ -10,6 +10,16 @@ from agent.deepagents_runtime.openrouter_attribution import (
     OPENROUTER_APP_URL,
 )
 
+# Same budget as the OpenAI / Anthropic paths (300 s). Without this the
+# OpenRouter SDK builds its httpx client with the library default of **5 s**.
+# A chat with ~300 tool schemas in the request routinely takes longer than
+# that to first byte, so every attempt hit ReadTimeout and the SDK's retry
+# loop (max_retries × 150 s) kept the run "Planning next moves" for up to
+# twelve minutes with no error. Milliseconds: that is what `timeout_ms` takes.
+OPENROUTER_REQUEST_TIMEOUT_MS = 300_000
+# Two retries cover a flaky connect; five made a real outage look like a hang.
+OPENROUTER_MAX_RETRIES = 2
+
 
 def build_openrouter_chat_model(config, *, temperature: float):
     """Build a native ``ChatOpenRouter`` with Sandwalk app attribution."""
@@ -37,7 +47,8 @@ def build_openrouter_chat_model(config, *, temperature: float):
         "app_url": OPENROUTER_APP_URL,
         "app_title": OPENROUTER_APP_TITLE,
         "app_categories": list(OPENROUTER_APP_CATEGORIES),
-        "max_retries": 5,
+        "max_retries": OPENROUTER_MAX_RETRIES,
+        "timeout": OPENROUTER_REQUEST_TIMEOUT_MS,
     }
     if not heal["omit_require_parameters"]:
         # Prefer endpoints that accept tools + the params we actually send.

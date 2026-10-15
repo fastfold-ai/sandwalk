@@ -18,6 +18,7 @@ _PROC_NAMES: dict[str, ExternalAgentKind] = {
     "codex": "codex",
     "opencode": "opencode",
     "fx": "fx",
+    "hermes": "hermes",
 }
 
 
@@ -121,6 +122,10 @@ def _argv_kind(argv: str) -> ExternalAgentKind | None:
         base = Path(part).name.lower()
         if base in _PROC_NAMES:
             return _PROC_NAMES[base]
+    # Hermes's launcher is `python3 -I -c '… hermes-agent …'`, so the
+    # basename of the first tokens is python, not hermes.
+    if "hermes-agent" in argv or "/bin/hermes" in argv:
+        return "hermes"
     return None
 
 

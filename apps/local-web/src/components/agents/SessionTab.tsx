@@ -261,6 +261,8 @@ export function SessionTab({
       {...(selected ? { 'data-selected': 'true' } : {})}
     >
       <TabBackground width={tabWidth} />
+      {/* Pointer target = the visible chip, not the overlapping tab box. */}
+      <div className="chrome-tab-hit" aria-hidden />
       <div className="chrome-tab-content">
         {/* T2: pin PRIMERO — antes de cualquier icon del tipo — para
             leerse como tag del tab. Aplica a chat, terminal y grupo

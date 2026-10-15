@@ -76,6 +76,22 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-chrome-tabs {
   cursor: pointer;
   user-select: none;
   touch-action: none;
+  /*
+   * Tabs overlap by 14 px and the hovered/active tab is lifted in z-order,
+   * so the box of one tab can sit on top of the neighbor's chip. Pointer
+   * input therefore goes through `.chrome-tab-hit`, which spans exactly the
+   * visible chip (same 10 px inset as the hover shape). Events bubble to the
+   * tab, so :hover, dnd-kit and the click handlers are unchanged.
+   */
+  pointer-events: none;
+}
+
+.sandwalk-chrome-tabs .chrome-tab .chrome-tab-hit {
+  position: absolute;
+  inset: 0 10px 0 10px;
+  pointer-events: auto;
+  /* Below `.chrome-tab-close` (z 2), which re-enables its own pointer-events on hover. */
+  z-index: 1;
 }
 
 /*
@@ -246,7 +262,10 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-chrome-tabs {
   background: #e5e7eb;
   border-radius: 4px;
   opacity: 0;
-  pointer-events: none;
+  /* Always hit-testable: the pointer can only be here via the chip, which
+   * means the tab is hovered and the X is visible. Gating on :hover made
+   * the first click after a fast move land on the hit layer instead. */
+  pointer-events: auto;
   z-index: 2;
   transition:
     opacity 0.12s ease,
@@ -260,7 +279,6 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-chrome-tabs {
 
 .sandwalk-chrome-tabs .chrome-tab:hover .chrome-tab-close {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .sandwalk-chrome-tabs .chrome-tab .chrome-tab-close:hover {

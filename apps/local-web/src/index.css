@@ -382,6 +382,24 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glas
   backdrop-filter: blur(28px) saturate(1.5);
 }
 
+/* Files / site preview column. It sits inside the main frost, so without
+ * its own blur it reads as a solid slab. Same glass as the menus. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off):not(.dark)
+  .sandwalk-glass-panel {
+  background-color: rgb(246 246 247 / 0.5) !important;
+  border-color: rgb(0 0 0 / 0.1) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
+  .sandwalk-glass-panel {
+  background-color: rgb(28 28 31 / 0.48) !important;
+  border-color: rgb(255 255 255 / 0.1) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
 html.sandwalk-mac-glass:not(.sandwalk-mac-glass-active) .sandwalk-shell-sidebar::after,
 html.sandwalk-mac-glass.sandwalk-liquid-glass-off .sandwalk-shell-sidebar::after {
   content: none;
@@ -1699,9 +1717,16 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active .chrome-tabs-bottom-bar {
 .sandwalk-drag-region textarea,
 .sandwalk-drag-region select,
 .sandwalk-drag-region [role='button'],
+.sandwalk-drag-region [role='menuitem'],
 .sandwalk-drag-region [data-no-window-drag],
 [data-capy-root],
-[data-capy-root] * {
+[data-capy-root] *,
+/* Menus portal to <body>, outside the title-bar drag region. On the desktop
+ * window that region still swallows the click, so the row highlights and
+ * nothing opens. */
+[data-radix-popper-content-wrapper],
+[role='menu'],
+[role='menuitem'] {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

@@ -57,8 +57,8 @@ class PtyLifecycleMixin:
     ) -> PtyInfo:
         pid, master_fd, workspace = spawn_pty(cwd=cwd, cols=cols, rows=rows)
 
-        existing = self.list(session_id)
-        next_number = len(existing) + 1
+        # Count only; `list()` would re-probe every sibling's foreground.
+        next_number = len(self._by_agent.get(session_id, ())) + 1
         pty_id = uuid.uuid4().hex
         info = PtyInfo(
             id=pty_id,
@@ -78,9 +78,7 @@ class PtyLifecycleMixin:
             asyncio.create_task(self.type_startup(session, startup))  # type: ignore[attr-defined]
         return info
 
-    async def resize(
-        self, session_id: str, pty_id: str, *, cols: int, rows: int
-    ) -> PtyInfo | None:
+    async def resize(self, session_id: str, pty_id: str, *, cols: int, rows: int) -> PtyInfo | None:
         session = self._sessions.get(pty_id)
         if session is None or session.info.session_id != session_id:
             return None

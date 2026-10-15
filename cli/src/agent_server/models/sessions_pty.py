@@ -6,7 +6,7 @@ from pydantic import Field
 
 from agent_server.models.base import ApiModel
 
-PtyAgentKind = Literal["claude", "codex", "opencode", "fx"]
+PtyAgentKind = Literal["claude", "codex", "opencode", "fx", "hermes"]
 
 
 class PtySessionInfo(ApiModel):

@@ -6,15 +6,16 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timezone
 from typing import Any, Literal
 
-ExternalAgentKind = Literal["claude", "codex", "opencode", "fx"]
+ExternalAgentKind = Literal["claude", "codex", "opencode", "fx", "hermes"]
 
-AGENT_KINDS: tuple[ExternalAgentKind, ...] = ("claude", "codex", "opencode", "fx")
+AGENT_KINDS: tuple[ExternalAgentKind, ...] = ("claude", "codex", "opencode", "fx", "hermes")
 
 AGENT_LABELS: dict[str, str] = {
     "claude": "Claude Code",
     "codex": "Codex",
     "opencode": "OpenCode",
     "fx": "fx",
+    "hermes": "Hermes",
 }
 
 # The executable name each agent installs on PATH.
@@ -23,6 +24,7 @@ AGENT_BINARIES: dict[str, str] = {
     "codex": "codex",
     "opencode": "opencode",
     "fx": "fx",
+    "hermes": "hermes",
 }
 
 

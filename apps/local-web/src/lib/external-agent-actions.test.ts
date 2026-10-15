@@ -11,6 +11,7 @@ vi.mock('sonner', () => ({ toast }))
 
 import {
   continueSessionIn,
+  convertTerminalToAgent,
   convertTerminalToSession,
   importExternalSessionAsChat,
   launchExternalAgent,
@@ -144,7 +145,6 @@ describe('external-agent-actions', () => {
       projectId: 'proj',
       workspacePath: '/work'
     })
-    expect(reloadSessions).toHaveBeenCalled()
     expect(openItem).toHaveBeenCalledWith('chat_imported')
     expect(toast.success).toHaveBeenCalled()
     expect(useExternalAgentActions.getState().busy).toEqual({})
@@ -161,6 +161,34 @@ describe('external-agent-actions', () => {
       expect.anything()
     )
     expect(client.importExternalSession).not.toHaveBeenCalled()
+  })
+
+  it('convertTerminalToAgent imports the session, then hands it off to the other CLI', async () => {
+    const client = makeClient()
+    useExternalAgentActions.getState().bind({ client, openItem, reloadSessions })
+    const term = await convertTerminalToAgent(terminal(), 'claude', 'codex')
+    expect(term?.id).toBe('term_handoff')
+    expect(client.importExternalSession).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'claude', sessionId: 'ext-1' })
+    )
+    expect(client.handoffSession).toHaveBeenCalledWith(
+      'chat_imported',
+      expect.objectContaining({ kind: 'codex', launch: true, native: false })
+    )
+    // The bridge chat is not opened — the new CLI terminal is.
+    expect(openItem).toHaveBeenCalledTimes(1)
+    expect(openItem).toHaveBeenCalledWith('term_handoff')
+    expect(toast.success).toHaveBeenCalledWith('Opened Codex on the Claude Code session.')
+    expect(useExternalAgentActions.getState().busy).toEqual({})
+  })
+
+  it('convertTerminalToAgent stops when the CLI has nothing saved yet', async () => {
+    const client = makeClient({
+      listExternalAgents: vi.fn(async () => ({ agents: [], sessions: [] }))
+    })
+    useExternalAgentActions.getState().bind({ client, openItem, reloadSessions })
+    expect(await convertTerminalToAgent(terminal(), 'claude', 'codex')).toBeNull()
+    expect(client.handoffSession).not.toHaveBeenCalled()
   })
 
   it('continueSessionIn opens the launched terminal and marks its agent', async () => {

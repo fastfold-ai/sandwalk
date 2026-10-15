@@ -69,9 +69,7 @@ async def _keep_backup_fresh(store: AgentStore) -> None:
             if now - last_backup_at < BACKUP_MIN_INTERVAL_SECONDS:
                 continue
             # Online backup API — safe against a live WAL database.
-            wrote = await asyncio.to_thread(
-                refresh_healthy_backup, store.path, force=False
-            )
+            wrote = await asyncio.to_thread(refresh_healthy_backup, store.path, force=False)
             if wrote is True:
                 last_backup_at = now
                 last_fp = database_fingerprint(store.path)
@@ -165,6 +163,103 @@ def create_app(
             install_stable_tls_httpx()
         except Exception:
             pass
+        # `kill -USR1 <pid>` dumps every thread's Python stack to stderr. The
+        # only way to see where a run is stuck on macOS without root (py-spy
+        # needs sudo there). No-op on platforms without SIGUSR1.
+        try:
+            import faulthandler
+            import signal
+            import sys
+
+            if hasattr(signal, "SIGUSR1"):
+                # chain=False: the default SIGUSR1 action terminates the process.
+                faulthandler.register(
+                    signal.SIGUSR1, file=sys.stderr, all_threads=True, chain=False
+                )
+            if hasattr(signal, "SIGUSR2"):
+                # Thread stacks show a run's loop idle in select(); this shows
+                # the *coroutine* each active run is awaiting.
+                def _dump_run_coroutines(_signum, _frame):  # noqa: ANN001
+                    import traceback
+
+                    runners = getattr(service, "_active_runners", {}) or {}
+                    print(f"\n=== {len(runners)} active run(s) ===", file=sys.stderr)
+                    for sid, runner in list(runners.items()):
+                        loop = getattr(runner, "_active_loop", None)
+                        if loop is None:
+                            print(f"--- {sid}: no loop", file=sys.stderr)
+                            continue
+                        try:
+                            tasks = asyncio.all_tasks(loop)
+                        except Exception as exc:  # noqa: BLE001
+                            print(f"--- {sid}: all_tasks failed: {exc}", file=sys.stderr)
+                            continue
+                        for task in tasks:
+                            print(f"--- {sid}: {task.get_coro()!r}", file=sys.stderr)
+                            # Walk the await chain: task coro → cr_await → … so
+                            # the innermost suspended frame (the real wait) shows.
+                            node = task.get_coro()
+                            depth = 0
+                            while node is not None and depth < 60:
+                                frame = getattr(node, "cr_frame", None) or getattr(
+                                    node, "gi_frame", None
+                                )
+                                if frame is not None:
+                                    code = frame.f_code
+                                    print(
+                                        f'  [{depth}] File "{code.co_filename}", line {frame.f_lineno}, in {code.co_name}',
+                                        file=sys.stderr,
+                                    )
+                                nxt = getattr(node, "cr_await", None) or getattr(
+                                    node, "gi_yieldfrom", None
+                                )
+                                if nxt is None:
+                                    print(f"  [{depth}] awaiting: {node!r}"[:300], file=sys.stderr)
+                                node = nxt
+                                depth += 1
+                    # Async generators (e.g. ChatModel._astream) hide behind
+                    # `async_generator_asend`; list the running ones directly.
+                    import gc
+                    import types
+
+                    print("=== running async generators ===", file=sys.stderr)
+                    for obj in gc.get_objects():
+                        if not isinstance(obj, types.AsyncGeneratorType) or not obj.ag_running:
+                            continue
+                        frame = obj.ag_frame
+                        if frame is None:
+                            continue
+                        code = frame.f_code
+                        if "site-packages/asyncio" in code.co_filename:
+                            continue
+                        print(
+                            f'  agen {code.co_name} File "{code.co_filename}", line {frame.f_lineno}',
+                            file=sys.stderr,
+                        )
+                        inner = obj.ag_await
+                        d = 0
+                        while inner is not None and d < 40:
+                            fr = getattr(inner, "cr_frame", None) or getattr(
+                                inner, "ag_frame", None
+                            )
+                            if fr is not None:
+                                print(
+                                    f'     [{d}] File "{fr.f_code.co_filename}", line {fr.f_lineno}, in {fr.f_code.co_name}',
+                                    file=sys.stderr,
+                                )
+                            nxt = getattr(inner, "cr_await", None) or getattr(
+                                inner, "ag_await", None
+                            )
+                            if nxt is None:
+                                print(f"     [{d}] awaiting: {inner!r}"[:300], file=sys.stderr)
+                            inner = nxt
+                            d += 1
+                    del traceback
+                    sys.stderr.flush()
+
+                signal.signal(signal.SIGUSR2, _dump_run_coroutines)
+        except Exception:
+            pass
         sandbox_event_bus.bind_loop(asyncio.get_running_loop())
         session_event_bus.bind_loop(asyncio.get_running_loop())
         pty_manager.bind_loop(asyncio.get_running_loop())
@@ -191,14 +286,13 @@ def create_app(
         # connection errors that spam the logs and waste CPU on retries.
         try:
             from agent_server.offline_mode import is_offline
+
             if not is_offline():
                 await connector_service.start()
             else:
                 import logging
 
-                logging.getLogger("agent_server").info(
-                    "Skipping Slack connectors (offline mode)"
-                )
+                logging.getLogger("agent_server").info("Skipping Slack connectors (offline mode)")
         except Exception:
             import logging
 

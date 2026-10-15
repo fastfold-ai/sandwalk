@@ -213,23 +213,19 @@ function TerminalRowInner({
               FAS-107: pin e icono de tipo viven en slots uniformes
               `size-4` con `place-items-center` para garantizar
               alineación vertical con las filas de chat y group split. */}
-          {isPinned ? (
-            <span
-              aria-hidden
-              className="grid size-4 shrink-0 place-items-center"
-            >
+          <span
+            aria-hidden
+            className="grid size-4 shrink-0 place-items-center"
+          >
+            {isPinned ? (
               <Pin
                 aria-label="Pinned"
                 className="text-zinc-400 size-3"
                 fill="currentColor"
               />
-            </span>
-          ) : null}
-          <span
-            aria-hidden
-            className="grid size-4 shrink-0 place-items-center"
-          >
-            <TerminalTypeIcon terminalId={term.id} />
+            ) : (
+              <TerminalTypeIcon terminalId={term.id} />
+            )}
           </span>
           {colorValue ? (
             <span

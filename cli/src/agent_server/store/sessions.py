@@ -14,7 +14,7 @@ DEFAULT_SESSION_TITLE = "New research session"
 
 # Connector / origin values a session row may carry. Mirrors ``SessionSource``
 # in ``models/sessions.py`` and the normalizer in ``store/rows.py``.
-SESSION_SOURCES = frozenset({"slack", "bench", "capy", "claude", "codex", "opencode", "fx"})
+SESSION_SOURCES = frozenset({"slack", "bench", "capy", "claude", "codex", "opencode", "fx", "hermes"})
 
 
 def initial_title_source(title: str | None) -> TitleSource:

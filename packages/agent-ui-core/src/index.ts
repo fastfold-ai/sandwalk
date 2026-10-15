@@ -386,7 +386,7 @@ export type MessageSource = {
 export type SessionTitleSource = 'pending' | 'auto' | 'user'
 
 /** Coding-agent CLIs Sandwalk can read from, launch, and hand off to. */
-export type ExternalAgentKind = 'claude' | 'codex' | 'opencode' | 'fx'
+export type ExternalAgentKind = 'claude' | 'codex' | 'opencode' | 'fx' | 'hermes'
 
 export type SessionSource = 'slack' | 'bench' | 'capy' | ExternalAgentKind
 

@@ -282,6 +282,16 @@ export default function App() {
   )
   const externalClient = bootstrap.client
   const reloadSessionsForExternal = bootstrap.loadSessions
+  const setSessionsForExternal = bootstrap.setSessions
+  // Refs so this effect does not re-bind (and briefly drop the client) on
+  // every session-list identity change. A dropped binding makes the "+" CLI
+  // rows toast and return without opening a terminal.
+  const openItemFromExternalRef = useRef(openItemFromExternal)
+  openItemFromExternalRef.current = openItemFromExternal
+  const reloadSessionsForExternalRef = useRef(reloadSessionsForExternal)
+  reloadSessionsForExternalRef.current = reloadSessionsForExternal
+  const setSessionsForExternalRef = useRef(setSessionsForExternal)
+  setSessionsForExternalRef.current = setSessionsForExternal
   useEffect(() => {
     if (!externalClient) {
       useExternalAgentActions.getState().bind(null)
@@ -289,12 +299,18 @@ export default function App() {
     }
     useExternalAgentActions.getState().bind({
       client: externalClient,
-      openItem: openItemFromExternal,
-      reloadSessions: () => reloadSessionsForExternal({ force: true })
+      openItem: id => openItemFromExternalRef.current(id),
+      upsertSession: session =>
+        setSessionsForExternalRef.current(current =>
+          current.some(item => item.id === session.id)
+            ? current.map(item => (item.id === session.id ? session : item))
+            : [session, ...current]
+        ),
+      reloadSessions: () => reloadSessionsForExternalRef.current({ force: true })
     })
     void refreshInstalledAgents(externalClient)
     return () => useExternalAgentActions.getState().bind(null)
-  }, [externalClient, openItemFromExternal, reloadSessionsForExternal])
+  }, [externalClient])
   const tabGroupsStore = useAppTabGroups(
     ui.projectScopeId,
     bootstrap.sessions,
@@ -546,9 +562,12 @@ export default function App() {
         if (!itemId) return
         const isTerminal = itemId.startsWith('term_')
         const ready = isTerminal
-          ? externalClient
-              ?.listTerminals()
-              .then(list => useTerminalsStore.getState().setAll(list))
+          ? (() => {
+              const seen = useTerminalsStore.getState().revision
+              return externalClient?.listTerminals().then(list => {
+                useTerminalsStore.getState().setAll(list, seen)
+              })
+            })()
           : bootstrap.loadSessions({ force: true })
         void Promise.resolve(ready).then(() => openItemFromExternal(itemId))
         return

@@ -1119,11 +1119,11 @@ def _external_workspace(deps, project_id: str, workspace_path: str) -> tuple[str
 
 @registry.register(
     name="capy.list_external_sessions",
-    description="List recent Claude Code, Codex, OpenCode, and fx sessions on this machine (and which of those CLIs are installed).",
+    description="List recent Claude Code, Codex, OpenCode, fx, and Hermes sessions on this machine (and which of those CLIs are installed).",
     category="capy",
-    usage_guide="Use before importing. Pass agent to filter (claude, codex, opencode, fx) and workspace_path to scope to one folder; otherwise the current project's folder is used when it has one.",
+    usage_guide="Use before importing. Pass agent to filter (claude, codex, opencode, fx, hermes) and workspace_path to scope to one folder; otherwise the current project's folder is used when it has one.",
     parameters={
-        "agent": "Optional: claude, codex, opencode, or fx. Empty lists all four.",
+        "agent": "Optional: claude, codex, opencode, fx, or hermes. Empty lists all of them.",
         "workspace_path": "Optional folder to scope the list to.",
         "project_id": "current (default), all, or a project id/name — its folder scopes the list when workspace_path is empty.",
         "limit": "Max sessions (default 20).",
@@ -1159,11 +1159,11 @@ def capy_list_external_sessions(
 
 @registry.register(
     name="capy.import_external_session",
-    description="Convert a Claude Code / Codex / OpenCode / fx session into a Sandwalk chat (history only; no model run).",
+    description="Convert a Claude Code / Codex / OpenCode / fx / Hermes session into a Sandwalk chat (history only; no model run).",
     category="capy",
     usage_guide="Use after list_external_sessions. The new chat keeps the original folder as its workspace and lands in the chosen project.",
     parameters={
-        "agent": "claude, codex, opencode, or fx.",
+        "agent": "claude, codex, opencode, fx, or hermes.",
         "session_id": "The external session id from list_external_sessions.",
         "project_id": "current (default), all, or a project id/name.",
     },
@@ -1201,11 +1201,11 @@ def capy_import_external_session(
 
 @registry.register(
     name="capy.launch_external_agent",
-    description="Open a terminal running Claude Code, Codex, OpenCode, or fx in a folder, optionally with a first prompt or resuming one of its sessions.",
+    description="Open a terminal running Claude Code, Codex, OpenCode, fx, or Hermes in a folder, optionally with a first prompt or resuming one of its sessions.",
     category="capy",
     usage_guide="Use when the user wants to start or continue work in one of those CLIs. Defaults to the current project's folder.",
     parameters={
-        "agent": "claude, codex, opencode, or fx.",
+        "agent": "claude, codex, opencode, fx, or hermes.",
         "workspace_path": "Folder to open in. Empty uses the current project's folder, then the home folder.",
         "prompt": "Optional first message for the CLI.",
         "resume_id": "Optional external session id to resume instead of starting fresh.",
@@ -1256,12 +1256,12 @@ def capy_launch_external_agent(
 
 @registry.register(
     name="capy.handoff_session",
-    description="Hand a Sandwalk chat to Claude Code, Codex, OpenCode, or fx: writes a transcript file in its folder and opens that CLI on it.",
+    description="Hand a Sandwalk chat to Claude Code, Codex, OpenCode, fx, or Hermes: writes a transcript file in its folder and opens that CLI on it.",
     category="capy",
     usage_guide="Use when the user wants to continue a Sandwalk chat inside one of those CLIs.",
     parameters={
         "session_id": "Sandwalk chat id (from #mention or list_sessions).",
-        "agent": "claude, codex, opencode, or fx.",
+        "agent": "claude, codex, opencode, fx, or hermes.",
     },
 )
 def capy_handoff_session(session_id: str = "", agent: str = "", **kwargs) -> dict:

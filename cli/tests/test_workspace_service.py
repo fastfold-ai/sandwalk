@@ -55,6 +55,53 @@ def test_workspace_create_folder_and_upload(tmp_path: Path):
     assert uploaded.path.endswith("model.cif")
 
 
+def test_workspace_list_is_bounded_on_huge_trees(tmp_path: Path, monkeypatch):
+    """A home-directory-sized workspace must return quickly and partially."""
+    import time
+
+    from agent_server.workspace import read_mixin
+
+    root = tmp_path / "ws"
+    root.mkdir()
+    # 40 dirs x 200 files = 8,000 entries, above the cap.
+    for d in range(40):
+        folder = root / f"d{d:02d}"
+        folder.mkdir()
+        for f in range(200):
+            (folder / f"f{f:03d}.txt").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(read_mixin, "_LIST_MAX_ENTRIES", 1_000)
+
+    started = time.monotonic()
+    items = WorkspaceService(root).list("", recursive=True)
+    elapsed = time.monotonic() - started
+    assert len(items) <= 1_000
+    assert elapsed < read_mixin._LIST_TIME_BUDGET_S + 1.0
+    # Breadth-first: the top-level folders all made it in before the cap hit.
+    assert {i.path for i in items if i.type == "directory"} >= {f"d{d:02d}" for d in range(40)}
+
+
+def test_workspace_list_skips_noise_dirs_and_does_not_follow_foreign_symlinks(tmp_path: Path):
+    import os
+
+    root = tmp_path / "ws"
+    root.mkdir()
+    (root / "node_modules").mkdir()
+    (root / "node_modules" / "big.js").write_text("", encoding="utf-8")
+    (root / "src").mkdir()
+    (root / "src" / "a.py").write_text("", encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "secret.txt").write_text("", encoding="utf-8")
+    os.symlink(elsewhere, root / "escape", target_is_directory=True)
+
+    paths = {i.path for i in WorkspaceService(root).list("", recursive=True)}
+    assert "src/a.py" in paths
+    assert not any(p.startswith("node_modules") for p in paths)
+    # The symlink itself is listed, its target is not descended into.
+    assert "escape" in paths
+    assert "escape/secret.txt" not in paths
+
+
 def test_workspace_lists_and_reads_project_symlink(tmp_path: Path):
     """Files panel must follow workspace/project → linked folder."""
     import os

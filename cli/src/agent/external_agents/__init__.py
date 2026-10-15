@@ -1,6 +1,6 @@
 """Read, launch, and hand off sessions from other coding-agent CLIs.
 
-Supported: Claude Code, Codex, OpenCode, fx. Each reader turns the tool's own
+Supported: Claude Code, Codex, OpenCode, fx, Hermes. Each reader turns the tool's own
 storage into the same ``ExternalSession`` so the import path, Capy, and the
 UI picker do not care which CLI produced it.
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agent.external_agents import claude, codex, fx, opencode
+from agent.external_agents import claude, codex, fx, hermes, opencode
 from agent.external_agents.detect import binary_for, foreground_agent, installed_agents
 from agent.external_agents.types import (
     AGENT_BINARIES,
@@ -42,6 +42,7 @@ _READERS: dict[str, Any] = {
     "codex": codex,
     "opencode": opencode,
     "fx": fx,
+    "hermes": hermes,
 }
 
 
@@ -53,6 +54,7 @@ def normalize_kind(value: str | None) -> ExternalAgentKind | None:
         "openai-codex": "codex",
         "open-code": "opencode",
         "fx.sh": "fx",
+        "hermes-agent": "hermes",
     }
     key = aliases.get(key, key)
     if key in AGENT_KINDS:

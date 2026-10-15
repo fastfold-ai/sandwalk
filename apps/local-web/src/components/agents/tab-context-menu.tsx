@@ -29,7 +29,15 @@ export function TabContextMenuShell({
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return
+      const target = event.target as Node
+      if (menuRef.current?.contains(target)) return
+      // Submenu flyouts portal to <body>; a click inside one is still "inside".
+      if (
+        target instanceof Element &&
+        target.closest('[data-tab-context-submenu]')
+      ) {
+        return
+      }
       onClose()
     }
     const onKey = (event: KeyboardEvent) => {
@@ -62,7 +70,7 @@ export function TabContextMenuShell({
   return createPortal(
     <div
       ref={menuRef}
-      className="bg-popover text-popover-foreground fixed z-50 min-w-[11.5rem] rounded-md border p-1 shadow-md"
+      className="sandwalk-glass-menu bg-popover text-popover-foreground fixed z-50 min-w-[11.5rem] rounded-md border p-1 shadow-md"
       style={{ left, top }}
       role="menu"
       onClick={event => event.stopPropagation()}
@@ -118,7 +126,21 @@ export function TabContextItem({
   )
 }
 
-/** Flyout opened by hovering a row. Used for Split down / Split right. */
+/** Width the flyout is assumed to need when deciding which side to open on. */
+const SUBMENU_WIDTH = 190
+
+/**
+ * Flyout for a context-menu row. Used for Split Down / Split Right and
+ * Continue in…
+ *
+ * Opens on hover *and* on click (WebKit inside the Tauri window delivers
+ * pointer-move inconsistently over native drag regions, so hover-only was
+ * flaky). Stays open while the pointer is over the row or the flyout — the
+ * old version closed as soon as the cursor crossed the gap between them,
+ * so the click landed on nothing. Portaled to <body> and flipped to the
+ * left when there is no room on the right, so it is never clipped at the
+ * window edge.
+ */
 export function TabContextSubmenu({
   icon,
   label,
@@ -131,23 +153,80 @@ export function TabContextSubmenu({
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const rowRef = useRef<HTMLDivElement | null>(null)
+  const flyoutRef = useRef<HTMLDivElement | null>(null)
+  const closeTimer = useRef<number | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  const cancelClose = () => {
+    if (closeTimer.current != null) {
+      window.clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+  }
+  const scheduleClose = () => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => setOpen(false), 120)
+  }
+  const show = () => {
+    cancelClose()
+    const rect = rowRef.current?.getBoundingClientRect()
+    if (rect) {
+      const roomRight = window.innerWidth - rect.right
+      const left =
+        roomRight >= SUBMENU_WIDTH + 8
+          ? rect.right + 4
+          : Math.max(8, rect.left - SUBMENU_WIDTH - 4)
+      const top = Math.min(rect.top, window.innerHeight - 8 - 240)
+      setPos({ top: Math.max(8, top), left })
+    }
+    setOpen(true)
+  }
+
+  useEffect(() => () => cancelClose(), [])
+
   return (
     <div
+      ref={rowRef}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={show}
+      onMouseLeave={scheduleClose}
     >
-      <div className="hover:bg-muted flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3.5">
+      <div
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="hover:bg-muted flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1 text-left text-xs [&_svg]:size-3.5"
+        onMouseDown={event => event.preventDefault()}
+        onClick={event => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (open) setOpen(false)
+          else show()
+        }}
+      >
         {icon}
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {trailing}
         <ChevronRight className="size-3 shrink-0 opacity-60" />
       </div>
-      {open ? (
-        <div className="bg-popover text-popover-foreground absolute top-0 left-full z-50 ml-1 min-w-[11rem] rounded-md border p-1 shadow-md">
-          {children}
-        </div>
-      ) : null}
+      {open && pos
+        ? createPortal(
+            <div
+              ref={flyoutRef}
+              role="menu"
+              data-tab-context-submenu
+              className="sandwalk-glass-menu bg-popover text-popover-foreground fixed z-[60] min-w-[11rem] rounded-md border p-1 shadow-md"
+              style={{ top: pos.top, left: pos.left }}
+              onMouseEnter={cancelClose}
+              onMouseLeave={scheduleClose}
+              onClick={event => event.stopPropagation()}
+            >
+              {children}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   )
 }
