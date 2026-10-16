@@ -157,30 +157,37 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           {
-            echo "# Sandwalk ${VERSION}"
+            echo "## [${VERSION}] - $(date -u +%F)"
             echo
-            echo "**[Download Sandwalk Desktop for macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)**"
+            echo "### Summary"
             echo
-            echo "## Changes"
+            echo "Replace this with what a person can do in this release."
             echo
-            if [[ -n "${PREV}" ]]; then
-              git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD" \
-                | grep -v '^- chore(release):' || true
-            else
-              git log --no-merges --pretty=format:'- %s' -20
-            fi
+            echo "**[Download for macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)**"
             echo
+            echo "### New Features"
             echo
-            echo "Signed with Developer ID and notarized. Add screenshots of the new screens to these notes after the build."
+            echo "#### Feature name"
+            echo
+            echo "- **Description**: What the person can do."
+            echo "- **Impact**: Why that matters."
+            echo
+            echo "**Screenshot**"
+            echo
+            echo "<br><br><br><br>"
+            echo
+            echo "### Bug Fixes"
+            echo
+            echo "- **Area**: What the person notices. (#PR)"
+            echo
           } > release-notes.md
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: Sandwalk Desktop ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: false
