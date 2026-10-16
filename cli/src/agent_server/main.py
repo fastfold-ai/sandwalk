@@ -150,6 +150,16 @@ def run_server(
     from agent_server.app import create_app
     from agent_server.store import AgentStoreCorruptedError, AgentStoreLockError
 
+    # Sealed runtimes (the Mac app bundle) keep catalog packages in a per-user
+    # directory. Put it on sys.path now so run_python and the Environment
+    # report see the same packages the user installed.
+    try:
+        from agent_server.environment_service.user_site import activate_user_site
+
+        activate_user_site()
+    except Exception:  # noqa: BLE001 — never block startup on this
+        pass
+
     # Match CLI Session: expose ~/.sandwalk config credentials to process env
     # so shell/skill subprocesses and PTYs see the same keys as interactive CLI.
     try:

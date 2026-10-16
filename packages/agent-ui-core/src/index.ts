@@ -165,6 +165,8 @@ export type EnvironmentReport = {
   pythonPath: string
   envPath: string | null
   envBytes: number
+  /** Per-user package directory when the interpreter is sealed (Mac app). */
+  userSitePath?: string | null
   groups: EnvironmentPackageGroup[]
   core: EnvironmentCorePackage[]
   checkedAt: string
@@ -177,6 +179,8 @@ export type EnvironmentPackageMutationResult = {
   version: string | null
   installed: boolean
   message: string
+  /** Top-level module that imported in the sandbox process after install. */
+  importModule?: string | null
 }
 
 export type AgentSessionStatus =

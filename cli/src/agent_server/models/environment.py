@@ -30,6 +30,9 @@ class EnvironmentReport(ApiModel):
     python_path: str
     env_path: str | None = None
     env_bytes: int = 0
+    # Set when the interpreter is sealed (Mac app bundle) and catalog packages
+    # live in a per-user directory on sys.path instead.
+    user_site_path: str | None = None
     groups: list[EnvironmentPackageGroup] = Field(default_factory=list)
     core: list[EnvironmentCorePackage] = Field(default_factory=list)
     checked_at: str
@@ -49,3 +52,6 @@ class EnvironmentPackageMutationResult(ApiModel):
     version: str | None = None
     installed: bool = False
     message: str = ""
+    # Top-level module that imported in the server process after install.
+    # The built-in sandbox shares this process, so this is what run_python sees.
+    import_module: str | None = None

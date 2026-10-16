@@ -11,11 +11,14 @@ flat dotted path ``agent_server.environment_service.<name>``.
 
 from __future__ import annotations
 
+import importlib
 import logging
+import os
 import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 
 from agent_server.environment_catalog import (
     is_core_package,
@@ -24,6 +27,11 @@ from agent_server.environment_catalog import (
 )
 from agent_server.environment_service.mutate import build_mutation_result, resolve_canonical_display
 from agent_server.environment_service.report import build_core, build_groups
+from agent_server.environment_service.user_site import (
+    activate_user_site,
+    active_user_site,
+    refresh_imports,
+)
 from agent_server.models import EnvironmentPackageMutationResult, EnvironmentReport
 from agent_server.storage_service import (
     _path_size_bytes,
@@ -47,40 +55,100 @@ def _installed_map() -> dict[str, str]:
     }
 
 
+_UV_FALLBACKS = (
+    Path.home() / ".local" / "bin" / "uv",
+    Path("/opt/homebrew/bin/uv"),
+    Path("/usr/local/bin/uv"),
+)
+
+
 def _find_uv() -> str | None:
-    return shutil.which("uv")
+    found = shutil.which("uv")
+    if found:
+        return found
+    # The Mac app launches with a minimal PATH; look where installers put uv.
+    for candidate in _UV_FALLBACKS:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def _pip_command(action: str, package: str, target: Path | None) -> list[str]:
+    uv = _find_uv()
+    if uv:
+        cmd = [uv, "pip", action]
+        if action == "uninstall":
+            cmd.append("-y")
+        cmd += ["--python", sys.executable]
+        if target is not None:
+            cmd += ["--target", str(target)]
+            if action == "install":
+                # Our own copy of CPython, flagged managed by uv's build tooling.
+                cmd.append("--break-system-packages")
+        cmd.append(package)
+        return cmd
+    cmd = [sys.executable, "-m", "pip", action]
+    if action == "uninstall":
+        cmd.append("-y")
+    if target is not None and action == "install":
+        cmd += ["--target", str(target), "--break-system-packages"]
+    cmd.append(package)
+    return cmd
 
 
 def _run_pip(action: str, package: str) -> subprocess.CompletedProcess[str]:
-    """Run install/uninstall against the current interpreter."""
-    uv = _find_uv()
-    if uv:
-        if action == "install":
-            cmd = [uv, "pip", "install", "--python", sys.executable, package]
-        else:
-            cmd = [
-                uv,
-                "pip",
-                "uninstall",
-                "-y",
-                "--python",
-                sys.executable,
-                package,
-            ]
-    else:
-        if action == "install":
-            cmd = [sys.executable, "-m", "pip", "install", package]
-        else:
-            cmd = [sys.executable, "-m", "pip", "uninstall", "-y", package]
+    """Run install/uninstall against the interpreter, or its user site when sealed."""
+    target = activate_user_site() if active_user_site() is not None else None
+    cmd = _pip_command(action, package, target)
+    env = None
+    if target is not None and not _find_uv():
+        # pip uninstall locates distributions through sys.path.
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(target), env.get("PYTHONPATH", "")]
+        ).rstrip(os.pathsep)
 
     logger.info("Environment package %s: %s", action, " ".join(cmd))
-    return subprocess.run(
+    completed = subprocess.run(
         cmd,
         check=False,
         capture_output=True,
         text=True,
         timeout=_PIP_TIMEOUT_S,
+        env=env,
     )
+    refresh_imports()
+    return completed
+
+
+def _import_check(package: str) -> str | None:
+    """Import the package's top-level module in this process.
+
+    The built-in sandbox runs in this interpreter, so a successful import here
+    is what the agent will see. Returns the module name, or None if nothing
+    importable was found.
+    """
+    from importlib import metadata as importlib_metadata
+
+    key = normalize_package_name(package)
+    modules: list[str] = []
+    try:
+        for module, dists in importlib_metadata.packages_distributions().items():
+            if any(normalize_package_name(d) == key for d in dists):
+                modules.append(module)
+    except Exception:  # noqa: BLE001 — best-effort
+        modules = []
+    if not modules:
+        modules = [key.replace("-", "_")]
+    for module in sorted(modules):
+        if module.startswith("_"):
+            continue
+        try:
+            importlib.import_module(module)
+        except Exception:  # noqa: BLE001 — try the next top-level name
+            continue
+        return module
+    return None
 
 
 class EnvironmentService:
@@ -88,10 +156,12 @@ class EnvironmentService:
         root = resolve_python_env_root()
         installed = _installed_map()
         env_bytes = _path_size_bytes(root) if root else 0
+        user_site = active_user_site()
         return EnvironmentReport(
             python_path=sys.executable,
             env_path=str(root) if root else None,
             env_bytes=env_bytes,
+            user_site_path=str(user_site) if user_site else None,
             groups=build_groups(installed),
             core=build_core(installed),
             checked_at=datetime.now(UTC).isoformat(),
@@ -151,7 +221,13 @@ class EnvironmentService:
                 or f"Failed to {action} {canonical_display} (exit {completed.returncode})."
             )
 
-        return build_mutation_result(action, canonical_display, _installed_map())
+        result = build_mutation_result(action, canonical_display, _installed_map())
+        if action == "install" and result.installed:
+            module = _import_check(canonical_display)
+            result.import_module = module
+            if module is None:
+                result.message += " (installed, but no top-level module imported yet)"
+        return result
 
 
 __all__ = ["EnvironmentError", "EnvironmentService"]
