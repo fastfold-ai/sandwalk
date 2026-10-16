@@ -90,7 +90,8 @@ export function Composer({
   placeholder,
   captureWindowDrops = false,
   onDropActiveChange,
-  capyVoice = null
+  capyVoice = null,
+  client
 }: ComposerProps) {
   const [auraTick, setAuraTick] = useState(0)
   const atMenuRef = useRef<ComposerAtMenuHandle | null>(null)
@@ -431,6 +432,7 @@ export function Composer({
                 onLoadLocalSystem={onLoadLocalSystem}
                 onRefreshSandbox={onRefreshSandbox}
                 onPlanModeChange={onPlanModeChange}
+          client={client}
                 onStop={onStop}
               />
             </>

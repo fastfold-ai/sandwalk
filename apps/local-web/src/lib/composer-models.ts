@@ -78,6 +78,7 @@ const LOCAL_BACKEND_LABELS: Record<string, string> = {
   omlx: 'oMLX',
   ds4: 'DS4',
   llama_cpp: 'llama.cpp',
+  llama: 'Llama',
   lm_studio: 'LM Studio',
   other: 'Local'
 }

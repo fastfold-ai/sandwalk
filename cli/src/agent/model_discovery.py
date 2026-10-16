@@ -247,7 +247,7 @@ def discover_compatible_models(
     errors: list[str] = []
     windows: dict[str, int] = {}
 
-    if backend_type in {"unsloth", "omlx", "ds4", "llama_cpp", "lm_studio"}:
+    if backend_type in {"unsloth", "omlx", "ds4", "llama_cpp", "llama", "lm_studio"}:
         models, windows, err = fetch_openai_models_with_context(
             base_url, api_key=api_key
         )

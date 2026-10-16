@@ -1,5 +1,8 @@
 import { Check, Eye, EyeOff, Loader, RefreshCw } from 'lucide-react'
 
+import {
+  LlamaLibrary,
+  type LlamaLibraryActions} from '@/components/agents/LlamaLibrary'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -31,7 +34,9 @@ export function OnboardingModelLocalPanel({
   onToggleShowKey,
   onDiscover,
   onSave,
-  onSelectModel
+  onSelectModel,
+  onUseLlama,
+  llamaRuntime
 }: {
   localBackend: OnboardingBackendValue
   localUrl: string
@@ -54,7 +59,33 @@ export function OnboardingModelLocalPanel({
   onDiscover: () => void
   onSave: () => void
   onSelectModel: (modelId: string) => void
+  onUseLlama?: (modelId: string) => void
+  llamaRuntime?: LlamaLibraryActions
 }) {
+  if (localBackend === 'llama' && llamaRuntime) {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {PROFILE_BACKENDS.map(item => (
+            <OnboardingChip
+              key={item.value}
+              selected={localBackend === item.value}
+              onClick={() => onPickBackend(item.value)}
+            >
+              <OnboardingBackendIcon icon={item.icon} />
+              {item.label}
+            </OnboardingChip>
+          ))}
+        </div>
+        <LlamaLibrary
+          actions={llamaRuntime}
+          selectedId={localSaved ? selectedModel : null}
+          onUse={modelId => onUseLlama?.(modelId)}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -130,7 +161,11 @@ export function OnboardingModelLocalPanel({
           )}
           Discover models
         </Button>
-        <Button type="button" disabled={localBusy} onClick={() => onSave()}>
+        <Button
+          type="button"
+          disabled={localBusy || !selectedModel}
+          onClick={() => onSave()}
+        >
           {localBusy ? (
             <Loader className="size-4 animate-spin" />
           ) : localSaved ? (
@@ -147,7 +182,7 @@ export function OnboardingModelLocalPanel({
       {discoveredModels.length ? (
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs">
-            Pick a default model
+            Pick one for your first chat
             {discoverSource ? ` (${discoverSource})` : ''}:
           </p>
           <div className="max-h-40 space-y-1 overflow-y-auto pr-1">

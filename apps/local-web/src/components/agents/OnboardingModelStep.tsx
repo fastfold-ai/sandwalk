@@ -24,9 +24,11 @@ import {
 type Mode = 'cloud' | 'local'
 
 export function OnboardingModelStep({
-  client
+  client,
+  onReadyChange
 }: {
   client: LocalAgentClient
+  onReadyChange?: (ready: boolean) => void
 }) {
   const [mode, setMode] = useState<Mode>('cloud')
   const [integrations, setIntegrations] = useState<IntegrationSummary[]>([])
@@ -80,6 +82,11 @@ export function OnboardingModelStep({
   const selectedIntegration = cloudProviders.find(
     item => item.key === selectedCloud
   )
+  const modelReady = defaultSaved || (localSaved && Boolean(selectedModel))
+
+  useEffect(() => {
+    onReadyChange?.(modelReady)
+  }, [modelReady, onReadyChange])
 
   // Set when the user connected via Sign in with ChatGPT rather than a key.
   const [chatGPTConnected, setChatGPTConnected] = useState(false)
@@ -268,7 +275,7 @@ export function OnboardingModelStep({
       setRuntimeSettings(next)
       setDefaultSaved(true)
       setNotice(
-        `Default model set to ${model}. You can change this anytime.`
+        `${model} will start your first chat. You can change it anytime.`
       )
     } catch (err) {
       setError(
@@ -293,16 +300,16 @@ export function OnboardingModelStep({
       const models = result.models || []
       setDiscoveredModels(models)
       setDiscoverSource(result.modelsSource || null)
-      setSelectedModel(models[0] || null)
+      setSelectedModel(null)
       if (result.error) {
         setDiscoverError(result.error)
       } else if (!models.length) {
         setDiscoverError('No models found at this endpoint.')
       } else {
         setNotice(
-          `Found ${models.length} model${models.length === 1 ? '' : 's'}${
+          `Found ${models.length} healthy model${models.length === 1 ? '' : 's'}${
             result.modelsSource ? ` via ${result.modelsSource}` : ''
-          }.`
+          }. Pick one for your first chat.`
         )
       }
     } catch (err) {
@@ -316,29 +323,34 @@ export function OnboardingModelStep({
     }
   }
 
-  const saveLocal = async () => {
+  const saveLocal = async (modelId?: string) => {
+    const model = modelId || selectedModel
+    if (!model) {
+      setError('Pick a discovered model for your first chat.')
+      return
+    }
+    if (modelId) setSelectedModel(modelId)
     setError(null)
     setNotice(null)
     setLocalBusy(true)
     try {
       await client.createModelProfile({
+        id: localBackend === 'llama' ? 'llama_local' : undefined,
         label: localLabel.trim() || selectedBackend.defaultLabel,
         backend: localBackend,
         baseUrl: localUrl.trim() || selectedBackend.baseUrl,
         apiKey: localKey.trim() || undefined,
-        defaultModel: selectedModel || undefined,
+        defaultModel: model,
         setActive: true,
         setDefault: true
       })
       await client.updateRuntimeSettings({
         provider: 'openai',
-        ...(selectedModel ? { model: selectedModel } : {})
+        model
       })
       setLocalSaved(true)
       setNotice(
-        `${selectedBackend.label} profile saved${
-          selectedModel ? ` · default ${selectedModel}` : ''
-        }. You can change this anytime.`
+        `${model} will start your first chat. You can change it anytime.`
       )
     } catch (err) {
       setError(
@@ -351,6 +363,39 @@ export function OnboardingModelStep({
 
   return (
     <div className="space-y-4">
+      <ChatGPTSignInCard
+        client={client}
+        compact
+        onConnected={onChatGPTConnected}
+        onDisconnected={onChatGPTDisconnected}
+      />
+      <div className="border-border/70 space-y-2 rounded-xl border p-3">
+        <div className="flex items-start gap-3">
+          <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
+            <img src="/local-llm/llama.png" alt="" className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Llama</p>
+            <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+              Run a model on this Mac. One click installs it, then you pick
+              the model for your first chat.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="bg-foreground text-background inline-flex h-8 items-center rounded-md px-3 text-sm font-medium"
+          onClick={() => {
+            setMode('local')
+            pickBackend('llama')
+            setError(null)
+            setNotice(null)
+            void client.llamaRuntimeEnsure()
+          }}
+        >
+          Set up Llama
+        </button>
+      </div>
       <div className="flex flex-wrap gap-2">
         <OnboardingChip
           selected={mode === 'cloud'}
@@ -377,12 +422,6 @@ export function OnboardingModelStep({
 
       {mode === 'cloud' ? (
         <>
-          <ChatGPTSignInCard
-            client={client}
-            compact
-            onConnected={onChatGPTConnected}
-            onDisconnected={onChatGPTDisconnected}
-          />
           <div className="flex items-center gap-3">
             <span className="bg-border/70 h-px flex-1" />
             <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
@@ -467,6 +506,16 @@ export function OnboardingModelStep({
           }}
           onToggleShowKey={() => setShowLocalKey(open => !open)}
           onDiscover={() => void discoverLocal()}
+          llamaRuntime={{
+            load: () => client.llamaRuntimeStatus(),
+            ensure: () => client.llamaRuntimeEnsure(),
+            catalog: query => client.llamaRuntimeCatalog(query),
+            install: (repo, quant) => client.llamaRuntimeInstall(repo, quant),
+            loadModel: modelId => client.llamaRuntimeLoad(modelId),
+            unloadModel: modelId => client.llamaRuntimeUnload(modelId),
+            update: () => client.llamaRuntimeUpdate()
+          }}
+          onUseLlama={modelId => void saveLocal(modelId)}
           onSave={() => void saveLocal()}
           onSelectModel={modelId => {
             setSelectedModel(modelId)

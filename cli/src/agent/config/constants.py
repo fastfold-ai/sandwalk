@@ -40,6 +40,6 @@ logger = logging.getLogger("config")
 OPENAI_API_KEY_PATTERN = re.compile(r"^sk-[A-Za-z0-9_-]{6,}$")
 ANTHROPIC_API_KEY_PATTERN = re.compile(r"^sk-ant-[A-Za-z0-9_-]{6,}$")
 OPENAI_PROFILE_BACKENDS = frozenset(
-    {"openai", "ollama", "unsloth", "omlx", "ds4", "llama_cpp", "lm_studio", "other"}
+    {"openai", "ollama", "unsloth", "omlx", "ds4", "llama_cpp", "llama", "lm_studio", "other"}
 )
 _UNSET = object()

@@ -1,6 +1,5 @@
 import { onboardingPath } from '@/lib/onboarding'
 
-import { ChatGPTSignInCard } from './models-view/ChatGPTSignInCard'
 import {
   AgentPromptsView,
   AgentRuntimeView,
@@ -19,6 +18,7 @@ import {
   VoiceView
 } from './dashboard-main-views-lazy'
 import type { DashboardMainViewsProps } from './dashboard-main-views-types'
+import { ChatGPTSignInCard } from './models-view/ChatGPTSignInCard'
 
 export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
   const {
@@ -202,6 +202,15 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     return (
       <ModelsView
         key="models-api-key-test-v3"
+        llamaRuntime={{
+          load: () => client.llamaRuntimeStatus(),
+          ensure: () => client.llamaRuntimeEnsure(),
+          catalog: query => client.llamaRuntimeCatalog(query),
+          install: (repo, quant) => client.llamaRuntimeInstall(repo, quant),
+          loadModel: modelId => client.llamaRuntimeLoad(modelId),
+          unloadModel: modelId => client.llamaRuntimeUnload(modelId),
+          update: () => client.llamaRuntimeUpdate()
+        }}
         integrations={integrations}
         onListModels={options => client.listModels(options)}
         onUpdateModelEnabled={async (modelId, enabled, signal, provider) => {

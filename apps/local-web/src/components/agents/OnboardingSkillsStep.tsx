@@ -1,6 +1,9 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
+import type { McpCatalogEntry } from '@sandwalk/agent-ui-core'
 import { Check, Loader } from 'lucide-react'
+import { useState } from 'react'
 
+import { McpDetailLocalSetupDialog } from '@/components/agents/mcp-view/mcp-detail-local-setup'
 import { McpView } from '@/components/agents/McpView'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +17,8 @@ export function OnboardingSkillsStep({
   client: LocalAgentClient
 }) {
   const skills = useOnboardingSkills(client)
+  const [localSetupEntry, setLocalSetupEntry] =
+    useState<McpCatalogEntry | null>(null)
 
   if (skills.loading && skills.skills.length === 0 && skills.suggestions.length === 0) {
     return (
@@ -107,9 +112,37 @@ export function OnboardingSkillsStep({
           await client.setMcpCatalogEnabled(entry.id, enabled)
           await skills.refreshMcp()
         }}
+        onOpenCatalog={entry => {
+          if (entry.transport === 'stdio') {
+            setLocalSetupEntry(entry)
+          }
+        }}
         onCreateMcp={async () => {}}
         onDeleteMcp={async () => {}}
         onToggleCustom={async () => {}}
+      />
+
+      <McpDetailLocalSetupDialog
+        open={Boolean(localSetupEntry)}
+        onOpenChange={open => {
+          if (!open) setLocalSetupEntry(null)
+        }}
+        entry={
+          localSetupEntry
+            ? (skills.mcpCatalog.find(item => item.id === localSetupEntry.id) ??
+              localSetupEntry)
+            : null
+        }
+        onInstallLocal={
+          localSetupEntry && client.installMcpCatalog
+            ? async opts => {
+                await client.installMcpCatalog!(localSetupEntry.id, {
+                  force: Boolean(opts?.force)
+                })
+                await skills.refreshMcp()
+              }
+            : undefined
+        }
       />
     </div>
   )

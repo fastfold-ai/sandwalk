@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSession,
   AgentSkill,
@@ -115,6 +116,8 @@ export type ComposerProps = {
   captureWindowDrops?: boolean
   onDropActiveChange?: (active: boolean) => void
   /** Capy hands-free owns this composer mic so it cannot stick in Listening. */
+  /** Present when the composer can change llama.cpp context length. */
+  client?: LocalAgentClient
   capyVoice?: {
     recording: boolean
     transcribing: boolean

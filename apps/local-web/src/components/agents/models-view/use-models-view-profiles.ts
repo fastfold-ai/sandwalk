@@ -354,18 +354,23 @@ export function useModelsViewProfiles({
     }
   }
 
-  const saveProfile = async () => {
+  const saveProfile = async (modelId?: string) => {
     setSavingProfile(true)
     setError(null)
     try {
       const defaultModel =
-        discoveredModels[0] || editing?.defaultModel || null
+        modelId || discoveredModels[0] || editing?.defaultModel || null
       const input: UpsertModelProfileInput = {
-        label: form.label.trim() || null,
-        backend: editing?.isCloud ? 'openai' : form.backend,
-        baseUrl: editing?.isCloud ? null : form.baseUrl.trim() || null,
+        id: modelId ? 'llama_local' : undefined,
+        label: form.label.trim() || (modelId ? 'Llama' : null),
+        backend: editing?.isCloud ? 'openai' : modelId ? 'llama' : form.backend,
+        baseUrl: editing?.isCloud
+          ? null
+          : modelId
+            ? 'http://127.0.0.1:9931/v1'
+            : form.baseUrl.trim() || null,
         defaultModel,
-        apiKey: form.apiKey.trim() || null
+        apiKey: modelId ? null : form.apiKey.trim() || null
       }
       if (editing) {
         await onUpdateProfile(editing.id, input)

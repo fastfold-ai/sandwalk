@@ -247,6 +247,13 @@ OPENAI_PROFILE_DEFAULTS = {
         "default_model": "llama3.1",
         "install_url": "https://github.com/ggml-org/llama.cpp",
     },
+    "llama": {
+        "label": "Llama",
+        "base_url": "http://127.0.0.1:9931/v1",
+        "discovery": ["v1_models"],
+        "default_model": "",
+        "install_url": "https://github.com/ggml-org/Llama-macOS",
+    },
     "lm_studio": {
         "label": "LM Studio",
         "base_url": "http://localhost:1234/v1",

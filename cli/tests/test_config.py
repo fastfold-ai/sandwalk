@@ -259,6 +259,7 @@ def test_llm_api_key_prefers_new_anthropic_key():
 def test_infer_openai_compatible_backend_new_template_ports():
     assert Config.infer_openai_compatible_backend("http://localhost:1234/v1") == "lm_studio"
     assert Config.infer_openai_compatible_backend("http://localhost:8080/v1") == "llama_cpp"
+    assert Config.infer_openai_compatible_backend("http://127.0.0.1:9931/v1") == "llama"
     assert Config.infer_openai_compatible_backend("http://localhost:8000/v1/ds4") == "ds4"
 
 
