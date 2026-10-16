@@ -24,11 +24,9 @@ import {
 type Mode = 'cloud' | 'local'
 
 export function OnboardingModelStep({
-  client,
-  onReadyChange
+  client
 }: {
   client: LocalAgentClient
-  onReadyChange?: (ready: boolean) => void
 }) {
   const [mode, setMode] = useState<Mode>('cloud')
   const [integrations, setIntegrations] = useState<IntegrationSummary[]>([])
@@ -82,11 +80,6 @@ export function OnboardingModelStep({
   const selectedIntegration = cloudProviders.find(
     item => item.key === selectedCloud
   )
-  const modelReady = defaultSaved || (localSaved && Boolean(selectedModel))
-
-  useEffect(() => {
-    onReadyChange?.(modelReady)
-  }, [modelReady, onReadyChange])
 
   // Set when the user connected via Sign in with ChatGPT rather than a key.
   const [chatGPTConnected, setChatGPTConnected] = useState(false)

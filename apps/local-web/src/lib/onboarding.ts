@@ -40,7 +40,7 @@ export const ONBOARDING_STEPS: OnboardingStepDef[] = [
     slug: 'model',
     title: 'Model',
     subtitle: 'Choose the model for your first chat.',
-    skippable: false
+    skippable: true
   },
   {
     id: 'agents',

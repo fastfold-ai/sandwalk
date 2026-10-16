@@ -23,7 +23,7 @@ describe('onboarding steps', () => {
       'ready'
     ])
     expect(ONBOARDING_STEPS[0]?.title).toBe('Make it yours')
-    expect(ONBOARDING_STEPS[1]?.skippable).toBe(false)
+    expect(ONBOARDING_STEPS[1]?.skippable).toBe(true)
     expect(ONBOARDING_STEPS[2]?.skippable).toBe(true)
     expect(ONBOARDING_STEPS[2]?.slug).toBe('agents')
     expect(ONBOARDING_STEPS[3]?.skippable).toBe(true)
