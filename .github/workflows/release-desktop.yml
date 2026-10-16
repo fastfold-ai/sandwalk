@@ -36,6 +36,8 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
@@ -147,6 +149,33 @@ jobs:
             apps/packaging/dist/latest.json
           if-no-files-found: error
 
+      - name: Write release notes
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+          {
+            echo "# Sandwalk ${VERSION}"
+            echo
+            echo "**[Download Sandwalk Desktop for macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)**"
+            echo
+            echo "## Changes"
+            echo
+            if [[ -n "${PREV}" ]]; then
+              git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD" \
+                | grep -v '^- chore(release):' || true
+            else
+              git log --no-merges --pretty=format:'- %s' -20
+            fi
+            echo
+            echo
+            echo "Signed with Developer ID and notarized. Add screenshots of the new screens to these notes after the build."
+          } > release-notes.md
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -155,26 +184,13 @@ jobs:
           draft: ${{ inputs.draft }}
           prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: false
+          body_path: release-notes.md
           files: |
             apps/packaging/dist/Sandwalk-${{ steps.ver.outputs.version }}-macos-arm64.dmg
             apps/packaging/dist/Sandwalk-macos-arm64.dmg
             apps/packaging/dist/Sandwalk.app.tar.gz
             apps/packaging/dist/Sandwalk.app.tar.gz.sig
             apps/packaging/dist/latest.json
-          body: |
-            [Sandwalk](https://sandwalk.sh) is a self-hosted science agent for researchers. Chat, CLI, and the macOS desktop app share the same sessions and workspace.
-
-            **[Download Sandwalk Desktop for macOS (Apple Silicon)](https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/Sandwalk-macos-arm64.dmg)**
-
-            Here's what you can do with Sandwalk Desktop:
-
-            - Run a **local agent server** from the menubar — one install covers the app, API, and `sandwalk` CLI on your PATH.
-            - Ask research questions with **plan mode**, multimodal attachments, and human-in-the-loop skill approvals.
-            - Use curated tools for **chemistry, targets, structures, omics, clinical, and literature**, plus live databases (PubChem, ChEMBL, UniProt, PDB, …).
-            - Connect **Anthropic, OpenAI, Gemini, Grok, local models** (Ollama, Unsloth, oMLX, llama.cpp, LM Studio), skills, and MCPs.
-            - Run compute **locally or on Modal / Lambda / Fastfold Cloud**.
-
-            macOS builds are signed with **Developer ID Application** and notarized when Apple secrets are configured. In-app updates use `latest.json` + `Sandwalk.app.tar.gz`.
         env:
           # A classic PAT (repo scope) as RELEASE_GITHUB_TOKEN publishes as you,
           # not github-actions[bot].
