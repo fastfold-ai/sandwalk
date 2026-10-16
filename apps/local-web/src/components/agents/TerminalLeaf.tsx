@@ -99,7 +99,7 @@ export function TerminalLeaf({
   return (
     <div
       className={cn(
-        'bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color] duration-300 ease-out',
+        'sandwalk-glass-panel bg-background relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border transition-[border-color] duration-300 ease-out',
         // Same hover-ring pattern as ChatLeaf — pseudo-element sits
         // inside the box so `overflow: hidden` doesn't clip it (per
         // CSS 2.2 §11.1.1 outline would be clipped). Orange border

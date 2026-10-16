@@ -130,18 +130,21 @@ describe('terminal-theme', () => {
     spy.mockRestore()
   })
 
-  it('watches window theme events and cleans up on stop', () => {
+  it('watches window theme events and cleans up on stop', async () => {
     const onChange = vi.fn()
     const stop = watchTerminalTheme(onChange)
 
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
     window.dispatchEvent(new Event(PALETTE_CHANGE_EVENT))
-    expect(onChange).toHaveBeenCalledTimes(2)
+    expect(onChange).not.toHaveBeenCalled()
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    expect(onChange).toHaveBeenCalledTimes(1)
 
     stop()
     onChange.mockClear()
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
     window.dispatchEvent(new Event(PALETTE_CHANGE_EVENT))
+    await new Promise(resolve => requestAnimationFrame(resolve))
     expect(onChange).not.toHaveBeenCalled()
   })
 })

@@ -1,5 +1,5 @@
 import type { AccountSummary } from '@sandwalk/agent-ui-core'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import {
@@ -167,9 +167,14 @@ export function GeneralView({
     }
   }, [refreshCliPath])
 
-  // Sandwalk menu → Check for Updates… lands here with ?checkUpdates=1
+  // Older menu links landed here with ?checkUpdates=1. Handle that once.
+  // Depending on searchParams and calling setSearchParams in the same effect
+  // retriggered replaceState until the webview aborted.
+  const checkUpdatesOnce = useRef(false)
   useEffect(() => {
+    if (checkUpdatesOnce.current) return
     if (searchParams.get('checkUpdates') !== '1') return
+    checkUpdatesOnce.current = true
     const next = new URLSearchParams(searchParams)
     next.delete('checkUpdates')
     setSearchParams(next, { replace: true })

@@ -283,6 +283,20 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark [data-pane-kind] {
   border-color: rgb(255 255 255 / 0.08);
 }
 
+/* The xterm canvas sits in a fixed portal over the pane. Blur whatever is
+ * behind it; the theme background is translucent while liquid glass is on. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off)
+  [data-terminal-portal-host] {
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
+  [data-terminal-portal-host] {
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
 /* Scroll edge fades are a solid --background wash. On glass they read as
  * a hard line above the composer. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-chat-edge-fade {

@@ -41,8 +41,11 @@ export function useDesktopWindowMenu(options?: {
         return
       }
       if (payload.action === 'check-updates') {
+        // Check in place and open Settings. Do not add ?checkUpdates=1:
+        // stripping that param with replace() looped history.replaceState
+        // on the desktop hash router and crashed the window.
         void checkForUpdate()
-        navigate('/dashboard/general?checkUpdates=1')
+        navigate('/dashboard/general')
         return
       }
       if (payload.action === 'open-recent' && payload.url) {

@@ -4,10 +4,11 @@ import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import { listen } from '@tauri-apps/api/event'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
-import { Terminal as XTerm } from '@xterm/xterm'
+import { type ITheme, Terminal as XTerm } from '@xterm/xterm'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { isExternalAgentKind } from '@/components/agents/ExternalAgentIcon'
 import {
   notifyTerminalCommandFinished,
   notifyTerminalCustom
@@ -20,9 +21,9 @@ import { takeTerminalStartup } from '@/lib/terminal-startup'
 import {
   buildTerminalTheme,
   isDocumentDark,
+  isLiquidGlassActive,
   watchTerminalTheme
 } from '@/lib/terminal-theme'
-import { isExternalAgentKind } from '@/components/agents/ExternalAgentIcon'
 import { useTerminalsStore } from '@/lib/terminals-store'
 
 import {
@@ -113,6 +114,7 @@ export function TerminalPortalHost({
   const termRef = useRef<XTerm | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const webglRef = useRef<WebglAddon | null>(null)
+  const pendingThemeRef = useRef<ITheme | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
   const ptyRef = useRef<PtyInfo | null>(null)
   const attachedRef = useRef(false)
@@ -268,6 +270,7 @@ export function TerminalPortalHost({
   const setGpuRenderer = (on: boolean) => {
     const term = termRef.current
     if (!term || !attachedRef.current) return
+    if (on && isLiquidGlassActive()) on = false
     if (on) {
       if (webglRef.current) return
       try {
@@ -313,6 +316,11 @@ export function TerminalPortalHost({
       return
     }
     host.style.display = ''
+    const pendingTheme = pendingThemeRef.current
+    if (pendingTheme && termRef.current) {
+      pendingThemeRef.current = null
+      termRef.current.options.theme = pendingTheme
+    }
     setGpuRenderer(true)
     host.style.position = 'fixed'
     host.style.top = `${rect.top}px`
@@ -349,7 +357,7 @@ export function TerminalPortalHost({
         '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       theme: buildTerminalTheme(isDocumentDark()),
       convertEol: false,
-      allowTransparency: false,
+      allowTransparency: true,
       scrollback: 5000,
       smoothScrollDuration: 0
     })
@@ -359,8 +367,18 @@ export function TerminalPortalHost({
     fitRef.current = fit
     perfTrackTerminal(terminalId, term)
 
-    const stopThemeWatch = watchTerminalTheme(() => {
-      term.options.theme = buildTerminalTheme(isDocumentDark())
+    const stopThemeWatch = watchTerminalTheme(theme => {
+      // Off-screen terminals take the new theme when they are next shown
+      // (see applyPosition). Re-theming every hidden xterm on a palette
+      // click rewrote dozens of `<style>` tags for nothing visible.
+      if (hostRef.current?.style.display === 'none') {
+        pendingThemeRef.current = theme
+        return
+      }
+      pendingThemeRef.current = null
+      term.options.theme = theme
+      // WebGL paints an opaque clear color, which hides the glass.
+      if (isLiquidGlassActive()) setGpuRenderer(false)
     })
 
     // Keystrokes typed before the PTY WebSocket is open (the restored

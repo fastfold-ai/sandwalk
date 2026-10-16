@@ -840,7 +840,10 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
           {terminalId ? (
             // Terminal-as-main-pane. The chrome tab already names it, so
             // the pane itself is just the shell.
-            <main className="relative flex h-full min-w-0 flex-col">
+            <main
+              className="sandwalk-glass-panel relative flex h-full min-w-0 flex-col"
+              data-pane-kind="terminal"
+            >
               {panelRail}
               {!terminalsLoading && !terminals.some(item => item.id === terminalId) ? (
                 <div className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
