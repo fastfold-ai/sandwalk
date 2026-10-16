@@ -84,6 +84,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     return (
       <AgentRuntimeView
         connected={Boolean(health)}
+        client={client}
         runtimeSettings={runtimeSettings}
         onUpdateRuntimeSettings={async changes => {
           const next = await client.updateRuntimeSettings(changes)

@@ -13,6 +13,8 @@ export type RuntimeDraft = {
   toolHealthEnabled: boolean
   toolHealthFailThreshold: string
   toolHealthSuppressSeconds: string
+  maxConcurrentRuns: string
+  minFreeMemoryGb: string
 }
 
 export function settingsToDraft(settings: RuntimeSettings | null): RuntimeDraft {
@@ -27,6 +29,10 @@ export function settingsToDraft(settings: RuntimeSettings | null): RuntimeDraft 
     toolHealthFailThreshold: String(settings?.toolHealthFailThreshold ?? 2),
     toolHealthSuppressSeconds: String(
       settings?.toolHealthSuppressSeconds ?? 900
+    ),
+    maxConcurrentRuns: String(settings?.maxConcurrentRuns ?? 0),
+    minFreeMemoryGb: String(
+      Math.round(((settings?.minFreeMemoryMb ?? 2048) / 1024) * 10) / 10
     )
   }
 }

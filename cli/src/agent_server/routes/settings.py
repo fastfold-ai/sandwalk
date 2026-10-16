@@ -10,6 +10,7 @@ from agent_server.app_deps import AppDeps
 from agent_server.models import (
     OnboardingSettings,
     PromptBudgetResponse,
+    RunCapacity,
     RuntimeSettings,
     SandboxProbeReport,
     SandboxSettings,
@@ -70,6 +71,24 @@ def register_settings_routes(app: FastAPI, deps: AppDeps) -> None:
             return await asyncio.to_thread(settings_service.update, payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/v1/settings/capacity", response_model=RunCapacity)
+    async def get_run_capacity() -> RunCapacity:
+        """How many agent runs are executing or queued, and the memory headroom."""
+        import os
+
+        from agent_server.run_admission import run_admission
+
+        snap = await asyncio.to_thread(run_admission().snapshot)
+        return RunCapacity(
+            running=snap.running,
+            queued=snap.queued,
+            max_concurrent_runs=snap.max_concurrent_runs,
+            min_free_memory_mb=snap.min_free_memory_mb,
+            available_memory_mb=snap.available_memory_mb,
+            total_memory_mb=snap.total_memory_mb,
+            cpu_count=os.cpu_count() or 1,
+        )
 
     @app.get("/v1/settings/onboarding", response_model=OnboardingSettings)
     async def get_onboarding_settings() -> OnboardingSettings:

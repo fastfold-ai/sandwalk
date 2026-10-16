@@ -877,7 +877,7 @@ export type AgentEvent =
         durationSeconds: number
       }
     >
-  | EventEnvelope<'run.progress', { text?: string }>
+  | EventEnvelope<'run.progress', { text?: string; kind?: 'capacity' | string }>
   | EventEnvelope<'todos.updated', { todos: AgentTodo[] }>
   | EventEnvelope<
       'plan.created',
@@ -1034,6 +1034,10 @@ export type RuntimeSettings = {
   toolHealthEnabled: boolean
   toolHealthFailThreshold: number
   toolHealthSuppressSeconds: number
+  /** Agent runs allowed at once; 0 = sized from the core count. */
+  maxConcurrentRuns?: number
+  /** RAM to keep free before another run may start. */
+  minFreeMemoryMb?: number
   /** True = Plan mode (author plans/*.md); false = Agent mode. */
   planMode?: boolean
   /**
@@ -1048,6 +1052,17 @@ export type AgentPlanCard = {
   path: string
   title: string
   summary: string
+}
+
+/** Live state of the agent-run gate (GET /v1/settings/capacity). */
+export type RunCapacity = {
+  running: number
+  queued: number
+  maxConcurrentRuns: number
+  minFreeMemoryMb: number
+  availableMemoryMb: number | null
+  totalMemoryMb: number | null
+  cpuCount: number
 }
 
 export type OnboardingSettings = {

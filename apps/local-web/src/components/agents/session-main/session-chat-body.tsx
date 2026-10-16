@@ -79,6 +79,7 @@ export type SessionChatBodyProps = {
   activeBuildPlan: import('@sandwalk/agent-ui-core').AgentPlanCard | null
   builtPlanPaths: string[]
   liveDelta: string
+  liveStatus?: string | null
   pendingApproval: import('@sandwalk/agent-ui-core').PendingHitlApproval | null
   approvalSubmitting: boolean
   onSubmitApprovals: (
@@ -131,6 +132,7 @@ export function SessionChatBody({
   activeBuildPlan,
   builtPlanPaths,
   liveDelta,
+  liveStatus = null,
   pendingApproval,
   approvalSubmitting,
   onSubmitApprovals,
@@ -340,6 +342,7 @@ export function SessionChatBody({
               activeBuildPlan={activeBuildPlan}
               builtPlanPaths={builtPlanPaths}
               liveDelta={liveDelta}
+              liveStatus={liveStatus}
               pendingApproval={pendingApproval}
               approvalSubmitting={approvalSubmitting}
               onSubmitApprovals={onSubmitApprovals}

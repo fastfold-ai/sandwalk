@@ -29,6 +29,10 @@ class RuntimeSettings(ApiModel):
     # File access policy: "project" (workspace + linked project folder only)
     # or "full" (anywhere on the host filesystem).
     file_access: str = "project"
+    # Capacity: how many agent runs may execute at once (0 = sized from the
+    # core count) and how much RAM to keep free before starting another.
+    max_concurrent_runs: int = 0
+    min_free_memory_mb: int = 2048
 
 
 class UpdateRuntimeSettingsRequest(ApiModel):
@@ -52,6 +56,20 @@ class UpdateRuntimeSettingsRequest(ApiModel):
     tool_health_suppress_seconds: int | None = None
     plan_mode: bool | None = None
     file_access: str | None = None
+    max_concurrent_runs: int | None = None
+    min_free_memory_mb: int | None = None
+
+
+class RunCapacity(ApiModel):
+    """Live view of the agent-run gate for the Runtime page."""
+
+    running: int
+    queued: int
+    max_concurrent_runs: int
+    min_free_memory_mb: int
+    available_memory_mb: int | None = None
+    total_memory_mb: int | None = None
+    cpu_count: int
 
 
 class OnboardingSettings(ApiModel):

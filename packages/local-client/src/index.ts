@@ -66,6 +66,7 @@ import type {
   ServerStatusReport,
   StorageReport,
   ModelsProvider,
+  RunCapacity,
   RuntimeSettings,
   SandboxProbeReport,
   SandboxSettings,
@@ -3199,11 +3200,18 @@ export class LocalAgentClient
         tool_health_fail_threshold: changes.toolHealthFailThreshold,
         tool_health_suppress_seconds: changes.toolHealthSuppressSeconds,
         plan_mode: changes.planMode,
-        file_access: changes.fileAccess
+        file_access: changes.fileAccess,
+        max_concurrent_runs: changes.maxConcurrentRuns,
+        min_free_memory_mb: changes.minFreeMemoryMb
       }),
       headers: { 'content-type': 'application/json' },
       signal
     })
+  }
+
+  /** Agent runs executing / queued right now, and the memory headroom. */
+  getRunCapacity(signal?: AbortSignal): Promise<RunCapacity> {
+    return this.request<RunCapacity>('/settings/capacity', { signal })
   }
 
   getOnboardingSettings(signal?: AbortSignal): Promise<OnboardingSettings> {

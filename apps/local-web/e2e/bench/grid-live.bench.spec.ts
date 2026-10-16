@@ -10,7 +10,21 @@ const SUITE = 'grid-live'
 const RUN_ID = process.env.SANDWALK_BENCH_RUN_ID ?? `${Date.now()}`
 /** Token the agent must echo; counted twice in a pane (user + assistant). */
 const REPLY_TOKEN = 'ZQX7'
-const PROMPT = `Reply with exactly this token and nothing else: ${REPLY_TOKEN}`
+const TINY_PROMPT = `Reply with exactly this token and nothing else: ${REPLY_TOKEN}`
+/**
+ * What a research grid actually streams: several hundred words of markdown
+ * with headings, a table and a code block, plus one run_python tool call so
+ * the server-side agent thread does real work. Ends with the token so the
+ * "reply visible" probe stays the same.
+ */
+const HEAVY_PROMPT =
+  'First use run_python to compute the first 25 Fibonacci numbers and their sum, and print them. ' +
+  'Then write a report of about 600 words on how protein language models are used for de novo ' +
+  'protein design. Use markdown: an H2 title, four H3 sections, one bullet list of at least six ' +
+  'items, one table with four rows comparing ESM-2, ESM-3, ProtGPT2 and ProGen2, and one short ' +
+  'Python code block. Include the Fibonacci sum you computed in the text. ' +
+  `End your reply with this exact token on its own line: ${REPLY_TOKEN}`
+const PROMPT = env.livePrompt === 'heavy' ? HEAVY_PROMPT : TINY_PROMPT
 
 function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0
@@ -201,7 +215,8 @@ test.describe('live agent grid', () => {
             grids: env.liveGrids,
             viewport: '1600x1000',
             provider: env.liveProvider ?? 'server-default',
-            model: env.liveModel ?? 'server-default'
+            model: env.liveModel ?? 'server-default',
+            prompt: env.livePrompt
           },
           RUN_ID
         )

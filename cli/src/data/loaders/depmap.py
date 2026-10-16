@@ -40,8 +40,9 @@ def load_model_metadata() -> pd.DataFrame:
     return _read_tabular(path)
 
 
+@lru_cache(maxsize=1)
 def load_mutations() -> pd.DataFrame:
-    """Load DepMap somatic mutation data."""
+    """Load DepMap somatic mutation data (one copy per process, like the others)."""
     from data.loaders import _find_file
 
     path = _find_file("OmicsSomaticMutationsMatrixDamaging.csv", subdirs=["", "depmap"])

@@ -160,6 +160,15 @@ def run_server(
     except Exception:  # noqa: BLE001 — never block startup on this
         pass
 
+    # Agent-run capacity limits from the user's config (Runtime → Capacity).
+    try:
+        from agent.config import Config
+        from agent_server.run_admission import refresh_from_config
+
+        refresh_from_config(Config.load())
+    except Exception:  # noqa: BLE001
+        pass
+
     # Match CLI Session: expose ~/.sandwalk config credentials to process env
     # so shell/skill subprocesses and PTYs see the same keys as interactive CLI.
     try:

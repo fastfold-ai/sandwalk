@@ -20,6 +20,11 @@ export type E2EEnv = {
   /** Provider/model for live sessions (else the server default). */
   liveProvider: string | null
   liveModel: string | null
+  /**
+   * `tiny` = echo one token (transport/latency). `heavy` = a long markdown
+   * report plus a run_python call per pane (what a research grid streams).
+   */
+  livePrompt: 'tiny' | 'heavy'
 }
 
 function settingsPathCandidates(): string[] {
@@ -69,6 +74,7 @@ export function resolveE2EEnv(): E2EEnv {
       .filter(Boolean),
     liveTimeoutMs: Number(process.env.SANDWALK_E2E_LIVE_TIMEOUT_MS || 120_000),
     liveProvider: (process.env.SANDWALK_E2E_PROVIDER || '').trim() || null,
-    liveModel: (process.env.SANDWALK_E2E_MODEL || '').trim() || null
+    liveModel: (process.env.SANDWALK_E2E_MODEL || '').trim() || null,
+    livePrompt: (process.env.SANDWALK_E2E_PROMPT || 'tiny').trim() === 'heavy' ? 'heavy' : 'tiny'
   }
 }

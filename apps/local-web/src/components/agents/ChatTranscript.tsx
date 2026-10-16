@@ -66,6 +66,8 @@ type ChatTranscriptProps = {
   activeBuildPlan?: AgentPlanCard | null
   builtPlanPaths?: string[]
   liveDelta: string
+  /** Server status for the active run, e.g. waiting in the capacity queue. */
+  liveStatus?: string | null
   pendingApproval?: PendingHitlApproval | null
   approvalSubmitting?: boolean
   onSubmitApprovals?: (decisions: HitlDecision[]) => void | Promise<void>
@@ -101,6 +103,7 @@ export function ChatTranscript({
   activeBuildPlan = null,
   builtPlanPaths = EMPTY_PLAN_PATHS,
   liveDelta,
+  liveStatus = null,
   pendingApproval = null,
   approvalSubmitting = false,
   onSubmitApprovals,
@@ -271,6 +274,13 @@ export function ChatTranscript({
                 {pendingApproval ? (
                   <span className="animate-text-shimmer font-light">
                     Pending approval
+                  </span>
+                ) : liveStatus && !liveDelta ? (
+                  <span
+                    className="text-muted-foreground font-light"
+                    data-testid="run-live-status"
+                  >
+                    {liveStatus}
                   </span>
                 ) : (
                   <AgentStatusText

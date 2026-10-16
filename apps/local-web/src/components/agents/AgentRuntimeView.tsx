@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
 import { Check, Loader } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -10,6 +11,7 @@ import {
   clampInt,
   type RuntimeDraft,
   settingsToDraft} from './runtime-view/runtime-view-fields'
+import { RuntimeCapacitySection } from './runtime-view/runtime-view-capacity'
 import {
   RuntimeTimeoutsSection,
   RuntimeToolCallingSection,
@@ -20,9 +22,12 @@ import {
 export function AgentRuntimeView({
   connected,
   runtimeSettings,
-  onUpdateRuntimeSettings
+  onUpdateRuntimeSettings,
+  client
 }: {
   connected: boolean
+  /** When present, the Capacity section shows live running / queued counts. */
+  client?: LocalAgentClient
   runtimeSettings: RuntimeSettings | null
   onUpdateRuntimeSettings: (
     changes: Partial<RuntimeSettings>
@@ -89,6 +94,10 @@ export function AgentRuntimeView({
           30,
           86400,
           900
+        ),
+        maxConcurrentRuns: clampInt(draft.maxConcurrentRuns, 0, 64, 0),
+        minFreeMemoryMb: Math.round(
+          Math.max(0, Math.min(256, Number(draft.minFreeMemoryGb) || 0)) * 1024
         )
       })
       setDraft(settingsToDraft(next))
@@ -137,6 +146,7 @@ export function AgentRuntimeView({
           </div>
         ) : null}
 
+        <RuntimeCapacitySection {...sectionProps} client={client} />
         <RuntimeToolCallingSection {...sectionProps} />
         <RuntimeToolTracesSection {...sectionProps} />
         <RuntimeTimeoutsSection {...sectionProps} />

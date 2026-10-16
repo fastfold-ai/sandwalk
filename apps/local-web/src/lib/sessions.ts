@@ -32,6 +32,8 @@ export type SessionChatState = {
   activeRunId: string | null
   runActive: boolean
   liveDelta: string
+  /** Server-side status for the active run (e.g. parked in the capacity queue). */
+  liveStatus: string | null
   composer: string
   composerSkills: string[]
   composerFiles: string[]
@@ -64,6 +66,7 @@ export function emptySessionChatState(): SessionChatState {
     activeRunId: null,
     runActive: false,
     liveDelta: '',
+    liveStatus: null,
     composer: '',
     composerSkills: [],
     composerFiles: [],

@@ -57,6 +57,45 @@ describe('reduceChatOnAgentEvent', () => {
     expect(next.liveDelta).toBe('Hello world')
   })
 
+  it('shows a run.progress status until the first token arrives', () => {
+    const start = { ...emptySessionChatState(), runActive: true }
+    // Reasoning snippets also arrive as run.progress; they must not show.
+    expect(
+      reduceChatOnAgentEvent(
+        start,
+        event('run.progress', { text: 'Enzymes are biological catalysts that ac' })
+      )
+    ).toBe(start)
+    const queued = reduceChatOnAgentEvent(
+      start,
+      event('run.progress', {
+        text: 'Waiting for a free agent slot (8 of 8 running).',
+        kind: 'capacity'
+      } as { text: string })
+    )
+    expect(queued.liveStatus).toBe('Waiting for a free agent slot (8 of 8 running).')
+    // Same text again is a no-op (no extra render).
+    expect(
+      reduceChatOnAgentEvent(
+        queued,
+        event('run.progress', {
+          text: 'Waiting for a free agent slot (8 of 8 running).',
+          kind: 'capacity'
+        } as { text: string })
+      )
+    ).toBe(queued)
+    const streaming = reduceChatOnAgentEvent(
+      queued,
+      event('assistant.delta', { delta: 'Hi' })
+    )
+    expect(streaming.liveStatus).toBeNull()
+    const ended = reduceChatOnAgentEvent(
+      queued,
+      event('run.completed', { messageId: 'm1' })
+    )
+    expect(ended.liveStatus).toBeNull()
+  })
+
   it('stores plan.created cards by run id', () => {
     const prev = emptySessionChatState()
     const next = reduceChatOnAgentEvent(

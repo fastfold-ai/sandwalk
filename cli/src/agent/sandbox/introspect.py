@@ -4,28 +4,39 @@
 class SandboxIntrospectMixin:
     """Owns dataset/tool injection and human-readable namespace descriptions."""
 
+    DATASET_LOADERS = {
+        "crispr": "load_crispr",
+        "prism": "load_prism",
+        "l1000": "load_l1000",
+        "proteomics": "load_proteomics",
+        "mutations": "load_mutations",
+        "model_metadata": "load_model_metadata",
+    }
+
     def load_datasets(self) -> dict:
-        """Load configured datasets into the namespace. Returns dict of loaded names."""
-        loaded = {}
-        loaders = {
-            "crispr": "load_crispr",
-            "prism": "load_prism",
-            "l1000": "load_l1000",
-            "proteomics": "load_proteomics",
-            "mutations": "load_mutations",
-            "model_metadata": "load_model_metadata",
-        }
-        for name, func_name in loaders.items():
-            try:
-                from data import loaders as data_loaders
-                loader_fn = getattr(data_loaders, func_name, None)
-                if loader_fn:
-                    df = loader_fn()
-                    self._namespace[name] = df
-                    loaded[name] = f"DataFrame {df.shape[0]} rows x {df.shape[1]} cols"
-            except (FileNotFoundError, Exception):
-                pass  # Dataset not configured — skip silently
-        return loaded
+        """Expose configured datasets in the namespace. Returns dict of names.
+
+        Nothing is read here. Each name is a :class:`LazyDataset` that parses
+        the file the first time agent code touches it, so a run that never
+        uses reference data pays no CPU or memory for it. Values in the
+        returned dict say ``lazy``; :meth:`describe_namespace` reports shapes
+        only for datasets that have been loaded.
+        """
+        from agent.sandbox.lazy_dataset import LazyDataset
+        from data import loaders as data_loaders
+
+        exposed = {}
+        for name, func_name in self.DATASET_LOADERS.items():
+            loader_fn = getattr(data_loaders, func_name, None)
+            if loader_fn is None:
+                continue
+            existing = self._namespace.get(name)
+            if existing is not None and not isinstance(existing, LazyDataset):
+                exposed[name] = "loaded"
+                continue
+            self._namespace[name] = LazyDataset(name, loader_fn, self._namespace)
+            exposed[name] = "lazy"
+        return exposed
 
     def inject_tools(self, tools_namespace) -> None:
         """Bind a ``tools`` namespace of domain-tool callables (PTC mode).
@@ -73,18 +84,33 @@ class SandboxIntrospectMixin:
                 "Use `tools.search('query')` / `tools.list('<category>')` to discover.\n"
             )
 
-        # Datasets
-        dataset_names = ["crispr", "prism", "l1000", "proteomics", "mutations", "model_metadata"]
-        for name in dataset_names:
-            if name in self._namespace:
-                df = self._namespace[name]
-                cols_preview = list(df.columns[:8])
-                if len(df.columns) > 8:
-                    cols_preview.append(f"... ({len(df.columns)} total)")
-                lines.append(
-                    f"**{name}**: DataFrame({df.shape[0]} rows x {df.shape[1]} cols), "
-                    f"columns: {cols_preview}, index: {df.index.name or type(df.index).__name__}"
-                )
+        # Datasets. Loaded ones get their shape; lazy ones are named only, so
+        # describing the namespace never triggers a multi-hundred-MB parse.
+        from agent.sandbox.lazy_dataset import LazyDataset
+
+        lazy_names = []
+        for name in self.DATASET_LOADERS:
+            if name not in self._namespace:
+                continue
+            df = self._namespace[name]
+            if isinstance(df, LazyDataset) and not df.loaded:
+                lazy_names.append(name)
+                continue
+            if isinstance(df, LazyDataset):
+                df = df.load()
+            cols_preview = list(df.columns[:8])
+            if len(df.columns) > 8:
+                cols_preview.append(f"... ({len(df.columns)} total)")
+            lines.append(
+                f"**{name}**: DataFrame({df.shape[0]} rows x {df.shape[1]} cols), "
+                f"columns: {cols_preview}, index: {df.index.name or type(df.index).__name__}"
+            )
+        if lazy_names:
+            lines.append(
+                f"**Reference datasets** (DataFrames, read on first use if installed): "
+                f"{', '.join(lazy_names)}. Call `<name>.shape` or `<name>.head()` to load one; "
+                "a missing dataset raises FileNotFoundError with the `sandwalk data pull` command."
+            )
 
         # Pre-built helpers
         helpers = []

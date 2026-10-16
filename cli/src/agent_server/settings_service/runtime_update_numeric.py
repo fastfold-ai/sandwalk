@@ -83,3 +83,21 @@ def apply_numeric_updates(config: Config, payload: UpdateRuntimeSettingsRequest)
         from agent_server.file_access import normalize_file_access
 
         config.set("agent.file_access", normalize_file_access(payload.file_access))
+    capacity_changed = False
+    if payload.max_concurrent_runs is not None:
+        config.set(
+            "agent.max_concurrent_runs",
+            clamp_int(payload.max_concurrent_runs, minimum=0, maximum=64, default=0),
+        )
+        capacity_changed = True
+    if payload.min_free_memory_mb is not None:
+        config.set(
+            "agent.min_free_memory_mb",
+            clamp_int(payload.min_free_memory_mb, minimum=0, maximum=262_144, default=2048),
+        )
+        capacity_changed = True
+    if capacity_changed:
+        # Take effect for runs already waiting, not just the next server start.
+        from agent_server.run_admission import refresh_from_config
+
+        refresh_from_config(config)

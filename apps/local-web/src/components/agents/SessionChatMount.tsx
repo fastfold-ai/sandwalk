@@ -141,6 +141,7 @@ function SessionChatMountInner({
        * delta específico del store por-sesión.
        */
       liveDelta={chat.liveDelta}
+      liveStatus={chat.liveStatus}
       pendingApproval={chat.pendingApproval}
       approvalSubmitting={chat.approvalSubmitting}
       onSubmitApprovals={submitApprovals}

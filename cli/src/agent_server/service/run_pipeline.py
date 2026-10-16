@@ -38,26 +38,45 @@ class _RunPipelineMixin:
                 if self._active_runners.get(session_id) is not None:
                     self._active_runners.pop(session_id, None)
 
-            summary = await asyncio.to_thread(
-                run_existing_agent,
-                content,
-                workspace_path,
-                emit_runtime_event,
-                history,
-                run_context.mcp_servers,
-                run_context.project_context,
-                run_context.specialist_instructions,
-                run_context.allowed_skill_names,
-                session_id,
-                run_context.sandbox_backend,
-                run_context.allowed_tool_names,
-                _on_runner_ready,
-                _on_runner_done,
-                run_context.provider,
-                run_context.model,
-                run_context.openai_profile_id,
-                run_context.capy_mode,
-            )
+            # Capacity gate: only so many agent threads at once, and only while
+            # the machine has memory to spare. Waiting happens in the worker,
+            # so the API loop keeps serving while this run is parked.
+            from agent_server.run_admission import run_admission
+
+            admission = run_admission()
+
+            def _guarded_run() -> str:
+                admission.acquire(
+                    # `kind` lets the UI show this in the pane; plain activity
+                    # snippets (reasoning, tool names) only feed the CLI spinner.
+                    on_wait=lambda text: emit_runtime_event(
+                        "activity", text=text, kind="capacity"
+                    )
+                )
+                try:
+                    return run_existing_agent(
+                        content,
+                        workspace_path,
+                        emit_runtime_event,
+                        history,
+                        run_context.mcp_servers,
+                        run_context.project_context,
+                        run_context.specialist_instructions,
+                        run_context.allowed_skill_names,
+                        session_id,
+                        run_context.sandbox_backend,
+                        run_context.allowed_tool_names,
+                        _on_runner_ready,
+                        _on_runner_done,
+                        run_context.provider,
+                        run_context.model,
+                        run_context.openai_profile_id,
+                        run_context.capy_mode,
+                    )
+                finally:
+                    admission.release()
+
+            summary = await asyncio.to_thread(_guarded_run)
             agent_done_at = time.monotonic()
             last_stream_at = getattr(emit_runtime_event, "last_stream_at", None)
             logger.info(
@@ -96,6 +115,16 @@ class _RunPipelineMixin:
                 run_id=run_id,
                 event_type="run.interrupted",
                 payload={"reason": str(exc) or "Run interrupted"},
+            )
+        except TimeoutError as exc:
+            # The capacity gate gave up; say so instead of a generic failure.
+            logger.warning("Run %s timed out waiting for capacity", run_id[:8])
+            self.store.set_session_status(session_id, "error")
+            self.store.append_event(
+                session_id=session_id,
+                run_id=run_id,
+                event_type="run.failed",
+                payload={"error": str(exc) or "This run waited too long for capacity."},
             )
         except Exception:
             logger.exception(

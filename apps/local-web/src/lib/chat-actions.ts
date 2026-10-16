@@ -93,6 +93,7 @@ export function reduceChatOnAgentEvent(
       runActive: true,
       activeRunId: event.runId,
       liveDelta: '',
+      liveStatus: null,
       pendingApproval: null,
       approvalSubmitting: false,
       // Drop zombie pending cards from a prior interrupted run.
@@ -154,8 +155,19 @@ export function reduceChatOnAgentEvent(
   if (event.type === 'assistant.delta') {
     return {
       ...prev,
-      liveDelta: prev.liveDelta + event.payload.delta
+      liveDelta: prev.liveDelta + event.payload.delta,
+      liveStatus: null
     }
+  }
+
+  if (event.type === 'run.progress') {
+    // Only capacity waits are user-facing; other progress snippets (reasoning
+    // fragments, tool names) feed the CLI spinner and would flicker here.
+    const payload = event.payload as { text?: string; kind?: string }
+    if (payload.kind !== 'capacity') return prev
+    const text = typeof payload.text === 'string' ? payload.text.trim() : ''
+    if (text === (prev.liveStatus ?? '')) return prev
+    return { ...prev, liveStatus: text || null }
   }
 
   if (event.type === 'tool.started') {
@@ -163,6 +175,7 @@ export function reduceChatOnAgentEvent(
     if (prev.tools.some(tool => tool.id === toolId)) return prev
     return {
       ...prev,
+      liveStatus: null,
       tools: [
         ...prev.tools,
         {
@@ -311,6 +324,7 @@ export function reduceChatOnAgentEvent(
       runActive: false,
       activeRunId: null,
       liveDelta: '',
+      liveStatus: null,
       activeBuildPlan: null,
       pendingApproval: null,
       approvalSubmitting: false,

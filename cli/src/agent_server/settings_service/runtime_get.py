@@ -82,4 +82,16 @@ def get_runtime_settings(config: Config) -> RuntimeSettings:
         ),
         plan_mode=bool_from_config(config, "agent.plan_preview", False),
         file_access=normalize_file_access(config.get("agent.file_access")),
+        max_concurrent_runs=clamp_int(
+            config.get("agent.max_concurrent_runs", 0),
+            minimum=0,
+            maximum=64,
+            default=0,
+        ),
+        min_free_memory_mb=clamp_int(
+            config.get("agent.min_free_memory_mb", 2048),
+            minimum=0,
+            maximum=262_144,
+            default=2048,
+        ),
     )
