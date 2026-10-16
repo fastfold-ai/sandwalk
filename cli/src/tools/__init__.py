@@ -64,6 +64,7 @@ _TOOL_MODULES = (
     "cellxgene",
     "clue",
     "remote_data",
+    "environment",
 )
 
 

@@ -15,6 +15,14 @@ from agent.deepagents_runtime.tool_adapter import (
 _NATIVE_TOOLS_LOCK = threading.Lock()
 _NATIVE_TOOLS_CACHE: dict[tuple, tuple[list[Any], dict[str, str]]] = {}
 
+# Registry tools that stay first-class in PTC mode instead of living only
+# inside the `tools.*` namespace. They act on the host, not on science data.
+PTC_DIRECT_TOOLS: tuple[str, ...] = (
+    "shell.run",
+    "environment.install_package",
+    "environment.list_packages",
+)
+
 
 def make_unique_namer(used_names: set[str]):
     """Build a namer that de-dupes sanitized tool names against ``used_names``."""
@@ -57,17 +65,23 @@ def build_ptc_domain_tools(
     tools.append(_make_search_tools_tool(ptc_excludes, set(exclude_tools)))
 
     # Expose shell.run as a first-class tool so skills can run scripts
-    # directly (rather than wrapping every command in run_python).
-    shell_obj = registry.get_tool("shell.run")
-    if shell_obj is not None:
-        safe_name = unique_name(shell_obj.name)
-        display_name_map[safe_name] = shell_obj.name
+    # directly (rather than wrapping every command in run_python). The
+    # environment tools ride along: a missing import is fixed by a direct
+    # call, not by hunting for pip inside the sandbox.
+    for name in PTC_DIRECT_TOOLS:
+        if name in exclude_tools:
+            continue
+        tool_obj = registry.get_tool(name)
+        if tool_obj is None:
+            continue
+        safe_name = unique_name(tool_obj.name)
+        display_name_map[safe_name] = tool_obj.name
         tools.append(
             _make_lc_tool(
                 name=safe_name,
-                description=shell_obj.description or shell_obj.name,
-                args_schema=_args_schema_for(safe_name, shell_obj.parameters),
-                handler=_make_tool_handler(shell_obj, session),
+                description=tool_obj.description or tool_obj.name,
+                args_schema=_args_schema_for(safe_name, tool_obj.parameters),
+                handler=_make_tool_handler(tool_obj, session),
             )
         )
 

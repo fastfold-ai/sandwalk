@@ -15,6 +15,8 @@ from collections.abc import Iterable
 CORE_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "shell.run",
+        "environment.install_package",
+        "environment.list_packages",
         "skills.manage",
         "files.list_directory",
         "files.read_file",
