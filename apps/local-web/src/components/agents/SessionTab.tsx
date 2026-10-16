@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { AgentSession } from '@sandwalk/agent-ui-core'
-import { Columns2, Pin, SquareTerminal, X } from 'lucide-react'
+import { Columns2, Pin, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { UNREAD_DOT_COLOR } from '@/lib/sidebar-unread-filter'
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 
 import { SessionSourceIcon } from './SessionSourceIcon'
 import { SessionStatusIcon } from './SessionStatusIcon'
+import { TerminalTypeIcon } from './TerminalTypeIcon'
 
 
 /** Title marquee — same feel as the previous chrome-tabs label. */
@@ -260,6 +261,8 @@ export function SessionTab({
       {...(selected ? { 'data-selected': 'true' } : {})}
     >
       <TabBackground width={tabWidth} />
+      {/* Pointer target = the visible chip, not the overlapping tab box. */}
+      <div className="chrome-tab-hit" aria-hidden />
       <div className="chrome-tab-content">
         {/* T2: pin PRIMERO — antes de cualquier icon del tipo — para
             leerse como tag del tab. Aplica a chat, terminal y grupo
@@ -287,13 +290,10 @@ export function SessionTab({
             ) : null}
           </>
         ) : isTerminal ? (
-          // Terminal chip: orange type-icon (SquareTerminal) replaces the
-          // chat status + source icons. Keeps the chip's chrome, marquee,
-          // close button unchanged for a consistent tab-strip anatomy.
-          <SquareTerminal
-            className="size-3.5 shrink-0 text-orange-500"
-            aria-hidden
-          />
+          // Terminal chip: type icon replaces the chat status + source
+          // icons (agent mark when claude/codex/opencode/fx is running).
+          // Keeps the chip's chrome, marquee, close button unchanged.
+          <TerminalTypeIcon terminalId={tab.id} />
         ) : (
           <>
             <SessionStatusIcon status={tab.status} />

@@ -16,7 +16,6 @@ import {
   Pencil,
   Pin,
   Search,
-  SquareTerminal,
   Trash2
 } from 'lucide-react'
 import {
@@ -32,6 +31,7 @@ import {
 import { flushSync } from 'react-dom'
 import type { NavigateFunction } from 'react-router-dom'
 
+import { isExternalAgentKind } from '@/components/agents/ExternalAgentIcon'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { useSessionTabColors } from '@/components/agents/session-tab-colors'
 import { SessionActionsMenu } from '@/components/agents/SessionActionsMenu'
@@ -40,6 +40,7 @@ import { SessionStatusIcon } from '@/components/agents/SessionStatusIcon'
 import { GroupDissolveDialog } from '@/components/agents/SessionTabs'
 import { TabInlineColorRow } from '@/components/agents/tab-context-menu'
 import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
+import { TerminalTypeIcon } from '@/components/agents/TerminalTypeIcon'
 import {
   Popover,
   PopoverAnchor,
@@ -583,18 +584,65 @@ function SidebarSessionListInner({
                             }}
                           >
                             <div className="flex min-w-0 items-center gap-1.5">
-                              {/* R3+R4: pin A LA IZQUIERDA DEL TODO, antes
-                                  del checkbox de selección. Vive fuera del
-                                  button clickable para que quede visualmente
-                                  alineado con el pin del terminal (que en
-                                  su fila también va como primer elemento
-                                  del row). Blanco absoluto con fill para
-                                  máxima legibilidad en la sección Pinned.
-                                  FAS-107: pin en slot uniforme `size-4`
-                                  con `place-items-center` para alineación
-                                  vertical con las filas de terminal y
-                                  group split. */}
-                              {chat.organizeLabel === 'pinned' ? (
+                              {/* One leading mark. The idle check drops when a
+                                  pin or a CLI/Slack source already identifies
+                                  the row. Multi-select still uses this slot. */}
+                              {selecting ||
+                              (chat.organizeLabel !== 'pinned' &&
+                                chat.source !== 'slack' &&
+                                !isExternalAgentKind(chat.source)) ? (
+                                <button
+                                  type="button"
+                                  className={cn(
+                                    'grid size-4 shrink-0 place-items-center',
+                                    (isSelected || selecting) &&
+                                      'rounded-[4px] border',
+                                    isSelected
+                                      ? 'border-primary bg-primary text-primary-foreground'
+                                      : selecting
+                                        ? 'border-muted-foreground/45 bg-background'
+                                        : null
+                                  )}
+                                  aria-label={
+                                    isSelected
+                                      ? `Deselect ${chat.title || 'chat'}`
+                                      : `Select ${chat.title || 'chat'}`
+                                  }
+                                  aria-pressed={isSelected}
+                                  onClick={(
+                                    event: MouseEvent<HTMLButtonElement>
+                                  ) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    if (event.shiftKey) {
+                                      selectSessionRange(
+                                        orderedRenderedSessionIds,
+                                        item.id
+                                      )
+                                      return
+                                    }
+                                    toggleSessionSelected(item.id)
+                                  }}
+                                >
+                                  {isSelected ? (
+                                    <Check
+                                      className="size-2.5"
+                                      strokeWidth={3}
+                                    />
+                                  ) : selecting ? null : (
+                                    <SessionStatusIcon
+                                      status={
+                                        chat.status === 'awaiting_approval' ||
+                                        activityBySessionId[item.id]?.pendingApproval
+                                          ? 'awaiting_approval'
+                                          : activityBySessionId[item.id]?.runActive
+                                            ? 'running'
+                                            : chat.status
+                                      }
+                                    />
+                                  )}
+                                </button>
+                              ) : chat.organizeLabel === 'pinned' ? (
                                 <span
                                   aria-hidden
                                   className="grid size-4 shrink-0 place-items-center"
@@ -606,57 +654,6 @@ function SidebarSessionListInner({
                                   />
                                 </span>
                               ) : null}
-                              <button
-                                type="button"
-                                className={cn(
-                                  'grid size-4 shrink-0 place-items-center',
-                                  (isSelected || selecting) &&
-                                    'rounded-[4px] border',
-                                  isSelected
-                                    ? 'border-primary bg-primary text-primary-foreground'
-                                    : selecting
-                                      ? 'border-muted-foreground/45 bg-background'
-                                      : null
-                                )}
-                                aria-label={
-                                  isSelected
-                                    ? `Deselect ${chat.title || 'chat'}`
-                                    : `Select ${chat.title || 'chat'}`
-                                }
-                                aria-pressed={isSelected}
-                                onClick={(
-                                  event: MouseEvent<HTMLButtonElement>
-                                ) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  if (event.shiftKey) {
-                                    selectSessionRange(
-                                      orderedRenderedSessionIds,
-                                      item.id
-                                    )
-                                    return
-                                  }
-                                  toggleSessionSelected(item.id)
-                                }}
-                              >
-                                {isSelected ? (
-                                  <Check
-                                    className="size-2.5"
-                                    strokeWidth={3}
-                                  />
-                                ) : selecting ? null : (
-                                  <SessionStatusIcon
-                                    status={
-                                      chat.status === 'awaiting_approval' ||
-                                      activityBySessionId[item.id]?.pendingApproval
-                                        ? 'awaiting_approval'
-                                        : activityBySessionId[item.id]?.runActive
-                                          ? 'running'
-                                          : chat.status
-                                    }
-                                  />
-                                )}
-                              </button>
                               <button
                                 type="button"
                                 className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
@@ -689,10 +686,15 @@ function SidebarSessionListInner({
                                   })
                                 }}
                               >
-                              <SessionSourceIcon
-                                source={chat.source}
-                                label={chat.sourceLabel}
-                              />
+                              {!selecting &&
+                              chat.organizeLabel !== 'pinned' &&
+                              (chat.source === 'slack' ||
+                                isExternalAgentKind(chat.source)) ? (
+                                <SessionSourceIcon
+                                  source={chat.source}
+                                  label={chat.sourceLabel}
+                                />
+                              ) : null}
                               {tabColor ? (
                                 <span
                                   className="size-2 shrink-0 rounded-full border border-black/10"
@@ -1007,18 +1009,6 @@ function SidebarGroupItem({
           {/* FAS-107: pin en slot uniforme `size-4` con
               `place-items-center` para alineación vertical con las
               filas de chat y terminal en la sección Pinned. */}
-          {group.pinned ? (
-            <span
-              aria-hidden
-              className="grid size-4 shrink-0 place-items-center"
-            >
-              <Pin
-                aria-label="Pinned"
-                className="text-zinc-400 size-3"
-                fill="currentColor"
-              />
-            </span>
-          ) : null}
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
@@ -1028,7 +1018,15 @@ function SidebarGroupItem({
               aria-hidden
               className="grid size-4 shrink-0 place-items-center"
             >
-              <Columns2 className="size-3.5" />
+              {group.pinned ? (
+                <Pin
+                  aria-label="Pinned"
+                  className="text-zinc-400 size-3"
+                  fill="currentColor"
+                />
+              ) : (
+                <Columns2 className="size-3.5" />
+              )}
             </span>
             {/*
               Badge de conteo solo cuando el split ya está armado.
@@ -1269,16 +1267,23 @@ function SidebarGroupItem({
                     onClick={() => onSelectChat(chat.id)}
                   >
                     <span className="grid size-3.5 shrink-0 place-items-center">
-                      <SessionStatusIcon
-                        status={
-                          chat.status === 'awaiting_approval' ||
-                          activityBySessionId[chat.id]?.pendingApproval
-                            ? 'awaiting_approval'
-                            : activityBySessionId[chat.id]?.runActive
-                              ? 'running'
-                              : chat.status
-                        }
-                      />
+                      {chat.source === 'slack' || isExternalAgentKind(chat.source) ? (
+                        <SessionSourceIcon
+                          source={chat.source}
+                          label={chat.sourceLabel}
+                        />
+                      ) : (
+                        <SessionStatusIcon
+                          status={
+                            chat.status === 'awaiting_approval' ||
+                            activityBySessionId[chat.id]?.pendingApproval
+                              ? 'awaiting_approval'
+                              : activityBySessionId[chat.id]?.runActive
+                                ? 'running'
+                                : chat.status
+                          }
+                        />
+                      )}
                     </span>
                     {tabColor ? (
                       <span
@@ -1578,10 +1583,15 @@ function SidebarSplitTerminalChild({
           className="flex min-w-0 items-center gap-1.5 text-left"
           onClick={onOpen}
         >
-          <SquareTerminal
-            className="size-3.5 shrink-0 text-orange-500"
-            aria-hidden
-          />
+          {isPinned ? (
+            <Pin
+              aria-label="Pinned"
+              className="text-zinc-400 size-3.5 shrink-0"
+              fill="currentColor"
+            />
+          ) : (
+            <TerminalTypeIcon terminalId={terminal.id} />
+          )}
           {tabColor ? (
             <span
               aria-hidden
@@ -1590,12 +1600,6 @@ function SidebarSplitTerminalChild({
             />
           ) : null}
           <SidebarMarqueeTitle text={terminal.title || 'Terminal'} />
-          {isPinned ? (
-            <Pin
-              aria-label="Pinned"
-              className="text-zinc-400 size-3 shrink-0"
-            />
-          ) : null}
         </button>
         <div className="relative h-6 w-8 justify-self-end">
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>

@@ -45,9 +45,15 @@ type TerminalsState = {
   terminals: TerminalSession[]
   loading: boolean
   error: string | null
+  /**
+   * Bumps on local inserts/removes. A list fetch passes the revision it
+   * observed at start; if a newer local edit landed, that response is
+   * stale and must not wipe the terminal the user just opened.
+   */
+  revision: number
 
   /** Reemplaza toda la lista. Se llama después de `listTerminals` del backend. */
-  setAll: (next: TerminalSession[]) => void
+  setAll: (next: TerminalSession[], seenRevision?: number) => void
 
   /** Marca inicio/fin de un fetch al backend. */
   setLoading: (next: boolean) => void
@@ -74,9 +80,29 @@ export const useTerminalsStore = create<TerminalsState>()(set => ({
   terminals: [],
   loading: false,
   error: null,
+  revision: 0,
 
-  setAll: next =>
-    set(state => (state.terminals === next ? state : { terminals: next })),
+  setAll: (next, seenRevision) =>
+    set(state => {
+      if (seenRevision !== undefined && seenRevision !== state.revision) return state
+      if (state.terminals === next) return state
+      // `agent` is UI-only (fed by the PTY `agent.changed` event); the
+      // /v1/terminals rows never carry it. Without this carry-over every
+      // list refresh wiped the Claude/Codex/OpenCode/fx icon off the tab.
+      const prevById = new Map(state.terminals.map(t => [t.id, t]))
+      let carried = false
+      const merged = next.map(row => {
+        const prev = prevById.get(row.id)
+        if (prev && prev.agent !== undefined && row.agent === undefined) {
+          carried = true
+          return { ...row, agent: prev.agent }
+        }
+        return row
+      })
+      // Nothing to carry: keep the caller's array identity (consumers and
+      // tests rely on `setAll(sameRef)` being a no-op).
+      return { terminals: carried ? merged : next }
+    }),
 
   setLoading: next =>
     set(state => (state.loading === next ? state : { loading: next })),
@@ -87,14 +113,14 @@ export const useTerminalsStore = create<TerminalsState>()(set => ({
   addOptimistic: term =>
     set(state => {
       if (state.terminals.some(t => t.id === term.id)) return state
-      return { terminals: [term, ...state.terminals] }
+      return { terminals: [term, ...state.terminals], revision: state.revision + 1 }
     }),
 
   remove: terminalId =>
     set(state => {
       const next = state.terminals.filter(t => t.id !== terminalId)
       if (next.length === state.terminals.length) return state
-      return { terminals: next }
+      return { terminals: next, revision: state.revision + 1 }
     }),
 
   patch: (terminalId, changes) =>

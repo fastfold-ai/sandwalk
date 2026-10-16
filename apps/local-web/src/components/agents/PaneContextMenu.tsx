@@ -1,24 +1,22 @@
 import { X } from 'lucide-react'
-import { useEffect, useState } from 'react'
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+import { useCallback, useEffect, useState } from 'react'
 
 import type { PaneContextMenuDetail } from './ChatTilingContainer'
-import { SplitMenuDropdown } from './split-menu'
+import { SplitMenuBlock } from './split-menu'
+import {
+  TabContextItem,
+  TabContextMenuShell,
+  TabContextSeparator
+} from './tab-context-menu'
 
 /**
  * Global listener + floating menu triggered by a right-click on any
- * chat pane in the tiling container. The menu is a plain shadcn
- * DropdownMenu anchored at the click coordinates via a hidden 1×1
- * trigger element. Kept out of the tree so every pane doesn't ship its
- * own menu markup.
+ * chat pane in the tiling container. Kept out of the tree so every pane
+ * doesn't ship its own menu markup.
+ *
+ * Uses the tab-context primitives (not a Radix DropdownMenu): the Split
+ * Down / Split Right flyouts must open on click, since WebKit in the
+ * Tauri window drops the pointer-move Radix sub-menus rely on.
  */
 export function PaneContextMenu() {
   const [state, setState] = useState<PaneContextMenuDetail | null>(null)
@@ -39,57 +37,34 @@ export function PaneContextMenu() {
       )
   }, [])
 
+  const close = useCallback(() => setState(null), [])
+
   if (!state) return null
 
   return (
-    <DropdownMenu open onOpenChange={o => !o && setState(null)}>
-      {/* Anchor: an invisible trigger sitting exactly at the click. */}
-      <DropdownMenuTrigger asChild>
-        <div
-          style={{
-            position: 'fixed',
-            left: `${state.x}px`,
-            top: `${state.y}px`,
-            width: 1,
-            height: 1,
-            pointerEvents: 'none'
-          }}
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        side="bottom"
-        // Keeps the menu inside the viewport when the click lands near
-        // the bottom-right of a pane (small splits especially). Radix's
-        // Popper flip handles the axis, this padding prevents flush-cut
-        // edges once flipped.
-        collisionPadding={{ bottom: 8, right: 8, top: 8, left: 8 }}
-        className="w-56"
-      >
-        <SplitMenuDropdown
-          sourceId={state.chatId}
-          onSplitPane={(id, direction, target) => {
-            state.handlers.onSplitPane(id, direction, target)
-            setState(null)
-          }}
-        />
-        {state.handlers.onClose ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="gap-2 text-[13px]"
-              onSelect={() => {
-                state.handlers.onClose?.()
-                setState(null)
-              }}
-            >
-              <X className="size-3.5" />
-              Close pane
-              <DropdownMenuShortcut>⌘W</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <TabContextMenuShell x={state.x} y={state.y} onClose={close}>
+      <SplitMenuBlock
+        sourceId={state.chatId}
+        onSplitPane={(id, direction, target) => {
+          state.handlers.onSplitPane(id, direction, target)
+          setState(null)
+        }}
+        trailingSeparator={false}
+      />
+      {state.handlers.onClose ? (
+        <>
+          <TabContextSeparator />
+          <TabContextItem
+            icon={<X />}
+            label="Close pane"
+            trailing={<span className="text-[11px] tabular-nums">⌘W</span>}
+            onClick={() => {
+              state.handlers.onClose?.()
+              setState(null)
+            }}
+          />
+        </>
+      ) : null}
+    </TabContextMenuShell>
   )
 }

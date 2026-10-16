@@ -23,6 +23,10 @@ import type {
   AgentSkill,
   ChatGPTAuthStart,
   ChatGPTAuthStatus,
+  ExternalAgentKind,
+  ExternalAgentsResponse,
+  ExternalLaunchResult,
+  HandoffResult,
   AgentSkillBatchAction,
   AgentSkillBatchResult,
   AgentSkillDepsInstallResult,
@@ -562,6 +566,90 @@ export class LocalAgentClient
       method: 'POST',
       signal
     })
+  }
+
+  // --- Claude Code / Codex / OpenCode / fx interop ------------------------
+
+  /** Installed agent CLIs plus their recent sessions (optionally for one folder). */
+  listExternalAgents(options?: {
+    cwd?: string | null
+    kind?: ExternalAgentKind | null
+    limit?: number
+    /** `false` skips the session scan and only reports installed CLIs. */
+    sessions?: boolean
+    signal?: AbortSignal
+  }): Promise<ExternalAgentsResponse> {
+    const params = new URLSearchParams()
+    if (options?.cwd) params.set('cwd', options.cwd)
+    if (options?.kind) params.set('kind', options.kind)
+    if (options?.limit) params.set('limit', String(options.limit))
+    if (options?.sessions === false) params.set('sessions', 'false')
+    const query = params.toString()
+    return this.request<ExternalAgentsResponse>(
+      `/external-agents${query ? `?${query}` : ''}`,
+      { signal: options?.signal }
+    )
+  }
+
+  /** Convert another CLI's session into a Sandwalk chat (history only). */
+  importExternalSession(
+    input: {
+      kind: ExternalAgentKind
+      sessionId: string
+      projectId?: string | null
+      workspacePath?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<AgentSession> {
+    return this.request<AgentSession>('/external-agents/import', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      signal
+    })
+  }
+
+  /** Open a terminal running the agent CLI in a folder. */
+  launchExternalAgent(
+    input: {
+      kind: ExternalAgentKind
+      workspacePath?: string | null
+      projectId?: string | null
+      originChatId?: string | null
+      prompt?: string | null
+      resumeId?: string | null
+      title?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<ExternalLaunchResult> {
+    return this.request<ExternalLaunchResult>('/external-agents/launch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      signal
+    })
+  }
+
+  /** Hand a Sandwalk chat to another CLI: handoff file, optional native session, optional launch. */
+  handoffSession(
+    sessionId: string,
+    input: {
+      kind: ExternalAgentKind
+      launch?: boolean
+      native?: boolean
+      projectId?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<HandoffResult> {
+    return this.request<HandoffResult>(
+      `/sessions/${encodeURIComponent(sessionId)}/handoff`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+        signal
+      }
+    )
   }
 
   async login(
@@ -3611,7 +3699,7 @@ export class LocalAgentClient
 
   createPtySession(
     sessionId: string,
-    input?: { title?: string; cols?: number; rows?: number },
+    input?: { title?: string; cols?: number; rows?: number; startup?: string },
     signal?: AbortSignal
   ): Promise<PtySessionInfo> {
     return this.request<PtySessionInfo>(

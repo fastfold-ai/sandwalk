@@ -26,6 +26,34 @@ def preferred_shell() -> str:
     return "/bin/sh"
 
 
+# Coding-agent CLIs the shell hooks announce via OSC 777. The PTY parser turns
+# `\e]777;notify;Sandwalk;agent;<kind>;started\a` into an `agent.changed`
+# event with no process lookup. Keep in sync with AGENT_BINARIES.
+AGENT_HOOK_BINARIES = ("claude", "codex", "opencode", "fx", "hermes")
+
+# POSIX sh fragment: `$1` is the command line about to run; prints the agent
+# kind (basename of the first word) when it is one of ours, else nothing.
+# Handles `claude …`, `/usr/local/bin/codex …`, `FOO=1 fx …`, `npx opencode`.
+_AGENT_KIND_SH = r"""_sandwalk_agent_kind() {
+  # zsh does not word-split "$1" by default; `set --` splits in both shells.
+  set -- $(printf '%s' "$1")
+  local word
+  for word in "$@"; do
+    case "$word" in
+      *=*) continue ;;
+      sudo|env|exec|command|nice|time|npx|bunx|pnpx) continue ;;
+    esac
+    word="${word##*/}"
+    case "$word" in
+      claude|codex|opencode|fx|hermes) printf '%s' "$word"; return 0 ;;
+    esac
+    return 1
+  done
+  return 1
+}
+"""
+
+
 def terminal_dot_dir() -> Path:
     """Shell startup dir that applies FastFold prompt colors after the user rc."""
     from agent.config import CONFIG_DIR
@@ -46,14 +74,22 @@ def terminal_dot_dir() -> Path:
         f"  PROMPT='{ZSH_PROMPT}'\n"
         "  RPROMPT=''\n"
         "}\n"
-        "_fastfold_set_prompt\n"
-        "_fastfold_osc133_precmd() {\n"
+        "_fastfold_set_prompt\n" + _AGENT_KIND_SH + "_fastfold_osc133_precmd() {\n"
         "  local rc=$?\n"
         "  printf '\\e]133;D;%s\\a' \"$rc\"\n"
         "  printf '\\e]133;A\\a'\n"
+        '  if [[ -n "$_sandwalk_agent_running" ]]; then\n'
+        "    printf '\\e]777;notify;Sandwalk;agent;%s;exited\\a' \"$_sandwalk_agent_running\"\n"
+        "    unset _sandwalk_agent_running\n"
+        "  fi\n"
         "}\n"
         "_fastfold_osc133_preexec() {\n"
         "  printf '\\e]133;C\\a'\n"
+        "  local kind\n"
+        '  if kind=$(_sandwalk_agent_kind "$1"); then\n'
+        '    _sandwalk_agent_running="$kind"\n'
+        "    printf '\\e]777;notify;Sandwalk;agent;%s;started\\a' \"$kind\"\n"
+        "  fi\n"
         "}\n"
         "# Autoload first, unconditionally: `typeset -f add-zsh-hook` does not\n"
         "# see the function until it has run once, so the check must come\n"
@@ -77,17 +113,25 @@ def terminal_dot_dir() -> Path:
     bashrc.write_text(
         "# Managed by FastFold agent terminal — do not edit.\n"
         '[[ -r "${HOME}/.bashrc" ]] && source "${HOME}/.bashrc"\n'
-        f"PS1='{BASH_PS1}'\n"
-        "_fastfold_osc133_precmd() {\n"
+        f"PS1='{BASH_PS1}'\n" + _AGENT_KIND_SH + "_fastfold_osc133_precmd() {\n"
         "  local rc=$?\n"
         "  printf '\\e]133;D;%s\\a' \"$rc\"\n"
         "  printf '\\e]133;A\\a'\n"
+        '  if [[ -n "$_sandwalk_agent_running" ]]; then\n'
+        "    printf '\\e]777;notify;Sandwalk;agent;%s;exited\\a' \"$_sandwalk_agent_running\"\n"
+        "    unset _sandwalk_agent_running\n"
+        "  fi\n"
         "  _fastfold_osc133_in_prompt=1\n"
         "}\n"
         "_fastfold_osc133_preexec() {\n"
-        "  if [[ -n \"$_fastfold_osc133_in_prompt\" ]]; then\n"
+        '  if [[ -n "$_fastfold_osc133_in_prompt" ]]; then\n'
         "    unset _fastfold_osc133_in_prompt\n"
         "    printf '\\e]133;C\\a'\n"
+        "    local kind\n"
+        '    if kind=$(_sandwalk_agent_kind "$BASH_COMMAND"); then\n'
+        '      _sandwalk_agent_running="$kind"\n'
+        "      printf '\\e]777;notify;Sandwalk;agent;%s;started\\a' \"$kind\"\n"
+        "    fi\n"
         "  fi\n"
         "}\n"
         'PROMPT_COMMAND="_fastfold_osc133_precmd; ${PROMPT_COMMAND}"\n'

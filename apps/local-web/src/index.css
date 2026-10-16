@@ -283,6 +283,20 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark [data-pane-kind] {
   border-color: rgb(255 255 255 / 0.08);
 }
 
+/* The xterm canvas sits in a fixed portal over the pane. Blur whatever is
+ * behind it; the theme background is translucent while liquid glass is on. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off)
+  [data-terminal-portal-host] {
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
+  [data-terminal-portal-host] {
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
 /* Scroll edge fades are a solid --background wash. On glass they read as
  * a hard line above the composer. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-chat-edge-fade {
@@ -378,6 +392,24 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glas
   .sandwalk-glass-menu {
   background-color: rgb(28 28 31 / 0.55) !important;
   border-color: rgb(255 255 255 / 0.12) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
+/* Files / site preview column. It sits inside the main frost, so without
+ * its own blur it reads as a solid slab. Same glass as the menus. */
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off):not(.dark)
+  .sandwalk-glass-panel {
+  background-color: rgb(246 246 247 / 0.5) !important;
+  border-color: rgb(0 0 0 / 0.1) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
+  .sandwalk-glass-panel {
+  background-color: rgb(28 28 31 / 0.48) !important;
+  border-color: rgb(255 255 255 / 0.1) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   backdrop-filter: blur(28px) saturate(1.5);
 }
@@ -1699,9 +1731,16 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active .chrome-tabs-bottom-bar {
 .sandwalk-drag-region textarea,
 .sandwalk-drag-region select,
 .sandwalk-drag-region [role='button'],
+.sandwalk-drag-region [role='menuitem'],
 .sandwalk-drag-region [data-no-window-drag],
 [data-capy-root],
-[data-capy-root] * {
+[data-capy-root] *,
+/* Menus portal to <body>, outside the title-bar drag region. On the desktop
+ * window that region still swallows the click, so the row highlights and
+ * nothing opens. */
+[data-radix-popper-content-wrapper],
+[role='menu'],
+[role='menuitem'] {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

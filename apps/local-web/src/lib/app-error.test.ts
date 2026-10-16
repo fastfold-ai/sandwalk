@@ -21,6 +21,10 @@ describe('normalizeAppError extras', () => {
   it('classifies network and 5xx as backend problems, not auth', () => {
     expect(isAuthCredentialError('Failed to fetch')).toBe(false)
     expect(isBackendUnavailableError('Failed to fetch')).toBe(true)
+    // A connect probe that hits its AbortSignal.timeout deadline means the
+    // server is not answering — must engage the retry loop, not stall it.
+    const timedOut = new DOMException('signal timed out', 'TimeoutError')
+    expect(isBackendUnavailableError(timedOut)).toBe(true)
     expect(
       isAuthCredentialError(
         'FastFold Agent API 500: {"detail":"boom"} [GET http://127.0.0.1:8787/v1/specialists]'

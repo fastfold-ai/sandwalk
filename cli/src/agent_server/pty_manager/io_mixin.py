@@ -11,7 +11,12 @@ from typing import Any
 
 from agent_server.pty_manager.osc_parser import PtyEvent
 from agent_server.pty_manager.shell_env import set_winsize
-from agent_server.pty_manager.types import BUFFER_LIMIT, OUTPUT_LOG_LIMIT, PtySession
+from agent_server.pty_manager.types import (
+    BUFFER_LIMIT,
+    OUTPUT_LOG_LIMIT,
+    RING_SLACK,
+    PtySession,
+)
 
 
 class PtyIOMixin:
@@ -38,6 +43,29 @@ class PtyIOMixin:
             os.kill(session.info.pid, signal.SIGWINCH)
         except OSError:
             pass
+        # Tell this subscriber which agent is already in the foreground, then
+        # keep probing on a timer for as long as it stays attached. Forced so
+        # a reattach to a running CLI gets its icon right away; ps runs off
+        # the loop.
+        await self.refresh_agent_async(session, force=True)  # type: ignore[attr-defined]
+        if session.info.agent:
+            try:
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "pty.event",
+                            "terminalId": session.info.session_id,
+                            "event": {
+                                "kind": "agent.changed",
+                                "agent": session.info.agent,
+                                "agentCwd": session.info.agent_cwd,
+                            },
+                        }
+                    )
+                )
+            except Exception:
+                pass
+        watcher = asyncio.create_task(self.watch_agent_while_attached(session, websocket))  # type: ignore[attr-defined]
         try:
             while True:
                 message = await websocket.receive()
@@ -54,6 +82,7 @@ class PtyIOMixin:
                     break
         finally:
             session.subscribers.discard(websocket)
+            watcher.cancel()
 
     async def _read_loop(self, pty_id: str) -> None:
         loop = asyncio.get_running_loop()
@@ -100,8 +129,10 @@ class PtyIOMixin:
                 # subscribers activos. Es el "cuaderno visual" que
                 # sobrevive el Cmd+Q + reopen.
                 session.output_log.extend(data)
-                if len(session.output_log) > OUTPUT_LOG_LIMIT:
-                    session.output_log = session.output_log[-OUTPUT_LOG_LIMIT:]
+                # Trim lazily: `del` on the head is in place; slicing on
+                # every chunk copied the full 2 MB per read once full.
+                if len(session.output_log) > OUTPUT_LOG_LIMIT + RING_SLACK:
+                    del session.output_log[: len(session.output_log) - OUTPUT_LOG_LIMIT]
                 # FAS-107 · Fase 1b · parsear OSC 133/9/777 sobre los mismos
                 # bytes que van al terminal. El parser es no-consuming — el
                 # stream de bytes sigue igual, solo se emiten frames de
@@ -119,10 +150,13 @@ class PtyIOMixin:
                         session.subscribers.discard(ws)
                 else:
                     session.buffer.extend(data)
-                    if len(session.buffer) > BUFFER_LIMIT:
-                        session.buffer = session.buffer[-BUFFER_LIMIT:]
+                    if len(session.buffer) > BUFFER_LIMIT + RING_SLACK:
+                        del session.buffer[: len(session.buffer) - BUFFER_LIMIT]
                 if events:
                     await self._dispatch_pty_events(session, events)
+                # Output means something is running; cheap rate-limited probe
+                # keeps the tab icon in step with the foreground agent.
+                await self._maybe_announce_agent(session)  # type: ignore[attr-defined]
         finally:
             session = self._sessions.get(pty_id)
             if session is not None:
@@ -131,9 +165,7 @@ class PtyIOMixin:
                 except Exception:
                     pass
 
-    async def _dispatch_pty_events(
-        self, session: PtySession, events: list[PtyEvent]
-    ) -> None:
+    async def _dispatch_pty_events(self, session: PtySession, events: list[PtyEvent]) -> None:
         """Convert parser events into JSON WS frames and fan them out.
 
         Uses `send_text` so the frontend can distinguish bytes (`send_bytes`,
@@ -141,15 +173,24 @@ class PtyIOMixin:
         Frame shape: `{"type": "pty.event", "terminalId": ..., "event": {...}}`.
         """
         for event in events:
+            if event.kind == "agent.hook":
+                # Shell hook said a CLI started or exited: authoritative and
+                # free. Record it, skip the probe, broadcast `agent.changed`
+                # on the same frame type the UI already handles.
+                session.agent_pgid = -1  # force the next pgrp check to re-sync
+                session.agent_probed_at = time.monotonic()
+                if self._apply_agent(  # type: ignore[attr-defined]
+                    session, event.agent, session.info.cwd if event.agent else None, from_hook=True
+                ):
+                    await self._broadcast_agent(session)  # type: ignore[attr-defined]
+                continue
             payload: dict[str, Any] = {"kind": event.kind}
             if event.kind == "command.started":
                 session.command_started_at = time.monotonic()
             elif event.kind == "command.finished":
                 payload["exitCode"] = event.exit_code
                 if session.command_started_at is not None:
-                    duration_ms = int(
-                        (time.monotonic() - session.command_started_at) * 1000
-                    )
+                    duration_ms = int((time.monotonic() - session.command_started_at) * 1000)
                     payload["durationMs"] = duration_ms
                 session.command_started_at = None
             elif event.kind == "notify":

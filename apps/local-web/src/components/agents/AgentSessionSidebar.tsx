@@ -21,7 +21,6 @@ import { CapySidebarButton } from '@/components/agents/capy/CapySidebarButton'
 import { ProjectSelector } from '@/components/agents/ProjectSelector'
 import { SidebarUserMenu } from '@/components/agents/SidebarUserMenu'
 import { DesktopDragRegion } from '@/components/DesktopDragRegion'
-import { DesktopUpdateBanner } from '@/components/DesktopUpdateBanner'
 import { SandwalkMark } from '@/components/SandwalkMark'
 import { Button } from '@/components/ui/button'
 import {
@@ -427,7 +426,6 @@ export function AgentSessionSidebar({
           onBatchSplitView={onBatchSplitView}
           canSplitView={canBatchSplitView}
         />
-        <DesktopUpdateBanner />
         <CapySidebarButton />
         <SidebarUserMenu
           userName={sidebarUserName}

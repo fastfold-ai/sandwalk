@@ -19,12 +19,20 @@ class PtyLifecycleMixin:
 
     def list(self, session_id: str) -> list[PtyInfo]:
         ids = self._by_agent.get(session_id, set())
-        return [self._sessions[pty_id].info for pty_id in ids if pty_id in self._sessions]
+        rows: list[PtyInfo] = []
+        for pty_id in ids:
+            session = self._sessions.get(pty_id)
+            if session is None:
+                continue
+            self.refresh_agent(session)  # type: ignore[attr-defined]
+            rows.append(session.info)
+        return rows
 
     def get(self, session_id: str, pty_id: str) -> PtyInfo | None:
         session = self._sessions.get(pty_id)
         if session is None or session.info.session_id != session_id:
             return None
+        self.refresh_agent(session)  # type: ignore[attr-defined]
         return session.info
 
     def get_session(self, session_id: str, pty_id: str) -> PtySession | None:
@@ -45,11 +53,12 @@ class PtyLifecycleMixin:
         title: str | None = None,
         cols: int = 80,
         rows: int = 24,
+        startup: str | None = None,
     ) -> PtyInfo:
         pid, master_fd, workspace = spawn_pty(cwd=cwd, cols=cols, rows=rows)
 
-        existing = self.list(session_id)
-        next_number = len(existing) + 1
+        # Count only; `list()` would re-probe every sibling's foreground.
+        next_number = len(self._by_agent.get(session_id, ())) + 1
         pty_id = uuid.uuid4().hex
         info = PtyInfo(
             id=pty_id,
@@ -65,11 +74,11 @@ class PtyLifecycleMixin:
             self._sessions[pty_id] = session
             self._by_agent.setdefault(session_id, set()).add(pty_id)
             session.reader_task = asyncio.create_task(self._read_loop(pty_id))  # type: ignore[attr-defined]
+        if startup:
+            asyncio.create_task(self.type_startup(session, startup))  # type: ignore[attr-defined]
         return info
 
-    async def resize(
-        self, session_id: str, pty_id: str, *, cols: int, rows: int
-    ) -> PtyInfo | None:
+    async def resize(self, session_id: str, pty_id: str, *, cols: int, rows: int) -> PtyInfo | None:
         session = self._sessions.get(pty_id)
         if session is None or session.info.session_id != session_id:
             return None

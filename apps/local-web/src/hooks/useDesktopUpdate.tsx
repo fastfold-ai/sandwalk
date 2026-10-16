@@ -12,7 +12,9 @@ import {
   checkDesktopUpdate,
   type DesktopUpdateProgress,
   desktopUpdaterAvailable,
-  installDesktopUpdate} from '@/lib/desktop-updater'
+  installDesktopUpdate,
+  previewUpdateVersion,
+  UPDATE_CHECK_INTERVAL_MS} from '@/lib/desktop-updater'
 
 const DISMISS_KEY_PREFIX = 'sandwalk.update.dismissed:'
 const AUTO_CHECK_DELAY_MS = 5_000
@@ -70,7 +72,11 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
   const installingRef = useRef(false)
 
   const checkForUpdate = useCallback(async (options?: { quiet?: boolean }) => {
-    if (!desktopUpdaterAvailable() || checkingRef.current || installingRef.current) {
+    if (
+      (!desktopUpdaterAvailable() && !previewUpdateVersion()) ||
+      checkingRef.current ||
+      installingRef.current
+    ) {
       return
     }
     checkingRef.current = true
@@ -126,11 +132,20 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
   }, [latestVersion])
 
   useEffect(() => {
-    if (!desktopUpdaterAvailable()) return
-    const timer = window.setTimeout(() => {
+    if (!desktopUpdaterAvailable() && !previewUpdateVersion()) return
+    const first = window.setTimeout(
+      () => {
+        void checkForUpdate({ quiet: true })
+      },
+      previewUpdateVersion() ? 0 : AUTO_CHECK_DELAY_MS
+    )
+    const every = window.setInterval(() => {
       void checkForUpdate({ quiet: true })
-    }, AUTO_CHECK_DELAY_MS)
-    return () => window.clearTimeout(timer)
+    }, UPDATE_CHECK_INTERVAL_MS)
+    return () => {
+      window.clearTimeout(first)
+      window.clearInterval(every)
+    }
   }, [checkForUpdate])
 
   const value = useMemo<DesktopUpdateContextValue>(

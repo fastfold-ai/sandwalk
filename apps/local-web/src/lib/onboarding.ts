@@ -1,8 +1,9 @@
-export const ONBOARDING_MAX_STEP = 5
+export const ONBOARDING_MAX_STEP = 6
 
 export type OnboardingStepId =
   | 'welcome'
   | 'models'
+  | 'agents'
   | 'skills'
   | 'integrations'
   | 'sandbox'
@@ -12,6 +13,7 @@ export type OnboardingStepId =
 export type OnboardingSlug =
   | 'welcome'
   | 'model'
+  | 'agents'
   | 'skills'
   | 'integrations'
   | 'sandbox'
@@ -38,6 +40,13 @@ export const ONBOARDING_STEPS: OnboardingStepDef[] = [
     slug: 'model',
     title: 'Model',
     subtitle: 'Add your favorite LLM provider, cloud or local.',
+    skippable: true
+  },
+  {
+    id: 'agents',
+    slug: 'agents',
+    title: 'Your other agents',
+    subtitle: 'Bring in sessions from Claude Code, Codex, OpenCode, or fx.',
     skippable: true
   },
   {
@@ -72,9 +81,9 @@ export const ONBOARDING_STEPS: OnboardingStepDef[] = [
 
 /** Older onboarding URLs → current step indices. */
 const LEGACY_ONBOARDING_SLUGS: Record<string, number> = {
-  keys: 2,
-  tools: 2,
-  data: 3
+  keys: 3,
+  tools: 3,
+  data: 4
 }
 
 export function clampOnboardingStep(step: number): number {

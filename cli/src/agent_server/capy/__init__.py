@@ -32,6 +32,10 @@ CAPY_TOOL_NAMES = [
     "capy.list_projects",
     "capy.create_project",
     "capy.move_session",
+    "capy.list_external_sessions",
+    "capy.import_external_session",
+    "capy.launch_external_agent",
+    "capy.handoff_session",
 ]
 
 # Deep Agents builtins Capy must not see (no sandbox / PTC).

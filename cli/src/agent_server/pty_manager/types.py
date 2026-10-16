@@ -15,6 +15,9 @@ BUFFER_LIMIT = 2 * 1024 * 1024
 # con `xterm.write(log_bytes)` y las dims actuales del cliente — xterm
 # aplica su reflow interno con las dims correctas.
 OUTPUT_LOG_LIMIT = 2 * 1024 * 1024
+# Trim the ring buffers only once they overshoot by this much. Slicing a
+# 2 MB bytearray on every 8 KB chunk copied the whole log per read.
+RING_SLACK = 256 * 1024
 
 
 @dataclass
@@ -27,6 +30,11 @@ class PtyInfo:
     rows: int
     pid: int
     status: str = "running"
+    # Coding-agent CLI in the foreground of this PTY (claude / codex /
+    # opencode / fx) and the directory it runs in. None while the shell
+    # itself is in the foreground. Refreshed by ``PtyAgentMixin``.
+    agent: str | None = None
+    agent_cwd: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -38,6 +46,8 @@ class PtyInfo:
             "rows": self.rows,
             "pid": self.pid,
             "status": self.status,
+            "agent": self.agent,
+            "agentCwd": self.agent_cwd,
         }
 
 
@@ -64,3 +74,14 @@ class PtySession:
     # prompt.
     osc_parser: OscParser = field(default_factory=OscParser)
     command_started_at: float | None = None
+    # Last ``time.monotonic()`` the foreground agent was probed (see
+    # PtyAgentMixin). ``agent_pgid`` is the foreground process group seen
+    # then; while it is unchanged the cached agent stands and ``ps`` is
+    # never run. ``agent_resolving`` guards against overlapping ``ps`` calls.
+    agent_probed_at: float = 0.0
+    agent_pgid: int = -1
+    agent_resolving: bool = False
+    # Set when the shell hook (OSC 777) reported the agent. The pgrp probe
+    # defers to it for a short grace window so it cannot clear the mark in
+    # the gap between the hook firing and the agent process exec'ing.
+    agent_from_hook_at: float = 0.0

@@ -7,6 +7,9 @@ export type PaneSplitTarget =
   | 'terminal'
   | 'claude'
   | 'codex'
+  | 'opencode'
+  | 'fx'
+  | 'hermes'
   | 'sandwalk'
 
 export type CliHarnessPreset = {
@@ -16,8 +19,11 @@ export type CliHarnessPreset = {
 }
 
 export const CLI_HARNESS_PRESETS: CliHarnessPreset[] = [
-  { id: 'claude', title: 'Claude', command: 'claude' },
+  { id: 'claude', title: 'Claude Code', command: 'claude' },
   { id: 'codex', title: 'Codex', command: 'codex' },
+  { id: 'opencode', title: 'OpenCode', command: 'opencode' },
+  { id: 'fx', title: 'fx', command: 'fx' },
+  { id: 'hermes', title: 'Hermes', command: 'hermes' },
   { id: 'sandwalk', title: 'Sandwalk CLI', command: 'sandwalk' }
 ]
 

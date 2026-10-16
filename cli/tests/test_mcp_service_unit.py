@@ -690,3 +690,29 @@ def test_mcp_service_resolve_runtime_servers(tmp_path: Path, monkeypatch):
     assert resolved[0]["id"] == server.id
     assert "headers" in resolved[0]
     assert "header_names" not in resolved[0]
+
+
+def test_mcp_service_resolve_runtime_servers_skips_catalog_server_needing_auth(
+    tmp_path: Path, monkeypatch
+):
+    """An enabled catalog remote whose key/OAuth is gone must not reach the run.
+
+    It used to be shipped without headers: every run then connected
+    unauthenticated, hit the 5 s timeout, and retried after each cooldown.
+    """
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    Config({}).save()  # no mcp.tamarind_api_key
+
+    store = AgentStore(tmp_path / "agent.db")
+    store.create_mcp_server(
+        name="Tamarind",
+        transport="streamable_http",
+        command=None,
+        args=[],
+        url="https://mcp.tamarind.bio",
+        enabled=True,
+        catalog_id="tamarind",
+    )
+    assert McpService(store).resolve_runtime_servers() == []

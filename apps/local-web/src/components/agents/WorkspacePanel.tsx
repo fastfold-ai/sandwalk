@@ -1,17 +1,7 @@
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
-import { useEffect, useRef, useState } from 'react'
-import type { ImperativePanelHandle } from 'react-resizable-panels'
-
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup
-} from '@/components/ui/resizable'
-import { cn } from '@/lib/utils'
 
 import { ArtifactsBrowser } from './ArtifactsBrowser'
 import { SitePreviewPanel } from './SitePreviewPanel'
-import { TerminalPanel } from './TerminalPanel'
 import { useWorkspacePanel } from './workspace/use-workspace-panel'
 import { WorkspaceFileBrowserContextMenu } from './workspace/workspace-file-browser-context-menu'
 import { WorkspaceFileTabContextMenu } from './workspace/workspace-file-tab-context-menu'
@@ -38,10 +28,7 @@ export function WorkspacePanel({
   onNewFiles,
   onTogglePanel,
   panelView = 'files',
-  siteId = null,
-  terminalOpen = false,
-  onCloseTerminal,
-  onOpenTerminal
+  siteId = null
 }: {
   client: LocalAgentClient
   sessionId: string
@@ -60,9 +47,6 @@ export function WorkspacePanel({
   onTogglePanel?: () => void
   panelView?: 'files' | 'preview'
   siteId?: string | null
-  terminalOpen?: boolean
-  onCloseTerminal?: () => void
-  onOpenTerminal?: () => void
 }) {
   const workspace = useWorkspacePanel({
     client,
@@ -74,24 +58,6 @@ export function WorkspacePanel({
     onFilesChange,
     onNewFiles
   })
-
-  /** Keep terminal mounted after first open so toggle doesn't drop the PTY socket. */
-  const [terminalMounted, setTerminalMounted] = useState(terminalOpen)
-  const terminalPanelRef = useRef<ImperativePanelHandle>(null)
-
-  useEffect(() => {
-    if (terminalOpen) setTerminalMounted(true)
-  }, [terminalOpen])
-
-  useEffect(() => {
-    const panel = terminalPanelRef.current
-    if (!panel || !terminalMounted) return
-    if (terminalOpen) {
-      if (panel.isCollapsed()) panel.expand(50)
-    } else if (!panel.isCollapsed()) {
-      panel.collapse()
-    }
-  }, [terminalOpen, terminalMounted])
 
   const browser = (
     <ArtifactsBrowser
@@ -203,58 +169,8 @@ export function WorkspacePanel({
 
   return (
     <>
-      <aside className="bg-card border-border relative z-20 mb-1.5 mr-1.5 flex h-[calc(100%-6px)] w-[calc(100%-6px)] min-w-0 flex-col overflow-hidden rounded-lg border">
-        {terminalMounted ? (
-          <ResizablePanelGroup
-            direction="vertical"
-            autoSaveId="fastfold.files-terminal-panels"
-            className="h-full"
-          >
-            <ResizablePanel
-              id="files"
-              order={1}
-              defaultSize={50}
-              minSize={20}
-              className="min-h-0"
-            >
-              <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                {main}
-              </div>
-            </ResizablePanel>
-            <ResizableHandle
-              className={cn(
-                'bg-transparent after:bg-transparent',
-                !terminalOpen && 'pointer-events-none opacity-0'
-              )}
-            />
-            <ResizablePanel
-              id="terminal"
-              order={2}
-              ref={terminalPanelRef}
-              collapsible
-              collapsedSize={0}
-              defaultSize={terminalOpen ? 50 : 0}
-              minSize={15}
-              className="min-h-0"
-              onCollapse={() => onCloseTerminal?.()}
-              onExpand={() => onOpenTerminal?.()}
-            >
-              {/*
-                onClose se pasa `undefined` a propósito por ahora — el
-                TerminalPanel esconde su botón X cuando no hay handler,
-                así el usuario no puede cerrar la terminal hasta que
-                definamos la UX final.
-              */}
-              <TerminalPanel
-                client={client}
-                sessionId={sessionId}
-                visible={terminalOpen}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        ) : (
-          main
-        )}
+      <aside className="sandwalk-glass-panel bg-card border-border relative z-20 mb-1.5 mr-1.5 flex h-[calc(100%-6px)] w-[calc(100%-6px)] min-w-0 flex-col overflow-hidden rounded-lg border">
+        {main}
       </aside>
 
       <WorkspaceArtifactsModal

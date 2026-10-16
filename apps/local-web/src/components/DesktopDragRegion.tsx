@@ -16,7 +16,7 @@ function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
   return Boolean(
     target.closest(
-      'button, a, input, textarea, select, [role="button"], [data-no-window-drag], [data-capy-root]'
+      'button, a, input, textarea, select, [role="button"], [role="menuitem"], [data-no-window-drag], [data-sandwalk-new-menu], [data-capy-root]'
     )
   )
 }

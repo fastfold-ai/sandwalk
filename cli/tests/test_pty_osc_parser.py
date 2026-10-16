@@ -101,6 +101,21 @@ class TestNotifications:
     def test_osc777_other_subcommands_ignored(self) -> None:
         assert OscParser().feed(b"\x1b]777;progress;50" + BEL) == []
 
+    def test_osc777_sandwalk_agent_hook_started(self) -> None:
+        events = OscParser().feed(b"\x1b]777;notify;Sandwalk;agent;claude;started" + BEL)
+        assert events == [PtyEvent(kind="agent.hook", agent="claude")]
+
+    def test_osc777_sandwalk_agent_hook_exited(self) -> None:
+        events = OscParser().feed(b"\x1b]777;notify;Sandwalk;agent;codex;exited" + BEL)
+        assert events == [PtyEvent(kind="agent.hook", agent=None)]
+
+    def test_osc777_sandwalk_agent_hook_unknown_kind_ignored(self) -> None:
+        assert OscParser().feed(b"\x1b]777;notify;Sandwalk;agent;gemini;started" + BEL) == []
+
+    def test_osc777_sandwalk_title_without_agent_is_plain_notify(self) -> None:
+        events = OscParser().feed(b"\x1b]777;notify;Sandwalk;done" + BEL)
+        assert events == [PtyEvent(kind="notify", title="Sandwalk", body="done")]
+
     def test_unknown_osc_ignored(self) -> None:
         assert OscParser().feed(b"\x1b]0;window title" + BEL) == []
 

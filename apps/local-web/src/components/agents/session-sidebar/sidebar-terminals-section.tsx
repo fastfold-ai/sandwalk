@@ -2,10 +2,11 @@ import type {
   AgentProject,
   TerminalSession
 } from '@sandwalk/agent-ui-core'
-import { ChevronDown, MoreHorizontal, Pin, SquareTerminal } from 'lucide-react'
+import { ChevronDown, MoreHorizontal, Pin } from 'lucide-react'
 import { useState } from 'react'
 
 import { TerminalActionsMenu } from '@/components/agents/TerminalActionsMenu'
+import { TerminalTypeIcon } from '@/components/agents/TerminalTypeIcon'
 import {
   Popover,
   PopoverContent,
@@ -212,23 +213,19 @@ function TerminalRowInner({
               FAS-107: pin e icono de tipo viven en slots uniformes
               `size-4` con `place-items-center` para garantizar
               alineación vertical con las filas de chat y group split. */}
-          {isPinned ? (
-            <span
-              aria-hidden
-              className="grid size-4 shrink-0 place-items-center"
-            >
+          <span
+            aria-hidden
+            className="grid size-4 shrink-0 place-items-center"
+          >
+            {isPinned ? (
               <Pin
                 aria-label="Pinned"
                 className="text-zinc-400 size-3"
                 fill="currentColor"
               />
-            </span>
-          ) : null}
-          <span
-            aria-hidden
-            className="grid size-4 shrink-0 place-items-center"
-          >
-            <SquareTerminal className="size-3.5 text-orange-500" />
+            ) : (
+              <TerminalTypeIcon terminalId={term.id} />
+            )}
           </span>
           {colorValue ? (
             <span

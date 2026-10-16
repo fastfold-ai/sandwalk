@@ -1,19 +1,14 @@
 import {
-  BookOpen,
+  ChevronRight,
   ExternalLink,
+  LayoutDashboard,
   LogOut,
-  Monitor,
-  Moon,
-  Settings,
-  Sun
+  Settings
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
-import {
-  listenSubtitle,
-  SandwalkServerCard
-} from '@/components/agents/SandwalkServerCard'
 import { ThemeAppearanceMenuContent } from '@/components/ThemeAppearanceMenu'
 import {
   DropdownMenu,
@@ -21,11 +16,9 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { useDesktopUpdate } from '@/hooks/useDesktopUpdate'
 import { openInSystemBrowser } from '@/lib/desktop'
 import {
   getStoredPalette,
@@ -33,12 +26,11 @@ import {
   PALETTE_CHANGE_EVENT,
   previewPalette,
   THEME_CHANGE_EVENT,
-  THEME_PALETTES,
   type ThemeMode,
   type ThemePaletteId
 } from '@/lib/theme'
+import { cn } from '@/lib/utils'
 
-const DOCS_URL = 'https://docs.fastfold.ai'
 const CLOUD_URL = 'https://cloud.fastfold.ai'
 const STATUS_URL = 'https://status.fastfold.ai'
 
@@ -57,9 +49,9 @@ export function SidebarUserMenu({
   userName,
   onLogout,
   onRefreshUser,
-  backendVersion = null,
-  backendUrl = null,
-  connected = false
+  backendVersion: _backendVersion = null,
+  backendUrl: _backendUrl = null,
+  connected: _connected = false
 }: {
   userName: string | null
   onLogout?: () => void | Promise<void>
@@ -69,20 +61,23 @@ export function SidebarUserMenu({
   connected?: boolean
 }) {
   const navigate = useNavigate()
+  const settingsActive = useLocation().pathname.startsWith('/dashboard')
+  const update = useDesktopUpdate()
   const displayName = userName?.trim() || 'Local User'
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme())
   const [palette, setPalette] = useState<ThemePaletteId>(() =>
     getStoredPalette()
   )
   const [loggingOut, setLoggingOut] = useState(false)
-  const serverSubtitle = useMemo(
-    () =>
-      listenSubtitle({
-        running: connected,
-        backendUrl
-      }),
-    [backendUrl, connected]
-  )
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [themeOpen, setThemeOpen] = useState(false)
+  const themeRowRef = useRef<HTMLDivElement | null>(null)
+  const themeCloseTimer = useRef<number | null>(null)
+  const [themePos, setThemePos] = useState<{
+    top: number
+    left: number
+    maxHeight: number
+  } | null>(null)
 
   useEffect(() => {
     const onTheme = (event: Event) => {
@@ -100,124 +95,193 @@ export function SidebarUserMenu({
   }, [])
 
   const initials = useMemo(() => userInitials(displayName), [displayName])
-  const activePalette =
-    THEME_PALETTES.find(item => item.id === palette) ?? THEME_PALETTES[0]
 
-  const ModeIcon =
-    theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
+  const cancelThemeClose = () => {
+    if (themeCloseTimer.current != null) {
+      window.clearTimeout(themeCloseTimer.current)
+      themeCloseTimer.current = null
+    }
+  }
+  const scheduleThemeClose = () => {
+    cancelThemeClose()
+    themeCloseTimer.current = window.setTimeout(() => setThemeOpen(false), 400)
+  }
+  const showTheme = () => {
+    cancelThemeClose()
+    const rect = themeRowRef.current?.getBoundingClientRect()
+    if (rect) {
+      const width = 272
+      const gap = 6
+      const left =
+        window.innerWidth - rect.right >= width + gap + 8
+          ? rect.right + gap
+          : Math.max(8, rect.left - width - gap)
+      // Sit level with the Theme row. Shrink and scroll instead of
+      // jumping the panel up over the rest of the sidebar.
+      const top = Math.max(8, rect.top)
+      const maxHeight = Math.max(160, window.innerHeight - top - 8)
+      setThemePos({ top, left, maxHeight })
+    }
+    setThemeOpen(true)
+  }
+  useEffect(() => () => cancelThemeClose(), [])
 
   return (
     <DropdownMenu
+      modal={false}
+      open={menuOpen}
       onOpenChange={open => {
+        setMenuOpen(open)
         if (open) void onRefreshUser?.()
+        else {
+          setThemeOpen(false)
+          previewPalette(getStoredPalette())
+        }
       }}
     >
-      <DropdownMenuTrigger asChild>
+      <div className="flex w-full items-center gap-1 px-1.5 py-1">
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={displayName}
+            className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/55 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left"
+          >
+            <span className="bg-muted text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
+              {initials}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              {displayName}
+            </span>
+          </button>
+        </DropdownMenuTrigger>
+        {update.available ? (
+          <button
+            type="button"
+            className="shrink-0 rounded-md bg-[#C6A15B] px-2 py-0.5 text-[11px] font-semibold text-[#1c1408] hover:bg-[#d4b56a] disabled:opacity-70"
+            disabled={update.installing}
+            onClick={() => void update.installUpdate()}
+          >
+            {update.installing ? 'Updating…' : 'Update'}
+          </button>
+        ) : null}
         <button
           type="button"
-          className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/55 flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors"
+          aria-label="Settings"
+          aria-current={settingsActive ? 'page' : undefined}
+          className={cn(
+            'inline-flex size-7 shrink-0 items-center justify-center rounded-lg',
+            settingsActive
+              ? 'bg-sidebar-accent/70 text-foreground'
+              : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+          )}
+          onClick={() => navigate('/dashboard/general')}
         >
-          <span className="bg-muted text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
-            {initials}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-            {displayName}
-          </span>
+          <Settings className="size-3.5" />
         </button>
-      </DropdownMenuTrigger>
+      </div>
       <DropdownMenuContent
-        className="bg-card w-[var(--radix-popper-anchor-width)] min-w-0 max-w-[var(--radix-popper-anchor-width)] rounded-xl border p-1 shadow-xl"
+        className="sandwalk-glass-menu bg-card w-64 rounded-xl border p-1 shadow-xl"
         side="top"
         align="start"
         sideOffset={8}
-        onCloseAutoFocus={() => previewPalette(getStoredPalette())}
+        collisionPadding={12}
+        onCloseAutoFocus={event => {
+          event.preventDefault()
+          previewPalette(getStoredPalette())
+        }}
+        onInteractOutside={event => {
+          const target = event.target
+          if (
+            target instanceof Element &&
+            target.closest('[data-account-theme-menu]')
+          ) {
+            event.preventDefault()
+          }
+        }}
       >
         <DropdownMenuItem
-          className="cursor-pointer items-start rounded-lg p-1.5 [&>div]:w-full"
+          className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm"
           onClick={() => navigate('/dashboard/general')}
         >
-          <SandwalkServerCard
-            compact
-            flat
-            title={displayName}
-            version={backendVersion}
-            running={connected}
-            subtitle={serverSubtitle}
-            trailing={<Settings className="size-3.5" />}
-          />
+          <Settings className="text-muted-foreground size-4 shrink-0" />
+          <span className="min-w-0 flex-1">Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
 
-        <DropdownMenuGroup>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="flex cursor-default items-center gap-2 px-2 py-1.5 text-sm">
-              <span className="min-w-0 flex-1 truncate">Theme</span>
-              <span
-                className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs"
-                title={activePalette.name}
+        <div
+          ref={themeRowRef}
+          className="hover:bg-accent flex cursor-default items-center gap-2 rounded-lg px-2 py-1.5 text-sm"
+          onMouseEnter={showTheme}
+          onMouseLeave={scheduleThemeClose}
+          onClick={event => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (themeOpen) setThemeOpen(false)
+            else showTheme()
+          }}
+        >
+          <span className="min-w-0 flex-1 truncate">Theme</span>
+          <ChevronRight className="size-3.5 shrink-0 opacity-60" />
+        </div>
+        {themeOpen && themePos
+          ? createPortal(
+              <div
+                data-account-theme-menu
+                className="fixed z-[200]"
+                style={{
+                  top: themePos.top,
+                  left: themePos.left - 10,
+                  paddingLeft: 10
+                }}
+                onMouseEnter={cancelThemeClose}
+                onMouseLeave={scheduleThemeClose}
               >
-                <ModeIcon className="size-3.5 shrink-0" />
-                <span className="flex items-center gap-0.5">
-                  {activePalette.swatches.map(color => (
-                    <span
-                      key={color}
-                      className="border-border/60 size-2 rounded-sm border"
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </span>
-              </span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent
-              sideOffset={8}
-              collisionPadding={16}
-              className="bg-card max-h-[min(28rem,calc(100dvh-2rem))] w-64 overflow-y-auto rounded-xl border p-1.5 shadow-xl"
-              onPointerLeave={() => previewPalette(getStoredPalette())}
-            >
-              <ThemeAppearanceMenuContent
-                mode={theme}
-                palette={palette}
-                onPreviewPalette={previewPalette}
-              />
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuGroup>
+                <div
+                  className="sandwalk-glass-menu bg-popover text-popover-foreground w-[17rem] overflow-y-auto rounded-xl border p-1.5 shadow-xl"
+                  style={{ maxHeight: themePos.maxHeight }}
+                >
+                  <ThemeAppearanceMenuContent mode={theme} palette={palette} />
+                </div>
+              </div>,
+              document.body
+            )
+          : null}
 
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
           <DropdownMenuItem
-            className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
-            onClick={() => openExternal(DOCS_URL)}
+            className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm"
+            onClick={() => navigate('/dashboard')}
           >
-            <span className="truncate">Docs</span>
-            <BookOpen className="text-muted-foreground size-4 shrink-0" />
+            <LayoutDashboard className="text-muted-foreground size-4 shrink-0" />
+            <span className="truncate">Overview</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
+            className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm"
             onClick={() => openExternal(CLOUD_URL)}
           >
-            <span className="truncate">Fastfold Cloud</span>
             <img
               src="/ff_simbol_color.svg"
               alt=""
               aria-hidden="true"
               className="size-4 shrink-0"
             />
+            <span className="truncate">Fastfold Cloud</span>
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
+            className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm"
             onClick={() => openExternal(STATUS_URL)}
           >
-            <span className="truncate">Status</span>
             <ExternalLink className="text-muted-foreground size-4 shrink-0" />
+            <span className="truncate">Status</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
-          className="flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm"
+          className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm"
           disabled={loggingOut || !onLogout}
           onClick={() => {
             if (!onLogout) return
@@ -225,10 +289,10 @@ export function SidebarUserMenu({
             void Promise.resolve(onLogout()).finally(() => setLoggingOut(false))
           }}
         >
+          <LogOut className="text-muted-foreground size-4 shrink-0" />
           <span className="truncate">
             {loggingOut ? 'Signing out…' : 'Log out'}
           </span>
-          <LogOut className="text-muted-foreground size-4 shrink-0" />
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

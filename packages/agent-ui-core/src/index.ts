@@ -385,7 +385,54 @@ export type MessageSource = {
 
 export type SessionTitleSource = 'pending' | 'auto' | 'user'
 
-export type SessionSource = 'slack' | 'bench' | 'capy'
+/** Coding-agent CLIs Sandwalk can read from, launch, and hand off to. */
+export type ExternalAgentKind = 'claude' | 'codex' | 'opencode' | 'fx' | 'hermes'
+
+export type SessionSource = 'slack' | 'bench' | 'capy' | ExternalAgentKind
+
+export type ExternalAgentInfo = {
+  kind: ExternalAgentKind
+  label: string
+  installed: boolean
+  path: string | null
+}
+
+export type ExternalSessionSummary = {
+  kind: ExternalAgentKind
+  label: string
+  id: string
+  title: string
+  cwd: string | null
+  updatedAt: string | null
+  turns: number
+}
+
+export type ExternalAgentsResponse = {
+  agents: ExternalAgentInfo[]
+  sessions: ExternalSessionSummary[]
+}
+
+export type ExternalLaunchResult = {
+  kind: ExternalAgentKind
+  command: string
+  terminal: TerminalSession
+  pty: PtySessionInfo
+}
+
+export type HandoffResult = {
+  kind: ExternalAgentKind
+  path: string
+  prompt: string
+  workspacePath: string
+  messages: number
+  native: boolean
+  resumeId?: string
+  nativePath?: string
+  /** Present when `launch` was true. */
+  command?: string
+  terminal?: TerminalSession
+  pty?: PtySessionInfo
+}
 
 export type ClientSurface = 'cli' | 'ui' | 'slack' | 'unknown'
 
@@ -643,6 +690,12 @@ export type TerminalSession = {
   lastActivityAt: string | null
   createdAt: string
   updatedAt: string
+  /**
+   * UI-only: the coding-agent CLI currently in the foreground of this
+   * terminal's PTY (from `PtySessionInfo.agent` / the `agent.changed`
+   * PTY event). Not persisted on the row.
+   */
+  agent?: ExternalAgentKind | null
 }
 
 /**
@@ -1466,6 +1519,9 @@ export type PtySessionInfo = {
   rows: number
   pid: number
   status: 'running' | 'exited'
+  /** Coding-agent CLI detected in the foreground, if any. */
+  agent?: ExternalAgentKind | null
+  agentCwd?: string | null
 }
 
 export interface McpProvider {

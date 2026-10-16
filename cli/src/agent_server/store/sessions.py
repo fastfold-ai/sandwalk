@@ -12,6 +12,10 @@ from agent_server.store.util import require_sandbox_backend, utc_now
 
 DEFAULT_SESSION_TITLE = "New research session"
 
+# Connector / origin values a session row may carry. Mirrors ``SessionSource``
+# in ``models/sessions.py`` and the normalizer in ``store/rows.py``.
+SESSION_SOURCES = frozenset({"slack", "bench", "capy", "claude", "codex", "opencode", "fx", "hermes"})
+
 
 def initial_title_source(title: str | None) -> TitleSource:
     """Placeholder create titles stay ``pending`` so auto-title can run later.
@@ -119,12 +123,8 @@ class SessionCreateMixin:
             normalized_backend = require_sandbox_backend(sandbox_backend)
 
         normalized_source = (source or "").strip().lower() or None
-        if normalized_source is not None and normalized_source not in {
-            "slack",
-            "bench",
-            "capy",
-        }:
-            raise ValueError("source must be 'slack', 'bench', or 'capy'")
+        if normalized_source is not None and normalized_source not in SESSION_SOURCES:
+            raise ValueError(f"source must be one of {', '.join(sorted(SESSION_SOURCES))}")
 
         from agent_server.store.usage import normalize_surface
 

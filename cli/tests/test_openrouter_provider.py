@@ -131,6 +131,31 @@ def test_build_openrouter_chat_model_sets_attribution():
         assert kwargs["reasoning"] == {"effort": "high"}
 
 
+def test_build_openrouter_chat_model_sets_a_real_request_timeout():
+    """Without an explicit timeout the SDK's httpx client defaults to 5 s.
+
+    Requests carrying hundreds of tool schemas take longer than that to first
+    byte, so every attempt timed out and the SDK retried for minutes with no
+    error surfaced. Match the 300 s budget the other providers use.
+    """
+    from agent.deepagents_runtime.chat_model_openrouter import (
+        OPENROUTER_MAX_RETRIES,
+        OPENROUTER_REQUEST_TIMEOUT_MS,
+        build_openrouter_chat_model,
+    )
+
+    cfg = MagicMock()
+    cfg.get.side_effect = lambda key, default=None: {"llm.model": "deepseek/deepseek-v4-flash-0731"}.get(
+        key, default
+    )
+    cfg.llm_api_key.return_value = "sk-or-test"
+    with patch("langchain_openrouter.ChatOpenRouter", return_value=MagicMock(name="chat")) as mock_cls:
+        build_openrouter_chat_model(cfg, temperature=0.2)
+        kwargs = mock_cls.call_args.kwargs
+    assert kwargs["timeout"] == OPENROUTER_REQUEST_TIMEOUT_MS == 300_000
+    assert kwargs["max_retries"] == OPENROUTER_MAX_RETRIES == 2
+
+
 def test_build_openrouter_chat_model_astra_omits_temperature():
     from agent.deepagents_runtime.chat_model_openrouter import build_openrouter_chat_model
 

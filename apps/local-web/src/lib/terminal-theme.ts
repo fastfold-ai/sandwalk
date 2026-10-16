@@ -335,6 +335,16 @@ export function readDocumentPalette(): ThemePaletteId {
   return 'default'
 }
 
+/** Desktop liquid glass is on and the window is focused. */
+export function isLiquidGlassActive(): boolean {
+  if (typeof document === 'undefined') return false
+  const root = document.documentElement
+  return (
+    root.classList.contains('sandwalk-mac-glass-active') &&
+    !root.classList.contains('sandwalk-liquid-glass-off')
+  )
+}
+
 export function isDocumentDark(): boolean {
   return (
     typeof document !== 'undefined' &&
@@ -352,10 +362,11 @@ export function buildTerminalTheme(
       dark ? 'dark' : 'light'
     ] ?? (dark ? DEFAULT_DARK_ANSI : DEFAULT_LIGHT_ANSI)
 
-  const background = cssHsl(
-    '--card',
-    dark ? '#0D1117' : '#FAFAFA'
-  )
+  const background = isLiquidGlassActive()
+    ? dark
+      ? 'rgba(28, 28, 31, 0.55)'
+      : 'rgba(246, 246, 247, 0.62)'
+    : cssHsl('--card', dark ? '#0D1117' : '#FAFAFA')
   const foreground = cssHsl(
     '--foreground',
     dark ? '#E6EDF3' : '#24292F'
@@ -380,19 +391,55 @@ export function buildTerminalTheme(
   }
 }
 
-/** Subscribe to light/dark + palette changes that should refresh xterm. */
-export function watchTerminalTheme(onChange: () => void): () => void {
+type ThemeListener = (theme: ITheme) => void
+
+const themeListeners = new Set<ThemeListener>()
+let themeWatcherStop: (() => void) | null = null
+
+/**
+ * One document-level watcher shared by every terminal. With dozens of
+ * xterm instances mounted, a per-terminal watcher meant N × (getComputedStyle
+ * → term.options.theme) and each theme write mutates a `<style>` tag, so the
+ * next read forced a full style recalc: layout thrash scaling with the
+ * number of terminals. Now the theme is read once per change and fanned out.
+ */
+function startThemeWatcher() {
+  // A palette click updates the DOM attribute and then dispatches an event.
+  // Both would rebuild every xterm theme. Coalesce to one frame.
+  let frame = 0
+  const schedule = () => {
+    if (frame) return
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      const theme = buildTerminalTheme(isDocumentDark())
+      for (const listener of themeListeners) listener(theme)
+    })
+  }
   const root = document.documentElement
-  const observer = new MutationObserver(onChange)
+  const observer = new MutationObserver(schedule)
   observer.observe(root, {
     attributes: true,
     attributeFilter: ['class', 'data-palette']
   })
-  window.addEventListener(THEME_CHANGE_EVENT, onChange)
-  window.addEventListener(PALETTE_CHANGE_EVENT, onChange)
-  return () => {
+  window.addEventListener(THEME_CHANGE_EVENT, schedule)
+  window.addEventListener(PALETTE_CHANGE_EVENT, schedule)
+  themeWatcherStop = () => {
+    if (frame) cancelAnimationFrame(frame)
     observer.disconnect()
-    window.removeEventListener(THEME_CHANGE_EVENT, onChange)
-    window.removeEventListener(PALETTE_CHANGE_EVENT, onChange)
+    window.removeEventListener(THEME_CHANGE_EVENT, schedule)
+    window.removeEventListener(PALETTE_CHANGE_EVENT, schedule)
+  }
+}
+
+/** Subscribe to light/dark + palette changes that should refresh xterm. */
+export function watchTerminalTheme(onChange: ThemeListener): () => void {
+  if (themeListeners.size === 0) startThemeWatcher()
+  themeListeners.add(onChange)
+  return () => {
+    themeListeners.delete(onChange)
+    if (themeListeners.size === 0 && themeWatcherStop) {
+      themeWatcherStop()
+      themeWatcherStop = null
+    }
   }
 }

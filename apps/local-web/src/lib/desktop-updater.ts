@@ -21,6 +21,33 @@ export function desktopUpdaterAvailable(): boolean {
   return isTauri()
 }
 
+/** Quiet re-check while the app stays open. */
+export const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000
+
+/**
+ * Dev-only stand-in for a newer GitHub release. Set in the browser console,
+ * then reload:
+ *
+ *   localStorage.setItem('sandwalk.update.preview', '9.9.9')
+ *
+ * Clear it with `localStorage.removeItem('sandwalk.update.preview')`.
+ * The Update button appears, but install does not download or relaunch.
+ */
+export const PREVIEW_UPDATE_STORAGE_KEY = 'sandwalk.update.preview'
+
+export function previewUpdateVersion(): string | null {
+  try {
+    const value = localStorage.getItem(PREVIEW_UPDATE_STORAGE_KEY)?.trim()
+    return value || null
+  } catch {
+    return null
+  }
+}
+
+function sameVersion(a: string, b: string): boolean {
+  return a.replace(/^v/i, '') === b.replace(/^v/i, '')
+}
+
 export type DesktopUpdateProgress = {
   phase: 'download' | 'install'
   received: number
@@ -33,6 +60,18 @@ export function formatDesktopVersion(version: string | null | undefined): string
 }
 
 export async function checkDesktopUpdate(): Promise<DesktopUpdateCheckResult> {
+  const preview = previewUpdateVersion()
+  if (preview) {
+    const current = typeof __UI_VERSION__ === 'string' ? __UI_VERSION__ : ''
+    if (current && sameVersion(preview, current)) return { kind: 'current' }
+    return {
+      kind: 'available',
+      info: {
+        version: preview,
+        body: 'Preview update. No download will run.'
+      }
+    }
+  }
   if (!isTauri()) return { kind: 'unavailable' }
   try {
     const { check } = await import('@tauri-apps/plugin-updater')
@@ -61,6 +100,13 @@ export async function installDesktopUpdate(options?: {
   ok: boolean
   message?: string
 }> {
+  if (previewUpdateVersion()) {
+    return {
+      ok: false,
+      message:
+        'Preview update only. Remove sandwalk.update.preview to install a real release.'
+    }
+  }
   if (!isTauri()) {
     return { ok: false, message: 'Desktop updater is only available in Sandwalk.app' }
   }

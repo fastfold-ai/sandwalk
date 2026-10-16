@@ -95,6 +95,7 @@ def register_pty_routes(app: FastAPI, deps: AppDeps) -> None:
             title=body.title,
             cols=body.cols,
             rows=body.rows,
+            startup=body.startup,
         )
         return PtySessionInfo(**info.to_dict())
 
