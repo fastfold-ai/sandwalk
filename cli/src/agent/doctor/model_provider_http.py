@@ -111,6 +111,14 @@ def _classify_http_result(
             status_code=code,
         )
     snippet = _error_snippet(payload)[:160] if payload is not None else ""
+    # The model authenticated and started answering; it only ran out of the
+    # tiny output budget we gave it. That is a working key, not an error.
+    if code == 400 and _is_output_limit_error(body_lower):
+        return ModelsProbeResult(
+            ok=True,
+            message=f"{label} API key works.",
+            status_code=code,
+        )
     if code in (401, 403):
         detail = f" ({snippet})" if snippet else ""
         return ModelsProbeResult(
@@ -174,6 +182,23 @@ def _success_message(label: str, reply: str) -> str:
     return f"{label} API key works."
 
 
+_REASONING_PREFIXES = ("gpt-5", "gpt-6", "o1", "o3", "o4", "openai/gpt-5", "openai/gpt-6", "openai/o")
+
+
+def _probe_token_budget(model: str) -> int:
+    """Output cap for the key probe: 1 token, or more for reasoning models."""
+    name = str(model or "").strip().lower()
+    if name.startswith(_REASONING_PREFIXES) or "deepseek-r" in name or "reason" in name:
+        return 64
+    return 1
+
+
+def _is_output_limit_error(body_lower: str) -> bool:
+    return "output limit was reached" in body_lower or (
+        "max_tokens" in body_lower and "reached" in body_lower
+    )
+
+
 def probe_chat_completions(
     url: str,
     headers: dict[str, str],
@@ -196,10 +221,14 @@ def probe_chat_completions(
         _openai_token_limit_kwargs,
     )
 
+    # Reasoning models (gpt-5.x, o-series) spend hidden tokens thinking before
+    # the first visible one, so a 1-token cap ends in HTTP 400 "max_tokens or
+    # model output limit was reached" and the key looks broken. Give those
+    # enough room to answer; non-reasoning models stay at 1 token.
     body = {
         "model": model,
         "messages": [{"role": "user", "content": "ping"}],
-        **_openai_token_limit_kwargs(model, 1),
+        **_openai_token_limit_kwargs(model, _probe_token_budget(model)),
         **_openai_temperature_kwargs(model, 0),
     }
     try:

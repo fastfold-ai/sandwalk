@@ -9,6 +9,26 @@ from agent_server.service.fork_import import import_shared_fork_files
 from agent_server.session_event_bus import SessionEventType, session_event_bus
 
 
+def _is_under_config_dir(path: Path) -> bool:
+    """True when ``path`` sits inside ``~/.sandwalk`` (or the configured dir)."""
+    import os
+
+    from agent.config import CONFIG_DIR
+
+    roots = [Path(CONFIG_DIR)]
+    override = (os.environ.get("SANDWALK_CONFIG_DIR") or "").strip()
+    if override:
+        roots.append(Path(override))
+    for root in roots:
+        try:
+            resolved = root.expanduser().resolve()
+        except OSError:
+            continue
+        if path == resolved or resolved in path.parents:
+            return True
+    return False
+
+
 def _publish_session_bus_event(event_type: str, session: AgentSession) -> None:
     """Fan out to `session_event_bus` — swallow errors so a broken subscriber
     can never break the write path.
@@ -73,7 +93,20 @@ class _SessionCrudMixin:
         if workspace_path:
             workspace = Path(workspace_path).expanduser().resolve()
             if not workspace.is_dir():
-                raise ValueError(f"Workspace directory does not exist: {workspace}")
+                # Folders under Sandwalk's own config dir (the Vercel setup
+                # terminal, integration scratch dirs) are ours to create. On a
+                # fresh install they do not exist yet, and the UI used to fail
+                # with "Workspace directory does not exist". Anything else is a
+                # user path and must already be there.
+                if _is_under_config_dir(workspace):
+                    try:
+                        workspace.mkdir(parents=True, exist_ok=True)
+                    except OSError as exc:
+                        raise ValueError(
+                            f"Could not create workspace directory {workspace}: {exc}"
+                        ) from exc
+                else:
+                    raise ValueError(f"Workspace directory does not exist: {workspace}")
             normalized_workspace = str(workspace)
         session = self.store.create_session(
             title=title,

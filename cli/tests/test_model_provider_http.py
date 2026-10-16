@@ -47,9 +47,69 @@ def test_probe_chat_completions_gpt5_uses_max_completion_tokens(monkeypatch):
         model="gpt-5-nano",
     )
     assert result.ok is True
-    assert seen["json"]["max_completion_tokens"] == 1
+    # Reasoning models think before the first visible token; 1 would 400.
+    assert seen["json"]["max_completion_tokens"] == 64
     assert "max_tokens" not in seen["json"]
     assert "temperature" not in seen["json"]
+
+
+def test_probe_chat_completions_plain_model_keeps_one_token(monkeypatch):
+    seen: dict = {}
+
+    class _Resp:
+        status_code = 200
+        text = '{"choices":[{"message":{"content":"pong"}}]}'
+
+        def json(self):
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    def post(*_args, **kwargs):
+        seen["json"] = kwargs.get("json")
+        return _Resp()
+
+    monkeypatch.setitem(__import__("sys").modules, "httpx", SimpleNamespace(post=post))
+    probe_chat_completions(
+        "https://api.openai.com/v1/chat/completions",
+        {"Authorization": "Bearer sk-test"},
+        label="OpenAI",
+        model="gpt-4o-mini",
+    )
+    assert seen["json"]["max_tokens"] == 1
+
+
+def test_probe_chat_completions_output_limit_400_counts_as_working_key(monkeypatch):
+    """OpenAI's 'max_tokens or model output limit was reached' means the key
+    authenticated and the model started answering. Users saw this as a broken
+    key on the Models page."""
+    body = {
+        "error": {
+            "message": (
+                "Could not finish the message because max_tokens or model output "
+                "limit was reached. Please try again with higher max_tokens."
+            ),
+            "type": "invalid_request_error",
+            "code": None,
+        }
+    }
+
+    class _Resp:
+        status_code = 400
+        text = __import__("json").dumps(body)
+
+        def json(self):
+            return body
+
+    monkeypatch.setitem(
+        __import__("sys").modules, "httpx", SimpleNamespace(post=lambda *_a, **_k: _Resp())
+    )
+    result = probe_chat_completions(
+        "https://api.openai.com/v1/chat/completions",
+        {"Authorization": "Bearer sk-test"},
+        label="OpenAI",
+        model="gpt-5-nano",
+    )
+    assert result.ok is True
+    assert "works" in result.message
 
 
 def test_probe_chat_completions_invalid_key(monkeypatch):
