@@ -1,7 +1,18 @@
 import type { ModelProfile } from '@sandwalk/agent-ui-core'
 import { Check, ChevronDown, ChevronRight, Loader, Plus } from 'lucide-react'
+import { useState } from 'react'
 
+import {
+  LlamaLibrary,
+  type LlamaLibraryActions} from '@/components/agents/LlamaLibrary'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 import { ProfileBackendIcon } from './models-view-shared'
@@ -17,7 +28,9 @@ export function ModelsProfilesSection({
   probeStatusById,
   onOpenChange,
   onOpenCreate,
-  onOpenEdit
+  onOpenEdit,
+  llamaRuntime,
+  onUseLlamaModel
 }: {
   open: boolean
   localProfiles: ModelProfile[]
@@ -25,7 +38,13 @@ export function ModelsProfilesSection({
   onOpenChange: (open: boolean) => void
   onOpenCreate: () => void
   onOpenEdit: (profile: ModelProfile) => void
+  llamaRuntime?: LlamaLibraryActions
+  onUseLlamaModel?: (modelId: string) => void
 }) {
+  const [llamaOpen, setLlamaOpen] = useState(false)
+  const llamaProfile = localProfiles.find(profile => profile.backend === 'llama')
+  const llamaProbe = llamaProfile ? probeStatusById[llamaProfile.id] : undefined
+  const llamaConnected = llamaProbe?.tone === 'ok'
   return (
     <section className="space-y-4">
       <button
@@ -60,13 +79,51 @@ export function ModelsProfilesSection({
             Add Local LLM
           </Button>
 
-          {localProfiles.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              No local OpenAI-compatible endpoints yet.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {localProfiles.map(profile => {
+          <div className="border-border/70 space-y-3 rounded-xl border p-4">
+            <div className="flex items-start gap-3">
+              <span className="bg-muted/50 grid size-9 shrink-0 place-items-center rounded-lg">
+                <img src="/local-llm/llama.png" alt="" className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Llama</p>
+                <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                  Run models on this Mac. See what is already installed, or
+                  download one sized for this machine.
+                </p>
+              </div>
+              {llamaConnected ? (
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <Check className="size-3.5" />
+                  Connected
+                </span>
+              ) : null}
+            </div>
+            <Button type="button" size="sm" onClick={() => setLlamaOpen(true)}>
+              {llamaConnected ? 'Browse models' : 'Set up Llama'}
+            </Button>
+          </div>
+
+          <Dialog open={llamaOpen} onOpenChange={setLlamaOpen}>
+            <DialogContent className="max-h-[min(40rem,85vh)] max-w-lg overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Llama</DialogTitle>
+                <DialogDescription>
+                  Pick an installed model as the default, or install one
+                  recommended for this Mac.
+                </DialogDescription>
+              </DialogHeader>
+              {llamaRuntime ? (
+                <LlamaLibrary
+                  actions={llamaRuntime}
+                  selectedId={llamaProfile?.defaultModel || null}
+                  onUse={modelId => onUseLlamaModel?.(modelId)}
+                />
+              ) : null}
+            </DialogContent>
+          </Dialog>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {localProfiles.filter(profile => profile.backend !== 'llama').map(profile => {
                 const backendMeta =
                   profileBackend(
                     profile.backend === 'openai' ? 'other' : profile.backend
@@ -125,7 +182,6 @@ export function ModelsProfilesSection({
                 )
               })}
             </div>
-          )}
         </div>
       ) : null}
     </section>

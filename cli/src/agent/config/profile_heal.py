@@ -4,7 +4,7 @@ from typing import Any
 
 from .providers import OPENAI_PROFILE_DEFAULTS
 
-_LOCAL_COMPATIBLE_BACKENDS = {"ollama", "unsloth", "omlx", "ds4", "llama_cpp", "lm_studio"}
+_LOCAL_COMPATIBLE_BACKENDS = {"ollama", "unsloth", "omlx", "ds4", "llama_cpp", "llama", "lm_studio"}
 
 
 class ProfileHealMixin:

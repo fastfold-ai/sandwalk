@@ -30,6 +30,9 @@ class ProfileBackendInferMixin:
             "llama_cpp": "llama_cpp",
             "llama-cpp": "llama_cpp",
             "llamacpp": "llama_cpp",
+            "llama": "llama",
+            "llama-app": "llama",
+            "llama.app": "llama",
             "lmstudio": "lm_studio",
             "lm_studio": "lm_studio",
             "lm-studio": "lm_studio",
@@ -56,6 +59,8 @@ class ProfileBackendInferMixin:
             or "ds4" in endpoint
         ):
             return "ds4"
+        if ":9931" in endpoint or endpoint.rstrip("/").endswith("9931"):
+            return "llama"
         if "1234" in endpoint or "lmstudio" in endpoint or "lm-studio" in endpoint:
             return "lm_studio"
         if (

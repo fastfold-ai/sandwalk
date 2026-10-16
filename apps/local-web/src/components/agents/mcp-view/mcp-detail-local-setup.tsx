@@ -24,14 +24,16 @@ export function McpDetailLocalSetupDialog({
   open,
   onOpenChange,
   state,
+  entry: entryProp,
   onInstallLocal
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  state: McpDetailViewState
+  state?: McpDetailViewState
+  entry?: import('@sandwalk/agent-ui-core').McpCatalogEntry | null
   onInstallLocal?: (opts?: { force?: boolean }) => Promise<void>
 }) {
-  const entry = state.catalogEntry
+  const entry = entryProp ?? state?.catalogEntry
   if (!entry || entry.transport !== 'stdio') return null
 
   const isRaymol = entry.id === 'raymol'

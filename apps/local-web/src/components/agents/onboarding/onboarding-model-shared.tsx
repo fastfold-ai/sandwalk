@@ -27,6 +27,14 @@ export const LLM_API_KEY_ORDER = [
 /** Same backends as ModelsView local modal / CLI setup. */
 export const PROFILE_BACKENDS = [
   {
+    value: 'llama',
+    label: 'Llama',
+    hint: '/v1/models',
+    baseUrl: 'http://127.0.0.1:9931/v1',
+    defaultLabel: 'Llama',
+    icon: '/local-llm/llama.png'
+  },
+  {
     value: 'ollama',
     label: 'Ollama',
     hint: '/api/tags',

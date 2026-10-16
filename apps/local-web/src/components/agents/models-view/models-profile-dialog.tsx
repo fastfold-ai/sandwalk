@@ -3,6 +3,9 @@ import { Check, ChevronDown, Copy, Eye, EyeOff, Loader, RefreshCw, Trash2 } from
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
+import {
+  LlamaLibrary,
+  type LlamaLibraryActions} from '@/components/agents/LlamaLibrary'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -54,7 +57,9 @@ export function ModelsProfileDialog({
   onRemoveProfile,
   onShowProfileApiKeyChange,
   onRevealStoredSecret,
-  onResetDiscoverState
+  onResetDiscoverState,
+  llamaRuntime,
+  onUseLlamaModel
 }: {
   open: boolean
   editing: ModelProfile | null
@@ -81,6 +86,8 @@ export function ModelsProfileDialog({
   /** Load the saved Local LLM API key into the draft for show/copy. */
   onRevealStoredSecret?: (profileId: string) => Promise<string>
   onResetDiscoverState: () => void
+  llamaRuntime?: LlamaLibraryActions
+  onUseLlamaModel?: (modelId: string) => void
 }) {
   const [secretAction, setSecretAction] = useState<'reveal' | 'copy' | null>(
     null
@@ -237,6 +244,16 @@ export function ModelsProfileDialog({
             </DropdownMenu>
           </div>
 
+          {form.backend === 'llama' && llamaRuntime ? (
+            <LlamaLibrary
+              actions={llamaRuntime}
+              selectedId={discoveredModels[0] || null}
+              onUse={modelId => onUseLlamaModel?.(modelId)}
+            />
+          ) : null}
+
+          {form.backend === 'llama' ? null : (
+          <>
           <label className="space-y-1.5 text-sm">
             <span className="text-muted-foreground text-xs">Base URL</span>
             <Input
@@ -313,8 +330,11 @@ export function ModelsProfileDialog({
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
 
+        {form.backend === 'llama' ? null : (
         <div className="flex min-h-0 min-w-0 flex-col gap-1.5">
           <div className="flex shrink-0 items-center justify-between gap-2">
             <span className="text-muted-foreground text-xs">Models</span>
@@ -386,6 +406,7 @@ export function ModelsProfileDialog({
             </p>
           ) : null}
         </div>
+        )}
 
         <DialogFooter className="shrink-0 gap-2 sm:justify-between">
           <div className="flex flex-wrap gap-2">

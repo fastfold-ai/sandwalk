@@ -39,8 +39,8 @@ export const ONBOARDING_STEPS: OnboardingStepDef[] = [
     id: 'models',
     slug: 'model',
     title: 'Model',
-    subtitle: 'Add your favorite LLM provider, cloud or local.',
-    skippable: true
+    subtitle: 'Choose the model for your first chat.',
+    skippable: false
   },
   {
     id: 'agents',

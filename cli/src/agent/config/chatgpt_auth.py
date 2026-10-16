@@ -59,6 +59,10 @@ _refresh_lock = threading.Lock()
 class ChatGPTAuthError(RuntimeError):
     """Raised when sign-in, refresh, or token validation fails."""
 
+    def __init__(self, message: str, *, title: str = "Sign-in failed") -> None:
+        super().__init__(message)
+        self.title = title
+
 
 @dataclass
 class ChatGPTCredentials:
@@ -301,9 +305,35 @@ def _post_token(form: dict[str, str]) -> dict[str, Any]:
     if resp.status_code >= 400 or not isinstance(payload, dict):
         err = payload.get("error") if isinstance(payload, dict) else None
         desc = payload.get("error_description") if isinstance(payload, dict) else None
-        detail = f"{err}: {desc}" if err and desc else (desc or err or f"HTTP {resp.status_code}")
-        raise ChatGPTAuthError(f"OpenAI token endpoint rejected the request ({detail}).")
+        _raise_token_error(form, err if isinstance(err, str) else None, desc if isinstance(desc, str) else None, resp.status_code)
     return payload
+
+
+def _raise_token_error(form: dict[str, str], err: str | None, desc: str | None, status: int) -> None:
+    """Turn OpenAI's token-endpoint error into copy a person can act on.
+
+    A ChatGPT account without Plus, Pro, Business, or Enterprise comes back
+    from the authorization-code exchange as a bare ``invalid_grant``.
+    """
+    code = (err or "").strip()
+    description = (desc or "").strip()
+    lowered = f"{code} {description}".lower()
+    grant = form.get("grant_type") or ""
+    stale_code = any(word in lowered for word in ("expired", "already used", "reused", "revoked"))
+    if grant == "authorization_code" and code == "invalid_grant" and not stale_code:
+        raise ChatGPTAuthError(
+            "This ChatGPT account doesn't include Plus, Pro, Business, or Enterprise. "
+            "Sandwalk needs one of those plans to sign in. Upgrade ChatGPT and try again, "
+            "or add an OpenAI API key in Dashboard → Models.",
+            title="ChatGPT plan needed",
+        )
+    if grant == "refresh_token" and code == "invalid_grant":
+        raise ChatGPTAuthError(
+            "Your ChatGPT sign-in expired. Sign in again from Dashboard → Models.",
+            title="Sign-in expired",
+        )
+    detail = f"{code}: {description}" if code and description else (description or code or f"HTTP {status}")
+    raise ChatGPTAuthError(f"OpenAI token endpoint rejected the request ({detail}).")
 
 
 _jwks_cache: dict[str, Any] = {"fetched_at": 0.0, "client": None}

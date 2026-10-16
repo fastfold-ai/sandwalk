@@ -5,8 +5,10 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import { Monitor } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 import { AgentSandboxView } from '@/components/agents/AgentSandboxView'
+import { mutationErrorMessage } from '@/components/agents/environment-view/environment-view-shared'
 import { INTEGRATION_ICONS } from '@/components/agents/IntegrationIcon'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +29,7 @@ export function OnboardingSandboxStep({
   const [envLoading, setEnvLoading] = useState(true)
   const [envError, setEnvError] = useState<string | null>(null)
   const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>({})
+  const [pendingPackage, setPendingPackage] = useState<string | null>(null)
 
   const [sandboxSettings, setSandboxSettings] =
     useState<SandboxSettings | null>(null)
@@ -109,6 +112,44 @@ export function OnboardingSandboxStep({
     await refreshModal()
   }, [refreshModal])
 
+  const installPackage = useCallback(
+    async (name: string) => {
+      setPendingPackage(name)
+      setEnvError(null)
+      try {
+        await client.installEnvironmentPackage(name, { allowUnlisted: false })
+        toast.success(`Installed ${name}`)
+        await loadEnvironment()
+      } catch (err) {
+        const message = mutationErrorMessage(err)
+        setEnvError(message)
+        toast.error(message)
+      } finally {
+        setPendingPackage(null)
+      }
+    },
+    [client, loadEnvironment]
+  )
+
+  const uninstallPackage = useCallback(
+    async (name: string) => {
+      setPendingPackage(name)
+      setEnvError(null)
+      try {
+        await client.uninstallEnvironmentPackage(name)
+        toast.success(`Removed ${name}`)
+        await loadEnvironment()
+      } catch (err) {
+        const message = mutationErrorMessage(err)
+        setEnvError(message)
+        toast.error(message)
+      } finally {
+        setPendingPackage(null)
+      }
+    },
+    [client, loadEnvironment]
+  )
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -155,12 +196,15 @@ export function OnboardingSandboxStep({
           envLoading={envLoading}
           report={report}
           groupOpen={groupOpen}
+          pendingPackage={pendingPackage}
           onToggleGroup={groupId =>
             setGroupOpen(current => ({
               ...current,
               [groupId]: !current[groupId]
             }))
           }
+          onInstallPackage={name => void installPackage(name)}
+          onUninstallPackage={name => void uninstallPackage(name)}
         />
       ) : (
         <AgentSandboxView

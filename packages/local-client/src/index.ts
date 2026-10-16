@@ -420,6 +420,41 @@ function normalizeUsageOverview(raw: Record<string, unknown>): UsageOverview {
   }
 }
 
+export type LlamaCatalogModel = {
+  id: string
+  name: string
+  brand: string
+  repo: string
+  quant: string | null
+  size: string | null
+  vision?: boolean
+  installed: boolean
+}
+
+export type LlamaInstalledModel = {
+  id: string
+  context: number | null
+  size: string | null
+  vision: boolean
+  state: string
+  error?: string | null
+}
+
+export type LlamaCatalog = {
+  installed: LlamaInstalledModel[]
+  recommended: LlamaCatalogModel[]
+}
+
+export type LlamaRuntimeStatus = {
+  baseUrl: string
+  installed: boolean
+  running: boolean
+  version: string | null
+  models: string[]
+  phase: string
+  detail: string
+}
+
 export class LocalAgentClient
   implements
     AgentClient,
@@ -3423,6 +3458,92 @@ export class LocalAgentClient
       `/model-profiles/${encodeURIComponent(profileId)}/probe`,
       { method: 'POST', signal }
     )
+  }
+
+  llamaRuntimeStatus(signal?: AbortSignal): Promise<LlamaRuntimeStatus> {
+    return this.request<LlamaRuntimeStatus>('/local-runtimes/llama', { signal })
+  }
+
+  llamaRuntimeEnsure(signal?: AbortSignal): Promise<LlamaRuntimeStatus> {
+    return this.request<LlamaRuntimeStatus>('/local-runtimes/llama/ensure', {
+      method: 'POST',
+      signal
+    })
+  }
+
+  llamaRuntimeCatalog(query = '', signal?: AbortSignal): Promise<LlamaCatalog> {
+    const q = query.trim()
+    const path = q
+      ? `/local-runtimes/llama/catalog?q=${encodeURIComponent(q)}`
+      : '/local-runtimes/llama/catalog'
+    return this.request<LlamaCatalog>(path, { signal })
+  }
+
+  llamaRuntimeUpdate(signal?: AbortSignal): Promise<LlamaRuntimeStatus> {
+    return this.request<LlamaRuntimeStatus>('/local-runtimes/llama/update', {
+      method: 'POST',
+      signal
+    })
+  }
+
+  llamaRuntimeLoad(
+    model: string,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; state: string }> {
+    return this.request('/local-runtimes/llama/load', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model }),
+      signal
+    })
+  }
+
+  llamaRuntimeUnload(
+    model: string,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; state: string }> {
+    return this.request('/local-runtimes/llama/unload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model }),
+      signal
+    })
+  }
+
+  llamaRuntimeMemory(
+    model: string,
+    signal?: AbortSignal
+  ): Promise<{ tiers: Array<{ context: number; memory: string }> }> {
+    return this.request(
+      `/local-runtimes/llama/memory?model=${encodeURIComponent(model)}`,
+      { signal }
+    )
+  }
+
+  llamaRuntimeSetContext(
+    model: string,
+    context: number,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; context: number }> {
+    return this.request('/local-runtimes/llama/context', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model, context }),
+      signal
+    })
+  }
+
+  llamaRuntimeInstall(
+    repo: string,
+    quant?: string | null,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>('/local-runtimes/llama/install', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo, quant: quant ?? null }),
+      signal
+    })
   }
 
   discoverModelEndpoint(

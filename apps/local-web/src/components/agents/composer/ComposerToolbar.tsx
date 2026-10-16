@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSkill,
   McpServer,
@@ -64,7 +65,8 @@ export function ComposerToolbar({
   onRefreshSandbox,
   onPlanModeChange,
   onStop,
-  embedded = false
+  embedded = false,
+  client
 }: {
   running: boolean
   showStopButton: boolean
@@ -128,6 +130,7 @@ export function ComposerToolbar({
    * overflow interno.
    */
   embedded?: boolean
+  client?: LocalAgentClient
 }) {
   const planMode = Boolean(runtimeSettings?.planMode)
 
@@ -190,6 +193,7 @@ export function ComposerToolbar({
           onLoadModelPreferences={onLoadModelPreferences}
           onToggleModelFavorite={onToggleModelFavorite}
           onFocusComposer={onFocusComposer}
+          client={client}
         />
       </div>
       <div className="flex shrink-0 items-center gap-1">

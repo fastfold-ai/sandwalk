@@ -1,6 +1,7 @@
 import type { EnvironmentReport } from '@sandwalk/agent-ui-core'
-import { Check, ChevronDown, Loader, Package } from 'lucide-react'
+import { Check, ChevronDown, Loader, Package, Plus, Trash2 } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import { formatBytes } from './onboarding-sandbox-utils'
@@ -10,13 +11,19 @@ export function OnboardingSandboxLocalPanel({
   envLoading,
   report,
   groupOpen,
-  onToggleGroup
+  pendingPackage = null,
+  onToggleGroup,
+  onInstallPackage,
+  onUninstallPackage
 }: {
   envError: string | null
   envLoading: boolean
   report: EnvironmentReport | null
   groupOpen: Record<string, boolean>
+  pendingPackage?: string | null
   onToggleGroup: (groupId: string) => void
+  onInstallPackage?: (name: string) => void
+  onUninstallPackage?: (name: string) => void
 }) {
   const installedCount =
     report?.groups.reduce(
@@ -126,26 +133,83 @@ export function OnboardingSandboxLocalPanel({
                       </button>
                       {open ? (
                         <ul className="border-border/50 space-y-0.5 border-t px-3 py-2">
-                          {group.packages.map(pkg => (
-                            <li
-                              key={pkg.name}
-                              className="flex items-center gap-2 py-1 text-sm"
-                            >
-                              {pkg.installed ? (
-                                <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                              ) : (
-                                <span className="bg-muted size-3.5 shrink-0 rounded-full" />
-                              )}
-                              <code className="min-w-0 flex-1 truncate font-mono text-xs">
-                                {pkg.name}
-                              </code>
-                              <span className="text-muted-foreground shrink-0 font-mono text-xs">
-                                {pkg.installed
-                                  ? pkg.version || 'installed'
-                                  : 'not installed'}
-                              </span>
-                            </li>
-                          ))}
+                          {group.packages.map(pkg => {
+                            const busy = pendingPackage === pkg.name
+                            const disabled = busy || pendingPackage !== null
+                            return (
+                              <li
+                                key={pkg.name}
+                                className="flex items-center gap-2 py-1 text-sm"
+                              >
+                                <button
+                                  type="button"
+                                  disabled={disabled}
+                                  title={
+                                    pkg.installed
+                                      ? `Remove ${pkg.name}`
+                                      : `Install ${pkg.name}`
+                                  }
+                                  onClick={() => {
+                                    if (pkg.installed) {
+                                      onUninstallPackage?.(pkg.name)
+                                    } else {
+                                      onInstallPackage?.(pkg.name)
+                                    }
+                                  }}
+                                  className="inline-flex size-4 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+                                >
+                                  {busy ? (
+                                    <Loader className="text-muted-foreground size-3.5 animate-spin" />
+                                  ) : pkg.installed ? (
+                                    <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  ) : (
+                                    <span className="bg-muted hover:bg-foreground/30 size-3.5 rounded-full transition-colors" />
+                                  )}
+                                </button>
+                                <code className="min-w-0 flex-1 truncate font-mono text-xs">
+                                  {pkg.name}
+                                </code>
+                                <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                                  {busy
+                                    ? pkg.installed
+                                      ? 'removing…'
+                                      : 'installing…'
+                                    : pkg.installed
+                                      ? pkg.version || 'installed'
+                                      : 'not installed'}
+                                </span>
+                                {pkg.installed ? (
+                                  onUninstallPackage ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 gap-1 px-2 text-xs"
+                                      disabled={disabled}
+                                      onClick={() =>
+                                        onUninstallPackage(pkg.name)
+                                      }
+                                    >
+                                      <Trash2 className="size-3" />
+                                      Remove
+                                    </Button>
+                                  ) : null
+                                ) : onInstallPackage ? (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 gap-1 px-2 text-xs"
+                                    disabled={disabled}
+                                    onClick={() => onInstallPackage(pkg.name)}
+                                  >
+                                    <Plus className="size-3" />
+                                    Install
+                                  </Button>
+                                ) : null}
+                              </li>
+                            )
+                          })}
                         </ul>
                       ) : null}
                     </li>

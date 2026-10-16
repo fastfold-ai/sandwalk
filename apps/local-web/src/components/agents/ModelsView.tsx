@@ -11,6 +11,7 @@ import type {
 import { Info } from 'lucide-react'
 import { type ReactNode, useRef, useState } from 'react'
 
+import { type LlamaLibraryActions } from '@/components/agents/LlamaLibrary'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
@@ -50,7 +51,8 @@ export function ModelsView({
   onLoadModelPreferences,
   onToggleModelFavorite,
   embedded = false,
-  renderChatGPTSignIn
+  renderChatGPTSignIn,
+  llamaRuntime
 }: {
   integrations: IntegrationSummary[]
   /**
@@ -58,6 +60,7 @@ export function ModelsView({
    * refreshes once the plan is connected or disconnected.
    */
   renderChatGPTSignIn?: (reload: () => Promise<void>) => ReactNode
+  llamaRuntime?: LlamaLibraryActions
   onListModels: (options?: {
     discover?: boolean
     signal?: AbortSignal
@@ -258,6 +261,8 @@ export function ModelsView({
           onOpenChange={state.setProfilesOpen}
           onOpenCreate={state.openCreate}
           onOpenEdit={state.openEdit}
+          llamaRuntime={llamaRuntime}
+          onUseLlamaModel={modelId => void state.saveProfile(modelId)}
         />
 
         <ModelsCustomSection
@@ -301,6 +306,8 @@ export function ModelsView({
         onShowProfileApiKeyChange={state.setShowProfileApiKey}
         onRevealStoredSecret={onRevealProfileSecret}
         onResetDiscoverState={state.resetDiscoverState}
+        llamaRuntime={llamaRuntime}
+        onUseLlamaModel={modelId => void state.saveProfile(modelId)}
       />
 
       <ModelsCustomDialog

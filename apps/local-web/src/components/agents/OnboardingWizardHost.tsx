@@ -30,6 +30,7 @@ export function OnboardingWizardHost({
   const def = onboardingStepDef(current)
 
   const [error, setError] = useState<string | null>(null)
+  const [modelReady, setModelReady] = useState(false)
   const [doneLoading, setDoneLoading] = useState(() => def.id === 'ready')
 
   useEffect(() => {
@@ -47,7 +48,9 @@ export function OnboardingWizardHost({
       </p>
     )
   } else if (def.id === 'models') {
-    body = <OnboardingModelStep client={client} />
+    body = (
+      <OnboardingModelStep client={client} onReadyChange={setModelReady} />
+    )
   } else if (def.id === 'agents') {
     body = <OnboardingAgentsStep client={client} />
   } else if (def.id === 'skills') {
@@ -72,6 +75,7 @@ export function OnboardingWizardHost({
       onFinish={onFinish}
       onExit={onExit}
       showFinish={!doneLoading}
+      canContinue={def.id !== 'models' || modelReady}
     >
       <div className="flex min-h-0 flex-col gap-3">
         {body}

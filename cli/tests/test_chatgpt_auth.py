@@ -459,6 +459,60 @@ def test_chat_model_uses_oauth_token_and_lifts_system_prompt():
     assert any(item.get("role") == "user" for item in payload["input"])
 
 
+def test_authorization_code_invalid_grant_explains_missing_plan(monkeypatch):
+    class _Resp:
+        status_code = 400
+
+        def json(self):
+            return {"error": "invalid_grant"}
+
+    monkeypatch.setattr(ca.httpx, "post", lambda *args, **kwargs: _Resp())
+    with pytest.raises(ca.ChatGPTAuthError) as exc:
+        ca._post_token({"grant_type": "authorization_code"})
+    assert exc.value.title == "ChatGPT plan needed"
+    assert "Plus, Pro, Business, or Enterprise" in str(exc.value)
+    assert "invalid_grant" not in str(exc.value)
+
+
+def test_refresh_invalid_grant_asks_to_sign_in_again(monkeypatch):
+    class _Resp:
+        status_code = 400
+
+        def json(self):
+            return {"error": "invalid_grant"}
+
+    monkeypatch.setattr(ca.httpx, "post", lambda *args, **kwargs: _Resp())
+    with pytest.raises(ca.ChatGPTAuthError) as exc:
+        ca._post_token({"grant_type": "refresh_token"})
+    assert "Sign in again" in str(exc.value)
+    assert exc.value.title == "Sign-in expired"
+
+
+def test_loopback_callback_missing_plan_uses_friendly_page(api, monkeypatch):
+    import httpx
+
+    def _no_plan(**kwargs):
+        raise ca.ChatGPTAuthError(
+            "This ChatGPT account doesn't include Plus, Pro, Business, or Enterprise.",
+            title="ChatGPT plan needed",
+        )
+
+    monkeypatch.setattr(ca, "complete_login", _no_plan)
+    started = api.post("/v1/auth/chatgpt/start").json()
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(started["url"]).query)
+    page = httpx.get(
+        query["redirect_uri"][0],
+        params={"code": "c-1", "state": started["state"], "client_id": "oaiapp_issued"},
+        timeout=5.0,
+    )
+    assert page.status_code == 400
+    assert "ChatGPT plan needed" in page.text
+    assert "invalid_grant" not in page.text
+    status = api.get("/v1/auth/chatgpt/status", params={"state": started["state"]})
+    assert status.status_code == 400
+    assert "Plus, Pro" in status.json()["detail"]
+
+
 def test_friendly_error_maps_plan_limit():
     from agent.runner.usage_ui import UsageUIMixin
 

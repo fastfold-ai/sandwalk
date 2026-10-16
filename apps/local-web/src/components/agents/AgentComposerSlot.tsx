@@ -352,6 +352,7 @@ export function AgentComposerSlot({
         onCreateSpecialist={() => navigate('/dashboard/specialists/new')}
         onManageSpecialists={() => navigate('/dashboard/specialists')}
         onAddModels={() => navigate('/dashboard/models')}
+        client={client}
         onLoadModelPreferences={() => client.getModelPreferences()}
         onToggleModelFavorite={option =>
           client.toggleModelFavorite({

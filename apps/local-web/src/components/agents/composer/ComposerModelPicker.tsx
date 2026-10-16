@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
 import { Check, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -33,7 +34,8 @@ export function ComposerModelPicker({
   onLoadModelPreferences,
   onToggleModelFavorite: _onToggleModelFavorite,
   onFocusComposer,
-  triggerLabel
+  triggerLabel,
+  client
 }: {
   modelOptions: ComposerModelOption[]
   runtimeSettings: RuntimeSettings | null
@@ -58,12 +60,17 @@ export function ComposerModelPicker({
   onFocusComposer?: () => void
   /** Override the trigger label (e.g. Bench “Compare”). */
   triggerLabel?: string
+  client?: LocalAgentClient
 }) {
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [sideOffset, setSideOffset] = useState(8)
   const [modelSearch, setModelSearch] = useState('')
-  const [flyout, setFlyout] = useState<'model' | 'effort' | null>(null)
+  const [flyout, setFlyout] = useState<'model' | 'effort' | 'context' | null>(null)
+  const [llamaContext, setLlamaContext] = useState(4096)
+  const [llamaMemory, setLlamaMemory] = useState<Record<number, string>>({})
+  const [llamaState, setLlamaState] = useState('unloaded')
+  const pinnedContext = useRef<number | null>(null)
   const [preferences, setPreferences] = useState<ComposerModelPreferences>({
     favorites: [],
     recent: []
@@ -119,6 +126,41 @@ export function ComposerModelPicker({
     selected: selectedModel,
     effortMenuOpen: flyout === 'effort'
   })
+
+  useEffect(() => {
+    pinnedContext.current = null
+  }, [selectedModel.model])
+
+  useEffect(() => {
+    if (llamaState !== 'loading' || !client) return
+    const timer = window.setInterval(() => {
+      void client.llamaRuntimeCatalog().then(catalog => {
+        const row = catalog.installed.find(item => item.id === selectedModel.model)
+        if (row?.state && row.state !== 'loading') setLlamaState(row.state)
+      }).catch(() => {})
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [client, llamaState, selectedModel.model])
+
+  useEffect(() => {
+    if (!client || selectedModel.backend !== 'llama') return
+    let cancelled = false
+    void client.llamaRuntimeMemory(selectedModel.model).then(result => {
+      if (cancelled) return
+      const next: Record<number, string> = {}
+      for (const tier of result.tiers) next[tier.context] = tier.memory
+      setLlamaMemory(next)
+    }).catch(() => {})
+    void client.llamaRuntimeCatalog().then(catalog => {
+      if (cancelled) return
+      const row = catalog.installed.find(item => item.id === selectedModel.model)
+      if (row?.state) setLlamaState(row.state)
+      if (pinnedContext.current == null && row?.context) setLlamaContext(row.context)
+    }).catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [client, selectedModel.backend, selectedModel.model])
 
   useEffect(() => {
     if (!modelPickerOpen || !onLoadModelPreferences) return
@@ -231,7 +273,45 @@ export function ComposerModelPicker({
                 </button>
               </div>
             ) : null}
-            {contextLabel ? (
+            {selectedModel.backend === 'llama' && client ? (
+              <button
+                type="button"
+                className="hover:bg-muted flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left"
+                onClick={() => {
+                  if (llamaState === 'loaded' || llamaState === 'ready') {
+                    setLlamaState('unloaded')
+                    void client.llamaRuntimeUnload(selectedModel.model)
+                    return
+                  }
+                  if (llamaState === 'loading') return
+                  setLlamaState('loading')
+                  void client.llamaRuntimeLoad(selectedModel.model)
+                }}
+              >
+                <span>{llamaState === 'loaded' || llamaState === 'ready' ? 'Eject' : 'Load'}</span>
+                <span className="text-muted-foreground">
+                  {llamaState === 'loading'
+                    ? 'Loading…'
+                    : llamaState === 'loaded' || llamaState === 'ready'
+                      ? 'In memory'
+                      : 'Unloaded'}
+                </span>
+              </button>
+            ) : null}
+            {selectedModel.backend === 'llama' && client ? (
+              <button
+                type="button"
+                className="hover:bg-muted flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left"
+                onMouseEnter={() => setFlyout('context')}
+                onClick={() => setFlyout('context')}
+              >
+                <span>Context</span>
+                <span className="text-muted-foreground flex items-center gap-1">
+                  {llamaContext / 1024}k
+                  <ChevronRight className="size-3.5 opacity-70" />
+                </span>
+              </button>
+            ) : contextLabel ? (
               <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5">
                 <span>Context</span>
                 <span className="text-muted-foreground flex items-center gap-1">
@@ -283,6 +363,32 @@ export function ComposerModelPicker({
               </span>
             </button>
           </div>
+          {flyout === 'context' && selectedModel.backend === 'llama' && client ? (
+            <div className="bg-popover absolute top-14 left-full z-10 ml-1.5 w-44 rounded-2xl border p-1 shadow-lg">
+              {[4096, 8192, 16384, 32768, 65536, 131072].map(tier => (
+                <button
+                  key={tier}
+                  type="button"
+                  className="hover:bg-muted flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-[13px]"
+                  onPointerDown={event => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    pinnedContext.current = tier
+                    setLlamaContext(tier)
+                    void client.llamaRuntimeSetContext(selectedModel.model, tier).catch(() => {
+                      pinnedContext.current = null
+                    })
+                  }}
+                >
+                  <span>{tier / 1024}k</span>
+                  <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                    {llamaMemory[tier] || '…'}
+                    {llamaContext === tier ? <Check className="size-3.5 text-foreground" /> : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           {flyout === 'effort' && supportsReasoningEffort ? (
             <div className="bg-popover absolute top-14 left-full z-10 ml-1.5 w-40 rounded-2xl border p-1 shadow-lg">
               {effortOptions.map(level => {

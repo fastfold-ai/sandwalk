@@ -268,6 +268,15 @@ def _classify_llm_error(exc: Exception) -> tuple[str, str] | None:
             "(TLS keep-alive often drops after Wi-Fi sleep or an API restart).",
         )
 
+    if "failed to load" in low or "unknown model architecture" in low:
+        return (
+            "Model failed to load",
+            f"{detail}\n"
+            "llama.cpp started this model and exited. The weights are installed, "
+            "but this build of the llama CLI does not understand that architecture. "
+            "Update llama (`llama update`) or pick another model.",
+        )
+
     is_server_unavailable = status in {500, 502, 503, 504} or "service unavailable" in low
     if is_server_unavailable:
         return (

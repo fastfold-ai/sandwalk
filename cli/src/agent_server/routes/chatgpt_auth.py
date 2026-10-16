@@ -116,7 +116,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             )
         except chatgpt_auth.ChatGPTAuthError as exc:
             _record(state, {"ok": False, "error": str(exc)})
-            self._page(status=400, ok=False, title="Sign-in failed", detail=str(exc))
+            self._page(status=400, ok=False, title=exc.title, detail=str(exc))
             self.server.finished.set()
             return
         except Exception as exc:  # noqa: BLE001

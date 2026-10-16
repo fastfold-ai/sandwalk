@@ -1,8 +1,8 @@
 import type { RuntimeSettings } from '@sandwalk/agent-ui-core'
 import { Check, Loader } from 'lucide-react'
 
-import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelPicker'
 import type { ComposerModelOption } from '@/lib/composer-models'
+import { cn } from '@/lib/utils'
 
 export function OnboardingModelDefaultPicker({
   providerName,
@@ -28,10 +28,10 @@ export function OnboardingModelDefaultPicker({
   return (
     <div className="border-border/70 space-y-3 rounded-xl border p-3">
       <div>
-        <p className="text-sm font-medium">Choose a default model</p>
+        <p className="text-sm font-medium">Choose a model for your first chat</p>
         <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-          Only {providerName} models with a working API key are listed. This
-          becomes the default for new chats — you can change it anytime.
+          These are the {providerName} models that are configured and healthy.
+          The one you pick starts your first chat.
         </p>
       </div>
       {loading ? (
@@ -41,24 +41,37 @@ export function OnboardingModelDefaultPicker({
         </p>
       ) : modelOptions.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No enabled {providerName} models yet. You can pick one later in Models.
+          No healthy {providerName} models yet. Check the key, then try again.
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-xs">Default</span>
-          <ComposerModelPicker
-            modelOptions={modelOptions}
-            runtimeSettings={runtimeSettings}
-            onModelSelect={onModelSelect}
-          />
-          {saving ? (
-            <Loader className="text-muted-foreground size-3.5 animate-spin" />
-          ) : saved ? (
-            <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-              <Check className="size-3.5" />
-              Saved
-            </span>
-          ) : null}
+        <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+          {modelOptions.map(option => {
+            const selected =
+              saved &&
+              runtimeSettings?.model === option.model &&
+              runtimeSettings.provider === option.provider
+            return (
+              <button
+                key={`${option.provider}:${option.model}`}
+                type="button"
+                disabled={saving}
+                onClick={() =>
+                  void onModelSelect(option.provider, option.model, option.profileId)
+                }
+                className={cn(
+                  'hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                  selected
+                    ? 'border-foreground bg-muted/40'
+                    : 'border-border/60'
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                {selected ? (
+                  <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                ) : null}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
