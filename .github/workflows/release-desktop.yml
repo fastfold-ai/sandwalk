@@ -157,30 +157,43 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           {
-            echo "## [${VERSION}] - $(date -u +%F)"
+            echo "# Sandwalk ${VERSION}"
             echo
-            echo "### Summary"
+            echo "One paragraph: what this release lets a person do."
             echo
-            echo "Replace this with what a person can do in this release."
+            echo "Download: [macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)"
             echo
-            echo "**[Download for macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)**"
+            echo "## Headline feature"
             echo
-            echo "### New Features"
+            echo "A paragraph in plain words, ending with the PR. #NN"
             echo
-            echo "#### Feature name"
+            echo "<!-- screenshot -->"
+            echo "<br><br><br><br><br>"
             echo
-            echo "- **Description**: What the person can do."
-            echo "- **Impact**: Why that matters."
+            echo "## New Features and Improvements"
             echo
-            echo "**Screenshot**"
+            if [[ -n "${PREV}" ]]; then
+              git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD" | grep -E '^- (feat|perf)' || true
+            fi
             echo
-            echo "<br><br><br><br>"
             echo
-            echo "### Bug Fixes"
+            echo "## Bug Fixes"
             echo
-            echo "- **Area**: What the person notices. (#PR)"
+            if [[ -n "${PREV}" ]]; then
+              git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD" | grep -E '^- fix' || true
+            fi
             echo
+            echo
+            echo "## Updating"
+            echo
+            echo "- Mac app: **Check for Updates** in the app menu, or wait for the banner."
+            echo "- CLI: \`sandwalk upgrade\`."
+            echo
+            if [[ -n "${PREV}" ]]; then
+              echo "**Full Changelog**: [${PREV}...${TAG}](https://github.com/${REPO}/compare/${PREV}...${TAG})"
+            fi
           } > release-notes.md
 
       - name: Publish GitHub Release
