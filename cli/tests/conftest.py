@@ -8,29 +8,36 @@ from pathlib import Path
 
 import pytest
 
-# scipy's vendored array_api_compat re-executes numpy.fft under coverage.
-# numpy 2.4 then raises "cannot load module more than once per process",
-# which drops the biomarker tools and fails the L1000 correlation test.
-_exec_module = importlib.machinery.SourceFileLoader.exec_module
+# scipy's vendored array_api_compat does `exec("from numpy.fft import *")`.
+# Under coverage on Linux that initializes numpy.fft._pocketfft_umath twice,
+# and numpy 2.4 raises "cannot load module more than once per process".
+# The biomarker tools then fail to import, and the L1000 test dies the same way.
+import numpy.fft._pocketfft_umath as _pocketfft_umath
+
+_FFT_EXT_CACHE = {"numpy.fft._pocketfft_umath": _pocketfft_umath}
+_ext_exec = importlib.machinery.ExtensionFileLoader.exec_module
 
 
-def _exec_module_once(self, module):
-    name = getattr(module, "__name__", "")
+def _reuse_numpy_fft_extension(self, module):
+    name = getattr(module, "__name__", "") or getattr(self, "name", "")
+    cached = _FFT_EXT_CACHE.get(name)
+    if cached is not None and cached is not module:
+        module.__dict__.update(
+            {key: value for key, value in cached.__dict__.items() if key != "__dict__"}
+        )
+        return None
+    try:
+        result = _ext_exec(self, module)
+    except ImportError as exc:
+        if name not in _FFT_EXT_CACHE or "more than once" not in str(exc):
+            raise
+        return None
     if name.startswith("numpy.fft"):
-        existing = sys.modules.get(name)
-        if existing is not None and existing is not module:
-            module.__dict__.update(
-                {
-                    key: value
-                    for key, value in existing.__dict__.items()
-                    if key != "__dict__"
-                }
-            )
-            return None
-    return _exec_module(self, module)
+        _FFT_EXT_CACHE[name] = module
+    return result
 
 
-importlib.machinery.SourceFileLoader.exec_module = _exec_module_once
+importlib.machinery.ExtensionFileLoader.exec_module = _reuse_numpy_fft_extension
 
 # Ensure `src/` packages import when running from repo root without editable install.
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
