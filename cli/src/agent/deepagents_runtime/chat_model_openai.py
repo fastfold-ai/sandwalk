@@ -6,6 +6,7 @@ from __future__ import annotations
 # models (Grok, etc.) often pause longer mid-response while TCP stayalives
 # still look healthy — 300s keeps the stall guard without failing healthy runs.
 STREAM_CHUNK_TIMEOUT_S = 300.0
+OPENAI_CLOUD_BASE_URL = "https://api.openai.com/v1"
 
 
 def _active_compatible_backend(config) -> str | None:
@@ -52,12 +53,18 @@ def build_openai_chat_model(config, *, temperature: float):
     if api_key:
         kwargs["api_key"] = api_key
     base_url = config.llm_openai_base_url()
-    if base_url:
-        kwargs["base_url"] = base_url
     # Default to chat completions for OpenAI-compatible local endpoints
     # (Ollama, LM Studio, vLLM, ...). Codex + GPT-5.6 on OpenAI cloud need
     # Responses (tools + reasoning_effort are rejected on chat completions).
     is_openai_cloud = (not base_url) or Config._is_openai_managed_base_url(base_url)
+    if base_url:
+        kwargs["base_url"] = base_url
+    elif is_openai_cloud:
+        # Pin the cloud endpoint. Left unset, the OpenAI SDK reads
+        # OPENAI_BASE_URL from the process, which the server syncs from the
+        # user's default profile; with Llama as default that sent every
+        # GPT chat to localhost:9931 and failed with "model not found".
+        kwargs["base_url"] = OPENAI_CLOUD_BASE_URL
     use_responses = bool(
         is_openai_cloud and openai_model_requires_responses_api(model)
     )
