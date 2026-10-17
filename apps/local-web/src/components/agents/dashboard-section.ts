@@ -11,6 +11,7 @@ export type DashboardSection =
   | 'datasets'
   | 'tools'
   | 'doctor'
+  | 'logs'
   | 'bench'
   | 'storage'
   | 'environment'

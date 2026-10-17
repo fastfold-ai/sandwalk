@@ -144,6 +144,9 @@ class CoreMutateMixin:
             cloud["api_key"] = None
             profiles["openai_cloud"] = self._normalize_profile_record("openai_cloud", cloud)
             self._data["llm.openai_profiles"] = profiles
+            # The flat key is projected back from openai_cloud on the next load.
+            # Persist the cleared profile or Remove appears to do nothing.
+            self._dirty_keys.add("llm.openai_profiles")
 
         self._data.pop(key, None)
         self._dirty_keys.discard(key)

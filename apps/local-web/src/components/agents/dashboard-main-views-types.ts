@@ -73,6 +73,7 @@ export type DashboardMainViewsProps = {
   isDashboardData: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardLogs: boolean
   isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean

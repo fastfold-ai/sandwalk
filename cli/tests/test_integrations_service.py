@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -226,6 +227,30 @@ def test_update_and_remove_integration(tmp_path: Path, monkeypatch):
     assert cleared.configured is False
     assert Config.load().get("llm.anthropic_api_key") is None
     assert Config.load().get("integrations.updated_at") == {}
+
+
+def test_remove_openai_key_stays_gone_after_reload(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    cfg = Config({})
+    cfg.set("llm.openai_api_key", "sk-test-openai-remove")
+    cfg.set("llm.openai_active_profile", "openai_cloud")
+    cfg.save()
+
+    loaded = Config.load()
+    assert loaded.get("llm.openai_api_key") == "sk-test-openai-remove"
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-openai-remove")
+
+    cleared = IntegrationsService().remove("openai")
+    assert cleared.configured is False
+    assert not os.environ.get("OPENAI_API_KEY")
+
+    again = Config.load()
+    assert not again.get("llm.openai_api_key")
+    cloud = (again.get("llm.openai_profiles") or {}).get("openai_cloud") or {}
+    assert not cloud.get("api_key")
 
 
 def test_update_requires_value():

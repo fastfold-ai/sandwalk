@@ -86,3 +86,26 @@ class ServerLifecycleResult(ApiModel):
     ok: bool = True
     action: Literal["stop", "restart"]
     message: str = ""
+
+
+class ServiceProcess(ApiModel):
+    id: str
+    name: str
+    status: Literal["running", "stopped"]
+    pid: int | None = None
+    port: int | None = None
+    rss_bytes: int | None = None
+    cpu_percent: float | None = None
+    command: str | None = None
+    detail: str | None = None
+
+
+class ServiceLogTail(ApiModel):
+    name: str
+    tail: str
+
+
+class ServicesReport(ApiModel):
+    processes: list[ServiceProcess] = Field(default_factory=list)
+    logs: list[ServiceLogTail] = Field(default_factory=list)
+    checked_at: str

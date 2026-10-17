@@ -138,6 +138,7 @@ export function AppShell(props: AppShellProps) {
           isDashboardData={props.isDashboardData}
           isDashboardTools={props.isDashboardTools}
           isDashboardDoctor={props.isDashboardDoctor}
+          isDashboardLogs={props.isDashboardLogs}
           isDashboardBench={props.isDashboardBench}
           isDashboardStorage={props.isDashboardStorage}
           isDashboardEnvironment={props.isDashboardEnvironment}

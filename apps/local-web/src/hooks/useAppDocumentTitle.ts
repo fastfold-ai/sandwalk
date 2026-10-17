@@ -30,6 +30,7 @@ type DocumentTitleArgs = {
   isDashboardModels: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardLogs: boolean
   isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
@@ -63,6 +64,7 @@ function pageLabel(args: DocumentTitleArgs): string {
   if (args.isDashboardModels) return 'Models'
   if (args.isDashboardTools) return 'Tools'
   if (args.isDashboardDoctor) return 'Doctor'
+  if (args.isDashboardLogs) return 'Logs'
   if (args.isDashboardBench) {
     if (typeof window !== 'undefined') {
       const path = desktopSpaRoute(window.location)
@@ -154,6 +156,7 @@ export function useAppDocumentTitle(args: DocumentTitleArgs) {
     args.activeIntegration,
     args.activeProject,
     args.isDashboardDoctor,
+    args.isDashboardLogs,
     args.isDashboardBench,
     args.isDashboardStorage,
     args.isDashboardEnvironment,

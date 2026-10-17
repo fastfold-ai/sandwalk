@@ -1,7 +1,8 @@
 """Bridge to the external Llama macOS app (https://github.com/ggml-org/Llama-macOS).
 
-Sandwalk does not embed the menu-bar app. It uses the ``llama`` CLI:
-``llama serve`` on port 9931, and ``llama download`` for catalog models.
+Sandwalk does not embed the menu-bar app. It installs the ``llama`` CLI from
+https://llama.app/install.sh, runs ``llama serve`` on port 9931, and uses
+``llama download`` for catalog models.
 """
 
 from __future__ import annotations
@@ -9,20 +10,25 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
 import threading
+from collections import deque
 from pathlib import Path
 from typing import Any
 
 import httpx
 
 LLAMA_BASE_URL = "http://127.0.0.1:9931/v1"
+_SERVE_PORT = 9931
 _MODELS_URL = f"{LLAMA_BASE_URL}/models"
 _CATALOG_URL = "https://llama.app/v1/catalog.json"
-_CASK = "llama-app"
-_APP_NAME = "Llama"
+_INSTALL_URL = "https://llama.app/install.sh"
 
 _lock = threading.Lock()
 _state: dict[str, str] = {"phase": "idle", "detail": ""}
+_debug: dict[str, Any] = {}
+_serve_log: deque[str] = deque(maxlen=80)
+_serve_command: list[str] = []
 # model id -> "loading" or the last load error
 _load_jobs: dict[str, str] = {}
 
@@ -145,6 +151,7 @@ def status() -> dict[str, Any]:
         "models": models or [],
         "phase": phase,
         "detail": detail,
+        "debug": _debug_public() if phase == "error" else {},
     }
 
 
@@ -166,21 +173,66 @@ def _llama_version() -> str | None:
     return line[0] if line else None
 
 
-def _set(phase: str, detail: str = "") -> None:
+def _set(phase: str, detail: str = "", debug: dict[str, Any] | None = None) -> None:
+    global _debug
     with _lock:
         _state["phase"] = phase
         _state["detail"] = detail
+        if debug is not None:
+            _debug = debug
+        elif phase != "error":
+            _debug = {}
+
+
+def _debug_public() -> dict[str, Any]:
+    with _lock:
+        payload = dict(_debug)
+        if _serve_log and not payload.get("log"):
+            payload["log"] = "\n".join(_serve_log)
+        return payload
+
+
+def _clip(text: str, limit: int = 40) -> str:
+    lines = [line.rstrip() for line in (text or "").splitlines() if line.strip()]
+    return "\n".join(lines[-limit:])
+
+
+def _binary_candidates() -> list[str]:
+    home = Path.home()
+    return [
+        str(home / ".local" / "bin" / "llama"),
+        str(home / ".llama-app" / "llama"),
+        "/Applications/Llama.app/Contents/MacOS/llama",
+        "/Applications/Llama.app/Contents/Resources/llama",
+        str(home / "Applications" / "Llama.app" / "Contents" / "MacOS" / "llama"),
+    ]
+
+
+def _install_debug(
+    *,
+    command: str,
+    exit_code: int | None,
+    binary: str | None,
+    log: str,
+) -> dict[str, Any]:
+    return {
+        "command": command,
+        "exitCode": exit_code,
+        "port": _SERVE_PORT,
+        "binary": binary,
+        "searched": _binary_candidates(),
+        "log": _clip(log),
+    }
 
 
 def llama_binary() -> str | None:
-    """The llama.cpp CLI. Prefer the copy Llama.app installs, then PATH."""
-    candidates = [
-        Path.home() / ".local" / "bin" / "llama",
-        Path.home() / ".llama-app" / "llama",
-        Path(shutil.which("llama") or ""),
-    ]
+    """The llama.cpp CLI. Prefer the copy the installer writes, then PATH."""
+    candidates = [Path(item) for item in _binary_candidates()]
+    which = shutil.which("llama")
+    if which:
+        candidates.append(Path(which))
     for path in candidates:
-        if path and path.is_file() and os.access(path, os.X_OK):
+        if path.is_file() and os.access(path, os.X_OK):
             return str(path)
     return None
 
@@ -188,46 +240,140 @@ def llama_binary() -> str | None:
 _serve_proc: subprocess.Popen[bytes] | None = None
 
 
-def _start_serve(binary: str) -> None:
-    """Run `llama serve` ourselves. Do not launch the menu-bar app."""
-    global _serve_proc
-    if _serve_proc is not None and _serve_proc.poll() is None:
+def serve_pid() -> int | None:
+    """Pid of the llama serve process Sandwalk started, if it is still alive."""
+    proc = _serve_proc
+    if proc is None or proc.poll() is not None:
+        return None
+    return proc.pid
+
+
+def _capture_serve(proc: subprocess.Popen[bytes], command: list[str]) -> None:
+    stream = getattr(proc, "stderr", None)
+    if stream is not None:
+        for raw in iter(stream.readline, b""):
+            line = raw.decode("utf-8", errors="replace").rstrip()
+            if not line:
+                continue
+            with _lock:
+                _serve_log.append(line)
+    code = proc.poll()
+    if code in (None, 0) or list_models() is not None:
         return
-    _serve_proc = subprocess.Popen(
-        [binary, "serve", "--host", "127.0.0.1", "--port", "9931"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
+    with _lock:
+        log = "\n".join(_serve_log)
+    _set(
+        "error",
+        f"llama serve exited {code}.",
+        debug=_install_debug(
+            command=" ".join(command),
+            exit_code=code,
+            binary=command[0] if command else None,
+            log=log,
+        ),
     )
 
 
+def _start_serve(binary: str) -> None:
+    """Run `llama serve` ourselves. Do not launch the menu-bar app."""
+    global _serve_proc, _serve_command
+    if _serve_proc is not None and _serve_proc.poll() is None:
+        return
+    command = [binary, "serve", "--host", "127.0.0.1", "--port", str(_SERVE_PORT)]
+    _serve_command = command
+    with _lock:
+        _serve_log.clear()
+    _serve_proc = subprocess.Popen(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    threading.Thread(
+        target=_capture_serve,
+        args=(_serve_proc, command),
+        name="llama-serve-log",
+        daemon=True,
+    ).start()
+
+
 def _install_cli_then_serve() -> None:
-    brew = shutil.which("brew")
-    if not brew:
+    """Install the llama CLI. The Homebrew cask only drops the menu-bar app."""
+    command = f"curl -LsSf {_INSTALL_URL} | sh"
+    curl = shutil.which("curl")
+    if not curl:
         _set(
             "error",
-            "Homebrew is not installed, so Sandwalk cannot install the llama CLI.",
+            "curl is not available, so Sandwalk cannot install the llama CLI.",
+            debug=_install_debug(command=command, exit_code=None, binary=None, log=""),
         )
         return
     _set("installing", "Installing the llama CLI…")
+    script = Path(tempfile.gettempdir()) / "sandwalk-llama-install.sh"
     try:
-        completed = subprocess.run(
-            [brew, "install", "--cask", _CASK],
+        download = subprocess.run(
+            [curl, "-LsSf", _INSTALL_URL, "-o", str(script)],
             check=False,
             capture_output=True,
             text=True,
+            timeout=120,
         )
-    except OSError as exc:
-        _set("error", f"Could not run Homebrew ({exc}).")
+        if download.returncode != 0:
+            log = (download.stderr or download.stdout or "").strip()
+            _set(
+                "error",
+                _clip(log, 1) or f"Could not download the llama installer ({download.returncode}).",
+                debug=_install_debug(
+                    command=command,
+                    exit_code=download.returncode,
+                    binary=None,
+                    log=log,
+                ),
+            )
+            return
+        env = os.environ.copy()
+        local_bin = str(Path.home() / ".local" / "bin")
+        env["PATH"] = local_bin + os.pathsep + env.get("PATH", "")
+        completed = subprocess.run(
+            ["/bin/sh", str(script)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        _set(
+            "error",
+            f"Could not install the llama CLI ({exc}).",
+            debug=_install_debug(command=command, exit_code=None, binary=None, log=str(exc)),
+        )
         return
+    finally:
+        try:
+            script.unlink(missing_ok=True)
+        except OSError:
+            pass
     binary = llama_binary()
-    if completed.returncode != 0 and not binary:
-        tail = (completed.stderr or completed.stdout or "").strip().splitlines()
-        message = tail[-1] if tail else f"brew exited {completed.returncode}"
-        _set("error", message)
-        return
-    if not binary:
-        _set("error", "The llama CLI did not appear after install.")
+    log = "\n".join(part for part in (completed.stdout, completed.stderr) if part).strip()
+    if completed.returncode != 0 or not binary:
+        lines = [line for line in log.splitlines() if line.strip()]
+        if completed.returncode != 0 and lines:
+            detail = lines[-1]
+        elif not binary:
+            detail = "The llama CLI did not appear after install."
+        else:
+            detail = f"llama installer exited {completed.returncode}"
+        _set(
+            "error",
+            detail,
+            debug=_install_debug(
+                command=command,
+                exit_code=completed.returncode,
+                binary=binary,
+                log=log,
+            ),
+        )
         return
     _set("opening", "Starting llama serve on port 9931…")
     _start_serve(binary)

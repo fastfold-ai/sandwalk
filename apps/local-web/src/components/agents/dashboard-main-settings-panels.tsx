@@ -9,6 +9,7 @@ import {
   BenchView,
   DataView,
   DoctorView,
+  LogsView,
   EnvironmentView,
   GeneralView,
   ModelsView,
@@ -42,6 +43,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
     isDashboardTools,
     isDashboardData,
     isDashboardDoctor,
+    isDashboardLogs,
     isDashboardBench,
     isDashboardStorage,
     isDashboardEnvironment,
@@ -341,6 +343,10 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         }
       />
     )
+  }
+
+  if (isDashboardLogs) {
+    return <LogsView onLoad={signal => client.getServices(signal)} />
   }
 
   if (isDashboardBench) {

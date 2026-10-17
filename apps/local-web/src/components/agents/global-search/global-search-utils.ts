@@ -15,6 +15,7 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
+  Terminal,
   Target,
   Wrench
 } from 'lucide-react'
@@ -169,6 +170,13 @@ export const DASHBOARD_COMMANDS = [
     path: '/dashboard/doctor',
     value: 'command doctor diagnostics health',
     icon: Stethoscope
+  },
+  {
+    id: 'logs',
+    label: 'Logs',
+    path: '/dashboard/logs',
+    value: 'command logs services daemon pid port memory',
+    icon: Terminal
   },
   {
     id: 'storage',
