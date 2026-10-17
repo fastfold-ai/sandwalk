@@ -295,10 +295,15 @@ jobs:
           set -euo pipefail
           deb="$(echo apps/local-web/src-tauri/target/release/bundle/deb/*.deb)"
           test -f "$deb"
-          dpkg-deb -c "$deb" | grep -q 'usr/lib/systemd/user/sandwalk.service'
-          dpkg-deb -c "$deb" | grep -q 'usr/lib/sandwalk/sandwalk-serve'
-          dpkg-deb -c "$deb" | grep -q 'usr/bin/sandwalk'
-          dpkg-deb -c "$deb" | grep -q 'usr/lib/sandwalk/agent-runtime/bin/'
+          # grep -q exits at the first hit and closes the pipe. dpkg-deb then
+          # reports "tar: stdout: write error", and pipefail fails the job
+          # even though the files are in the package.
+          listing="$(mktemp)"
+          dpkg-deb -c "$deb" > "$listing"
+          grep -q 'usr/lib/systemd/user/sandwalk.service' "$listing"
+          grep -q 'usr/lib/sandwalk/sandwalk-serve' "$listing"
+          grep -q 'usr/bin/sandwalk' "$listing"
+          grep -q 'usr/lib/sandwalk/agent-runtime/bin/' "$listing"
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
