@@ -135,6 +135,56 @@ class _SessionCrudMixin:
         _publish_session_bus_event(SessionEventType.SESSION_CREATED, session)
         return session
 
+    def duplicate_session(
+        self,
+        session_id: str,
+        *,
+        title: str | None = None,
+        client_surface: str | None = None,
+    ) -> AgentSession:
+        """Clone a chat: same settings and the full message history, a fresh workspace.
+
+        The copy keeps project, specialist, sandbox, provider, model and
+        profile, and every message in order with its original timestamps so
+        the transcript and the model's context match the source. It does not
+        copy workspace files (outputs can be gigabytes) or pin/archive state;
+        it starts as a normal chat, titled "<title> (copy)" by default.
+        """
+        source = self.store.get_session(session_id)
+        if source is None:
+            raise KeyError(session_id)
+        base_title = str(source.title or "").strip() or "Chat"
+        copy_title = (title or "").strip() or f"{base_title} (copy)"
+        clone = self.create_session(
+            title=copy_title,
+            workspace_path=None,
+            project_id=source.project_id,
+            specialist_id=source.specialist_id,
+            sandbox_backend=source.sandbox_backend,
+            source=source.source,
+            source_label=source.source_label,
+            client_surface=client_surface or source.client_surface,
+            provider=source.provider,
+            model=source.model,
+            openai_profile_id=source.openai_profile_id,
+        )
+        for message in self.store.list_messages(session_id):
+            self.store.add_message(
+                session_id=clone.id,
+                role=message.role,
+                content=message.content,
+                source=message.source,
+                created_at=message.created_at,
+            )
+        refreshed = self.store.get_session(clone.id) or clone
+        self.store.append_event(
+            session_id=refreshed.id,
+            event_type="session.updated",
+            payload={"session": refreshed.model_dump(mode="json", by_alias=True)},
+        )
+        _publish_session_bus_event(SessionEventType.SESSION_UPDATED, refreshed)
+        return refreshed
+
     def update_session(
         self,
         *,

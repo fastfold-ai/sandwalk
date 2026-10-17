@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   Columns2,
+  Copy,
   Download,
   Folder,
   MoreHorizontal,
@@ -49,6 +50,7 @@ import {
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSessionAttentionIds } from '@/hooks/useSessionAttention'
+import { duplicateChat } from '@/lib/duplicate-chat'
 import { navigateToSession } from '@/lib/navigate-session'
 import { perfCount } from '@/lib/perf-probe'
 import type { SessionActivityMap } from '@/lib/session-activity'
@@ -809,6 +811,8 @@ function SidebarSessionListInner({
                                       setThreadMenuOpenId(null)
                                       setDeleteTarget(chat)
                                     }}
+                                    onDuplicate={() => setThreadMenuOpenId(null)}
+                                    onContinueIn={() => setThreadMenuOpenId(null)}
                                   />
                                 </PopoverContent>
                               </Popover>
@@ -1425,6 +1429,17 @@ function SplitChildActionsMenu({
       >
         <Pencil className="size-3.5" />
         Rename chat…
+      </button>
+      <button
+        type="button"
+        className={itemBase}
+        onClick={() => {
+          onClose()
+          void duplicateChat(chat)
+        }}
+      >
+        <Copy className="size-3.5" />
+        Duplicate chat
       </button>
       {isNative ? (
         <ProjectPicker

@@ -62,6 +62,12 @@ class CreateSessionRequest(ApiModel):
     openai_profile_id: str | None = None
 
 
+class DuplicateSessionRequest(ApiModel):
+    """Optional title for the copy; defaults to "<source title> (copy)"."""
+
+    title: str | None = None
+
+
 class UpdateSessionRequest(ApiModel):
     title: str | None = None
     organize_label: OrganizeLabel | None = None
