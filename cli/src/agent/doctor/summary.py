@@ -53,6 +53,15 @@ def _configured_llm_summary(cfg: Config) -> DoctorCheck:
         if label and label not in labels:
             labels.append(label)
 
+    # Sign in with ChatGPT is a provider: the plan token lives outside API keys.
+    try:
+        from agent.config.chatgpt_auth import is_connected
+
+        if is_connected() and "ChatGPT plan" not in labels:
+            labels.append("ChatGPT plan")
+    except Exception:  # noqa: BLE001 — doctor still reports keys and local endpoints
+        pass
+
     if labels:
         return DoctorCheck(
             name="llm",
