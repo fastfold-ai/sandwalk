@@ -86,7 +86,14 @@ export const platformOS = (): string => {
 export const isMainDesktopWindow = (): boolean => {
   const kind = (globalThis as { __SANDWALK_WINDOW_KIND__?: unknown })
     .__SANDWALK_WINDOW_KIND__
-  return kind !== 'client'
+  return kind !== 'client' && kind !== 'about'
+}
+
+/** Small About / update window opened from the Sandwalk menu. */
+export const isAboutDesktopWindow = (): boolean => {
+  const kind = (globalThis as { __SANDWALK_WINDOW_KIND__?: unknown })
+    .__SANDWALK_WINDOW_KIND__
+  return kind === 'about'
 }
 
 /** Overlay title bar (traffic lights over content) — macOS Tauri only. */

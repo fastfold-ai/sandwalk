@@ -18,7 +18,8 @@ export function isSpaDesktopRoute(path: string) {
     head === 'dashboard' ||
     head === 'library' ||
     head === 'projects' ||
-    head === 'onboarding'
+    head === 'onboarding' ||
+    head === 'about'
   )
 }
 

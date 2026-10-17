@@ -2,6 +2,7 @@ import type { SessionGroup, TerminalSession } from '@sandwalk/agent-ui-core'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+import { AboutUpdateWindow } from '@/components/AboutUpdateWindow'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
@@ -38,6 +39,7 @@ import { useOfflineStatus } from '@/hooks/useOfflineStatus'
 import { notifyMissedCompletions } from '@/lib/browser-notifications'
 import { applyCapyOpenSplit, parseGridLayout } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
+import { isAboutDesktopWindow } from '@/lib/desktop'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
 import { setFocusedItemId } from '@/lib/focused-item'
 import { setItemOpener } from '@/lib/item-opener'
@@ -1299,6 +1301,10 @@ export default function App() {
       (!isDraftAgentSessionId(route.sessionId) ||
         Boolean(context.activeProjectId))
   )
+
+  if (isAboutDesktopWindow() || location.pathname === '/about') {
+    return <AboutUpdateWindow />
+  }
 
   const gate = AppGates({
     authBootstrapped: bootstrap.authBootstrapped,

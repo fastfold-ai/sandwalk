@@ -102,6 +102,16 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${MARKETING}" \
             apps/sandwalk-mac/Resources/Info.plist 2>/dev/null \
             || true
+          node -e '
+            const fs = require("fs");
+            fs.writeFileSync(
+              "apps/local-web/public/release.json",
+              JSON.stringify({
+                version: process.env.VERSION,
+                pub_date: new Date().toISOString().replace(/\.\d{3}Z$/, "Z")
+              }, null, 2) + "\n"
+            );
+          '
 
       - uses: pnpm/action-setup@v6
         with:

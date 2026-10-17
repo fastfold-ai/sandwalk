@@ -691,7 +691,7 @@ fn is_spa_route(path: &str) -> bool {
     let head = rest.split('/').next().unwrap_or("");
     matches!(
         head,
-        "agents" | "dashboard" | "library" | "projects" | "onboarding"
+        "agents" | "dashboard" | "library" | "projects" | "onboarding" | "about"
     )
 }
 

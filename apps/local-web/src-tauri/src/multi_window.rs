@@ -6,13 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::image::Image;
-use tauri::menu::{
-    AboutMetadata, MenuBuilder, MenuEvent, PredefinedMenuItem, SubmenuBuilder,
-};
-
-/// Default dark Dock tile (1024×1024 squircle + border) — same asset as dark theme.
-static ABOUT_ICON_PNG: &[u8] = include_bytes!("../icons/dock/dock-dark.png");
+use tauri::menu::{MenuBuilder, MenuEvent, PredefinedMenuItem, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const MAX_RECENTS: usize = 12;
@@ -736,7 +730,7 @@ pub fn inject_bootstrap_script(
     is_spa_route: impl Fn(&str) -> bool,
 ) -> String {
     let os = std::env::consts::OS;
-    let overlay = if os == "macos" {
+    let overlay = if os == "macos" && window_kind != "about" {
         "try{document.documentElement.classList.add('sandwalk-mac-overlay','sandwalk-mac-glass');document.documentElement.dataset.platform='macos';}catch(e){}"
     } else {
         ""
@@ -1038,28 +1032,9 @@ pub fn install_app_menu(app: &AppHandle) -> Result<(), String> {
 
     // First submenu becomes the macOS app menu (named "Sandwalk" by the OS).
     // Without this, File is absorbed and disappears from the menu bar.
-    // Native About panel (orderFrontStandardAboutPanel) — traffic-light
-    // window chrome, not an in-webview modal.
-    let about_icon = Image::from_bytes(ABOUT_ICON_PNG)
-        .ok()
-        .or_else(|| app.default_window_icon().cloned());
-    // ApplicationVersion shows as the main line; Version (build) is the
-    // parenthetical. Leaving short_version unset falls back to Info.plist
-    // CFBundleVersion and duplicates the same number — pass "" to hide it.
-    let about = AboutMetadata {
-        name: Some("Sandwalk".into()),
-        version: Some(format!("Version {}", env!("CARGO_PKG_VERSION"))),
-        short_version: Some(String::new()),
-        copyright: Some("© 2026 Fastfold AI Labs. All rights reserved.".into()),
-        authors: Some(vec!["Fastfold AI Labs".into()]),
-        icon: about_icon,
-        ..Default::default()
-    };
+    // About opens a custom window (Cursor-style), not the tiny system panel.
     let app_menu = SubmenuBuilder::new(app, "Sandwalk")
-        .item(
-            &PredefinedMenuItem::about(app, Some("About Sandwalk"), Some(about))
-                .map_err(|e| e.to_string())?,
-        )
+        .text("about-sandwalk", "About Sandwalk")
         .text("check-updates", "Check for Updates…")
         .separator()
         .text("server-settings", "Server Settings…")
@@ -1177,6 +1152,9 @@ pub fn handle_menu_event(
                 },
             );
         }
+        "about-sandwalk" => {
+            let _ = open_about_window(app, is_spa_route);
+        }
         "check-updates" => {
             emit_menu_action(
                 app,
@@ -1233,6 +1211,51 @@ pub fn handle_menu_event(
         }
         _ => {}
     }
+}
+
+/// About / update window. Larger than the system About panel, with room
+/// for Restart to Update and Copy version info.
+pub fn open_about_window(
+    app: &AppHandle,
+    is_spa_route: impl Fn(&str) -> bool,
+) -> Result<(), String> {
+    if let Some(existing) = app.get_webview_window("about") {
+        let _ = existing.unminimize();
+        let _ = existing.show();
+        let _ = existing.center();
+        let _ = existing.set_focus();
+        return Ok(());
+    }
+    let script = inject_bootstrap_script(
+        Some("/about"),
+        DEFAULT_API,
+        None,
+        None,
+        "about",
+        is_spa_route,
+    );
+    let start_url = window_start_url(DEFAULT_API, None, "about");
+    let mut win = WebviewWindowBuilder::new(app, "about", start_url)
+        .title("About Sandwalk")
+        .inner_size(480.0, 440.0)
+        .min_inner_size(440.0, 400.0)
+        .resizable(true)
+        .center()
+        .disable_drag_drop_handler()
+        .initialization_script(&script);
+    #[cfg(target_os = "macos")]
+    {
+        win = win
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+            .traffic_light_position(tauri::LogicalPosition::new(16.0, 18.0))
+            .background_color(tauri::window::Color(42, 42, 44, 255));
+    }
+    let window = win.build().map_err(|e| e.to_string())?;
+    let _ = window.eval(&script);
+    attach_window_lifecycle(&window, false);
+    let _ = window.center();
+    Ok(())
 }
 
 pub fn focus_best_window(app: &AppHandle) {
