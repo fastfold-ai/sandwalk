@@ -463,6 +463,8 @@ export type LlamaRuntimeStatus = {
   models: string[]
   phase: string
   detail: string
+  /** Recent llama CLI lines, newest last. Present while a download is running. */
+  log?: string[]
   debug?: LlamaRuntimeDebug
 }
 

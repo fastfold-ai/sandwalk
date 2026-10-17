@@ -46,6 +46,60 @@ def test_ensure_starts_the_cli_server_when_the_port_is_down(monkeypatch):
     assert snapshot["running"] is False
 
 
+def test_status_keeps_download_progress_while_the_server_is_up(monkeypatch):
+    class _Response:
+        status_code = 200
+
+        def json(self):
+            return {"data": [{"id": "org/model:Q4"}]}
+
+    monkeypatch.setattr(bridge.httpx, "get", lambda *args, **kwargs: _Response())
+    bridge._set("installing", "Downloading 40%")
+    snapshot = bridge.status()
+    assert snapshot["running"] is True
+    assert snapshot["phase"] == "installing"
+    assert snapshot["detail"] == "Downloading 40%"
+    bridge._set("ready", "")
+
+
+def test_download_streams_cli_lines_into_the_log(monkeypatch, tmp_path):
+    monkeypatch.setattr("agent.diagnostics.logging_setup.LOGS_DIR", tmp_path)
+
+    class _Stdout:
+        def __init__(self, text: str):
+            self._text = text
+            self._index = 0
+
+        def read(self, count: int) -> str:
+            chunk = self._text[self._index : self._index + count]
+            self._index += count
+            return chunk
+
+    class _Proc:
+        def __init__(self, *_args, **_kwargs):
+            self.stdout = _Stdout("Fetching 10%\rFetching 100%\n")
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+    real_popen = subprocess.Popen
+
+    def _popen(cmd, **kwargs):
+        if "download" in cmd:
+            return _Proc()
+        return real_popen(cmd, **kwargs)
+
+    monkeypatch.setattr(bridge.subprocess, "Popen", _popen)
+    monkeypatch.setattr(bridge, "list_models", lambda: [])
+    bridge._download("/tmp/llama", "org/gemma")
+    snapshot = bridge.status()
+    assert snapshot["phase"] == "ready"
+    assert "Fetching 100%" in snapshot["log"]
+    assert "Fetching 100%" in (tmp_path / "llama.log").read_text(encoding="utf-8")
+    assert "Fetching 100%" in (tmp_path / "cli.log").read_text(encoding="utf-8")
+
+
 def test_catalog_keeps_featured_models_that_fit(monkeypatch):
     monkeypatch.setattr(bridge, "list_models", lambda: ["ggml-org/gpt-oss-20b-GGUF:MXFP4"])
     monkeypatch.setattr(bridge, "_models_payload", lambda: None)

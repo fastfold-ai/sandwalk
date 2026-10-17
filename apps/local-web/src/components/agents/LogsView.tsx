@@ -60,7 +60,7 @@ export function LogsView({
           <div>
             <h2 className="text-2xl font-semibold">Logs</h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              Sandwalk services on this Mac: process id, port, memory, and the
+              Sandwalk services on this machine: process id, port, memory, and the
               latest server log.
             </p>
           </div>
@@ -147,7 +147,7 @@ export function LogsView({
         {(report?.logs || []).map(log => (
           <section key={log.name} className="space-y-2">
             <h3 className="text-sm font-medium">{log.name}</h3>
-            <pre className="bg-muted/40 max-h-96 overflow-auto rounded-xl p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+            <pre className="bg-muted/40 max-h-96 min-h-32 overflow-auto rounded-xl p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
               {log.tail || 'No log lines yet.'}
             </pre>
           </section>

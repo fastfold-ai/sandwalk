@@ -1,11 +1,15 @@
 #!/bin/sh
 # Start the Sandwalk agent for the systemd user service.
-# The desktop package does not embed the Python CLI. Use a user install,
-# the checkout venv, or whatever `sandwalk` is already on PATH.
+# Prefer the CLI shipped in this package (/usr/bin/sandwalk). A user install
+# or checkout venv is only a fallback.
 set -eu
 
 if [ -n "${SANDWALK_BIN:-}" ] && [ -x "${SANDWALK_BIN}" ]; then
   exec "${SANDWALK_BIN}" serve --host 127.0.0.1 --port 8787
+fi
+
+if [ -x /usr/bin/sandwalk ]; then
+  exec /usr/bin/sandwalk serve --host 127.0.0.1 --port 8787
 fi
 
 home="${HOME:-}"

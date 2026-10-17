@@ -145,7 +145,7 @@ export function OnboardingAgentsStep({ client }: { client: LocalAgentClient }) {
       {sessions.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {installed.size === 0
-            ? 'None of these CLIs are on this Mac yet. You can import their sessions later from Dashboard, or open them from any terminal tab.'
+            ? 'None of these CLIs are on this machine yet. You can import their sessions later from Dashboard, or open them from any terminal tab.'
             : 'No saved sessions found. Once you chat in one of these CLIs, it will show up here and in the terminal menu.'}
         </p>
       ) : (

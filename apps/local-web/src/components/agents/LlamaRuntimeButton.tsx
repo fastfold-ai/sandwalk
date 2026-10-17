@@ -115,7 +115,7 @@ export function LlamaRuntimeButton({
         <p className="text-muted-foreground text-xs">{status.detail}</p>
       ) : (
         <p className="text-muted-foreground text-xs">
-          Sandwalk runs the llama CLI on localhost:9931. The menu-bar app stays closed.
+          Sandwalk runs the llama CLI on localhost:9931.
         </p>
       )}
       {status?.phase === 'error' && status.debug ? (

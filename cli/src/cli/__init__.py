@@ -30,7 +30,7 @@ from cli.main import entry
 
 # Import every command-group module so their @app.command / add_typer calls run.
 from cli import (  # noqa: F401
-    auth, bench, case_study, config, data, doctor, eval_cmd, fork, knowledge,
+    auth, bench, case_study, config, data, desktop, doctor, eval_cmd, fork, knowledge,
     knowledge_quality, login, mcp, release_check, report, report_notebook, run,
     sandbox, serve, skills, skills_deps, skills_manage, specialists, sync, tool, trace,
     trace_export, upgrade,

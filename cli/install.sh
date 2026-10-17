@@ -43,8 +43,11 @@ Options:
       --setup             Run interactive sandwalk setup after install
       --no-setup          Skip setup (default when stdin is not a TTY)
 
-Installs the Python CLI from GitHub (cli/ subdirectory) via uv, pipx, or pip.
+Installs the Python CLI on macOS and Linux from GitHub (cli/ subdirectory)
+via uv, pipx, or pip. Detects the OS and puts `sandwalk` on PATH.
 Default: latest stable GitHub Release tag. Falls back to main if no releases exist.
+
+After install, `sandwalk desktop` downloads the latest Mac app or Ubuntu .deb.
 
 While the repo is private, GitHub auth is required (gh auth / SSH / token).
 EOF
@@ -100,21 +103,28 @@ for candidate in python3 python; do
     break
   fi
 done
-[[ -n "$PYTHON" ]] || fail "Python not found. Install Python ${MIN_PYTHON}+ and try again."
+[[ -n "$PYTHON" ]] || fail "Python not found. Install Python 3 and try again."
 
 PY_VERSION=$("$PYTHON" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 PY_MAJOR=$("$PYTHON" -c "import sys; print(sys.version_info.major)")
 PY_MINOR=$("$PYTHON" -c "import sys; print(sys.version_info.minor)")
-if [[ "$PY_MAJOR" -lt 3 ]] || { [[ "$PY_MAJOR" -eq 3 ]] && [[ "$PY_MINOR" -lt 11 ]]; }; then
-  fail "Python ${MIN_PYTHON}+ required (found ${PY_VERSION})"
+NEED_NEWER_PYTHON=0
+if [[ "$PY_MAJOR" -lt 3 ]]; then
+  fail "Python 3 is required (found ${PY_VERSION})"
 fi
-ok "Found Python ${PY_VERSION}"
+if [[ "$PY_MINOR" -lt 11 ]]; then
+  NEED_NEWER_PYTHON=1
+  warn "Python ${PY_VERSION} is older than ${MIN_PYTHON}. uv will install Python 3.12 for sandwalk."
+else
+  ok "Found Python ${PY_VERSION}"
+fi
 
 OS="$(uname -s)"
+ARCH="$(uname -m)"
 case "$OS" in
-  Darwin) info "Detected macOS" ;;
-  Linux)  info "Detected Linux" ;;
-  *)      warn "Unsupported OS: $OS — installation may still work" ;;
+  Darwin) info "Detected macOS (${ARCH})" ;;
+  Linux)  info "Detected Linux (${ARCH})" ;;
+  *)      warn "Unsupported OS: $OS (${ARCH}) — the CLI install may still work" ;;
 esac
 
 # ── Resolve git ref from GitHub Releases ───────────────────────
@@ -280,7 +290,14 @@ fi
 
 if ensure_uv_on_path; then
   info "Installing ${PACKAGE} via uv tool…"
-  if ! uv tool install "$UV_SPEC" && ! uv tool install --force "$UV_SPEC"; then
+  if [[ "$NEED_NEWER_PYTHON" == 1 ]]; then
+    uv_ok=0
+    uv tool install --python 3.12 "$UV_SPEC" || uv tool install --force --python 3.12 "$UV_SPEC" || uv_ok=1
+  else
+    uv_ok=0
+    uv tool install "$UV_SPEC" || uv tool install --force "$UV_SPEC" || uv_ok=1
+  fi
+  if [[ "$uv_ok" != 0 ]]; then
     install_failed_hint
     fail "uv tool install failed"
   fi
@@ -308,10 +325,32 @@ else
   fi
 fi
 
+# ── PATH ───────────────────────────────────────────────────────
+
+ensure_local_bin_on_path() {
+  local marker="# Added by Sandwalk"
+  local line='export PATH="$HOME/.local/bin:$PATH"'
+  local profiles=()
+  case "$OS" in
+    Darwin) profiles=("${HOME}/.zprofile" "${HOME}/.zshrc") ;;
+    Linux)  profiles=("${HOME}/.profile" "${HOME}/.bashrc") ;;
+    *)      profiles=("${HOME}/.profile") ;;
+  esac
+  local profile
+  for profile in "${profiles[@]}"; do
+    if [[ -f "$profile" ]] && grep -q '\.local/bin' "$profile"; then
+      continue
+    fi
+    printf '\n%s\n%s\n' "$marker" "$line" >> "$profile"
+    ok "Added ~/.local/bin to ${profile#"${HOME}/"}"
+  done
+}
+
 # ── Verify ─────────────────────────────────────────────────────
 
 # uv tool / pipx / pip --user all commonly land here
 export PATH="${HOME}/.local/bin:${PATH}"
+ensure_local_bin_on_path
 
 if ! command -v sandwalk >/dev/null 2>&1; then
   warn "'sandwalk' not found on PATH. Restart your shell, then run: sandwalk --version"
@@ -337,8 +376,9 @@ if [[ "$run_setup" == true ]]; then
   sandwalk setup
 else
   printf "\n${MUTED}Next steps:${NC}\n"
-  printf "  sandwalk setup     ${MUTED}# configure providers / models${NC}\n"
-  printf "  sandwalk serve     ${MUTED}# start the agent API${NC}\n"
+  printf "  sandwalk setup      ${MUTED}# configure providers / models${NC}\n"
+  printf "  sandwalk desktop    ${MUTED}# install the Mac app or Ubuntu .deb${NC}\n"
+  printf "  sandwalk serve      ${MUTED}# start the agent API${NC}\n"
   printf "  sandwalk --help\n"
   printf "\n${MUTED}Docs: ${NC}https://sandwalk.sh\n\n"
 fi

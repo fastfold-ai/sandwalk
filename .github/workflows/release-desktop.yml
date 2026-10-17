@@ -266,6 +266,16 @@ jobs:
             patchelf \
             pkg-config
 
+      - name: Bundle agent CLI
+        run: |
+          set -euo pipefail
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          export PATH="${HOME}/.local/bin:${PATH}"
+          case "$(uname -m)" in
+            aarch64|arm64) export OPENBLAS_CORETYPE=ARMV8 ;;
+          esac
+          ./apps/packaging/bundle-agent-runtime.sh apps/packaging/dist/agent-runtime
+
       - name: Build deb
         working-directory: apps/local-web
         env:
@@ -274,13 +284,21 @@ jobs:
           GGML_NATIVE: "OFF"
         run: pnpm exec tauri build --bundles deb
 
-      - name: Check the package contains the user service
+      - name: Install CLI into deb
+        run: |
+          set -euo pipefail
+          deb="$(echo apps/local-web/src-tauri/target/release/bundle/deb/*.deb)"
+          ./apps/packaging/linux/install-cli-into-deb.sh apps/packaging/dist/agent-runtime "${deb}"
+
+      - name: Check the package contains the user service and CLI
         run: |
           set -euo pipefail
           deb="$(echo apps/local-web/src-tauri/target/release/bundle/deb/*.deb)"
           test -f "$deb"
           dpkg-deb -c "$deb" | grep -q 'usr/lib/systemd/user/sandwalk.service'
           dpkg-deb -c "$deb" | grep -q 'usr/lib/sandwalk/sandwalk-serve'
+          dpkg-deb -c "$deb" | grep -q 'usr/bin/sandwalk'
+          dpkg-deb -c "$deb" | grep -q 'usr/lib/sandwalk/agent-runtime/bin/'
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
@@ -376,7 +394,14 @@ jobs:
             echo "## Updating"
             echo
             echo "- Mac app: **Check for Updates** in the app menu, or wait for the banner."
-            echo "- Ubuntu: install the .deb for your architecture. The app starts a user service so the agent stays up after the window closes."
+            echo "- Ubuntu: install the .deb above, or use APT:"
+            echo
+            echo '```bash'
+            echo 'curl -fsSL https://apt.sandwalk.sh/sandwalk.gpg | sudo gpg --dearmor -o /usr/share/keyrings/sandwalk.gpg'
+            echo 'echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/sandwalk.gpg] https://apt.sandwalk.sh stable main" | sudo tee /etc/apt/sources.list.d/sandwalk.list'
+            echo 'sudo apt update && sudo apt install sandwalk'
+            echo '```'
+            echo
             echo "- CLI: \`sandwalk upgrade\`."
             echo
             if [[ -n "${PREV}" ]]; then
@@ -396,6 +421,7 @@ jobs:
           # The action's default token is the Actions bot. This PAT publishes as you.
           token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
           files: release-assets/*
+
   publish-apt:
     name: Publish APT repository
     needs: linux-deb

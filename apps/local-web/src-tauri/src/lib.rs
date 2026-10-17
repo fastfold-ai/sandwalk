@@ -1039,6 +1039,10 @@ fn agent_port_open() -> bool {
 /// If the unit is not installed yet, start the CLI directly.
 #[cfg(not(target_os = "macos"))]
 fn linux_sandwalk_bin() -> Option<PathBuf> {
+    let packaged = PathBuf::from("/usr/bin/sandwalk");
+    if packaged.is_file() {
+        return Some(packaged);
+    }
     if let Some(home) = dirs::home_dir() {
         for candidate in [
             home.join(".local/bin/sandwalk"),

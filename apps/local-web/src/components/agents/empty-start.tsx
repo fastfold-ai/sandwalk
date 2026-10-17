@@ -66,7 +66,7 @@ export function takeQueuedPlusMenu(): PlusMenuFlyout | null {
 export const EMPTY_START_TIPS = [
   'Type / to attach a skill or an MCP server.',
   'Sandbox a run on Modal when you want a clean machine.',
-  'Local models stay on this Mac. Cloud models use your provider key.',
+  'Local models stay on this machine. Cloud models use your provider key.',
   'The ring next to Send is input usage. Compact it when the window fills up.',
   '@ mentions a file from the workspace.',
   '⌘D splits the current pane to the right.',
