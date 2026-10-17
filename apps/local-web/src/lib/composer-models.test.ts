@@ -240,6 +240,28 @@ describe('resolveComposerModelOption', () => {
     expect(isComposerModelSelected(options[1], runtime, options)).toBe(false)
   })
 
+  it('matches an openai/ prefixed id to the bare catalog row', () => {
+    const gpt = {
+      provider: 'openai',
+      model: 'gpt-6-luna',
+      label: 'GPT-6 Luna',
+      speed: 'OpenAI',
+      profileId: null,
+      source: 'cloud' as const,
+      supportsReasoningEffort: true,
+      reasoningEffortOptions: ['low', 'medium', 'high']
+    }
+    const resolved = resolveComposerModelOption([gpt], {
+      provider: 'openai',
+      model: 'openai/gpt-6-luna'
+    })
+    expect(resolved?.label).toBe('GPT-6 Luna')
+    expect(resolved?.supportsReasoningEffort).toBe(true)
+    expect(
+      isComposerModelSelected(gpt, { provider: 'openai', model: 'openai/gpt-6-luna' }, [gpt])
+    ).toBe(true)
+  })
+
   it('prefers active local profile when runtime is openai', () => {
     const runtime = {
       provider: 'openai',

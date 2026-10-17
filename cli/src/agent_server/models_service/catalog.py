@@ -14,6 +14,31 @@ from agent_server.models_service.catalog_static import (
 )
 
 
+def _drop_unconfirmed_curated(items: list[AgentModel]) -> list[AgentModel]:
+    """Drop hardcoded OpenAI/Anthropic rows the provider did not return.
+
+    Live /v1/models is the source of truth once a fetch succeeds. Curated
+    names that are not in that list (and therefore cannot be called) stay
+    out of the composer. A failed fetch leaves the curated list alone.
+    """
+    from agent_server.models_service.first_party_discovery import confirmed_live_ids
+
+    live = {
+        "openai": confirmed_live_ids("openai"),
+        "anthropic": confirmed_live_ids("anthropic"),
+    }
+    if live["openai"] is None and live["anthropic"] is None:
+        return items
+    kept: list[AgentModel] = []
+    for item in items:
+        provider = item.provider
+        catalog = live.get("openai" if provider == "openai-chatgpt" else provider)
+        if item.source == "cloud" and catalog is not None and item.id not in catalog:
+            continue
+        kept.append(item)
+    return kept
+
+
 def list_models(
     cfg: Config, *, enabled_only: bool = False, discover: bool = True
 ) -> AgentModelList:
@@ -44,6 +69,7 @@ def list_models(
         items.extend(
             first_party_discovered_items(cfg, hidden, known_ids, enabled_only=enabled_only)
         )
+        items = _drop_unconfirmed_curated(items)
         items.extend(
             _provider_discovered_items(cfg, hidden, known_ids, enabled_only=enabled_only)
         )

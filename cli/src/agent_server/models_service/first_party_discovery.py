@@ -287,6 +287,17 @@ def _cloud_key(cfg: Config, provider: str) -> str | None:
     return cfg.llm_api_key(provider)
 
 
+def confirmed_live_ids(provider: str) -> set[str] | None:
+    """Ids from a successful /v1/models fetch, or None when we have no list.
+
+    A failed fetch stays None so the curated catalog remains the fallback.
+    """
+    entry = _cached(provider)
+    if entry is None or entry.error:
+        return None
+    return {model.id for model in entry.models}
+
+
 def first_party_discovered_items(
     cfg: Config, hidden: set[str], known_ids: set[str], *, enabled_only: bool
 ) -> list[AgentModel]:
@@ -335,6 +346,7 @@ def first_party_discovered_items(
 __all__ = [
     "DiscoveredModel",
     "fetch_anthropic_models",
+    "confirmed_live_ids",
     "fetch_openai_models",
     "first_party_discovered_items",
 ]
