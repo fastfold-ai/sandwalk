@@ -465,6 +465,8 @@ export type LlamaRuntimeStatus = {
   detail: string
   /** Recent llama CLI lines, newest last. Present while a download is running. */
   log?: string[]
+  /** The download currently running, so the row can stay pinned if the window closes. */
+  install?: { repo: string; quant: string | null; spec: string } | null
   debug?: LlamaRuntimeDebug
 }
 
@@ -3604,6 +3606,18 @@ export class LocalAgentClient
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ repo, quant: quant ?? null }),
+      signal
+    })
+  }
+
+  llamaRuntimeRemove(
+    model: string,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>('/local-runtimes/llama/remove', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model }),
       signal
     })
   }

@@ -47,6 +47,14 @@ def run_existing_agent(
             config.set_openai_active_profile(session_profile)
         except Exception:  # noqa: BLE001
             pass
+    try:
+        profile = config.get_openai_profile()
+    except Exception:  # noqa: BLE001
+        profile = None
+    if isinstance(profile, dict) and str(profile.get("backend") or "").strip().lower() == "llama":
+        from agent_server.llama_runtime import wait_until_serving
+
+        wait_until_serving()
     # Throwaway in-memory config for this run — never persist overrides.
     config._dirty_keys.clear()
     if workspace_path:

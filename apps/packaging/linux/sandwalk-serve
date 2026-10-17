@@ -8,7 +8,8 @@ if [ -n "${SANDWALK_BIN:-}" ] && [ -x "${SANDWALK_BIN}" ]; then
   exec "${SANDWALK_BIN}" serve --host 127.0.0.1 --port 8787
 fi
 
-if [ -x /usr/bin/sandwalk ]; then
+# The package wrapper only works when this deb also shipped the Python runtime.
+if [ -x /usr/bin/sandwalk ] && { [ -x /usr/lib/sandwalk/agent-runtime/bin/python3.12 ] || [ -x /usr/lib/sandwalk/agent-runtime/bin/python3 ]; }; then
   exec /usr/bin/sandwalk serve --host 127.0.0.1 --port 8787
 fi
 
@@ -27,7 +28,10 @@ do
 done
 
 if command -v sandwalk >/dev/null 2>&1; then
-  exec sandwalk serve --host 127.0.0.1 --port 8787
+  found="$(command -v sandwalk)"
+  if [ "$found" != /usr/bin/sandwalk ]; then
+    exec "$found" serve --host 127.0.0.1 --port 8787
+  fi
 fi
 
 echo "sandwalk CLI not found. Install it in this account, then restart the service." >&2

@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 from collections import deque
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ _INSTALL_URL = "https://llama.app/install.sh"
 _lock = threading.Lock()
 _state: dict[str, str] = {"phase": "idle", "detail": ""}
 _download_log: deque[str] = deque(maxlen=80)
+_install_job: dict[str, str | None] | None = None
 _debug: dict[str, Any] = {}
 _serve_log: deque[str] = deque(maxlen=80)
 _serve_command: list[str] = []
@@ -138,6 +140,7 @@ def status() -> dict[str, Any]:
         phase = _state["phase"]
         detail = _state["detail"]
         log = list(_download_log)
+        install = dict(_install_job) if phase == "installing" and _install_job else None
         # A running server used to wipe an in-progress download. Keep install,
         # update, and error text until that job finishes.
         if running and phase not in {"installing", "updating", "error"}:
@@ -156,6 +159,7 @@ def status() -> dict[str, Any]:
         "phase": phase,
         "detail": detail,
         "log": log,
+        "install": install,
         "debug": _debug_public() if phase == "error" else {},
     }
 
@@ -507,6 +511,7 @@ def _note_download(line: str) -> None:
 
 
 def _download(binary: str, spec: str) -> None:
+    global _install_job
     with _lock:
         _download_log.clear()
     _set("installing", f"Downloading {spec}…")
@@ -520,6 +525,8 @@ def _download(binary: str, spec: str) -> None:
             bufsize=1,
         )
     except OSError as exc:
+        with _lock:
+            _install_job = None
         _set("error", f"Could not run llama download ({exc}).")
         return
     buffer = ""
@@ -544,8 +551,11 @@ def _download(binary: str, spec: str) -> None:
     if code != 0:
         with _lock:
             tail = _download_log[-1] if _download_log else ""
+            _install_job = None
         _set("error", tail or f"llama download exited {code}")
         return
+    with _lock:
+        _install_job = None
     _set("ready", f"Installed {spec}")
 
 
@@ -758,6 +768,77 @@ def unload_model(model_id: str) -> dict[str, Any]:
     return {"ok": True, "state": "unloaded"}
 
 
+def _hf_hub_dir(repo: str) -> Path | None:
+    """Hugging Face cache folder for ``org/name``, only if it stays inside the hub."""
+    if repo.count("/") != 1:
+        return None
+    org, name = repo.split("/", 1)
+    if not org or not name or ".." in org or ".." in name:
+        return None
+    hub = (Path.home() / ".cache" / "huggingface" / "hub").resolve()
+    folder = (hub / f"models--{org}--{name}").resolve()
+    if hub not in folder.parents:
+        return None
+    return folder if folder.is_dir() else None
+
+
+def _delete_downloaded_weights(repo: str, quant: str) -> bool:
+    folder = _hf_hub_dir(repo)
+    if folder is None:
+        return False
+    ggufs = [path for path in folder.rglob("*") if path.name.lower().endswith(".gguf")]
+    needle = quant.strip().lower()
+    matched = [path for path in ggufs if needle and needle in path.name.lower()] or ggufs
+    removed = False
+    for path in matched:
+        target = path.resolve() if path.exists() or path.is_symlink() else None
+        path.unlink(missing_ok=True)
+        if (
+            target is not None
+            and target.is_file()
+            and folder in target.parents
+            and target != path
+        ):
+            target.unlink(missing_ok=True)
+        removed = True
+    if not any(path.name.lower().endswith(".gguf") for path in folder.rglob("*")):
+        shutil.rmtree(folder, ignore_errors=True)
+    return removed
+
+
+def _remove_ini_section(path: Path, model_id: str) -> None:
+    if not path.is_file():
+        return
+    lines = path.read_text(encoding="utf-8").splitlines()
+    header = f"[{model_id}]"
+    start = next((i for i, line in enumerate(lines) if line.strip() == header), None)
+    if start is None:
+        return
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")), len(lines))
+    del lines[start:end]
+    text = "\n".join(lines).strip()
+    path.write_text((text + "\n") if text else "", encoding="utf-8")
+
+
+def remove_model(model_id: str) -> dict[str, Any]:
+    """Delete a downloaded GGUF from the Hugging Face cache and Llama's preset."""
+    cleaned = model_id.strip()
+    if cleaned.count("/") < 1:
+        raise ValueError("Model id must include the repo, like org/name.")
+    repo = cleaned.split(":", 1)[0]
+    quant = cleaned.split(":", 1)[1] if ":" in cleaned else ""
+    try:
+        unload_model(cleaned)
+    except Exception:  # noqa: BLE001 - an unloaded model has nothing to stop
+        pass
+    deleted = _delete_downloaded_weights(repo, quant)
+    _remove_ini_section(Path.home() / ".config" / "llama" / "models.user.ini", cleaned)
+    _mem_cache.pop(cleaned, None)
+    if not deleted:
+        raise ValueError("Could not find that model's files on this machine.")
+    return {"ok": True}
+
+
 def install_model(repo: str, quant: str | None = None) -> dict[str, Any]:
     """Download a GGUF with `llama download`. The running server picks it up from the Hugging Face cache."""
     cleaned = repo.strip()
@@ -767,6 +848,13 @@ def install_model(repo: str, quant: str | None = None) -> dict[str, Any]:
     if not binary:
         raise ValueError("The llama CLI is not installed.")
     spec = f"{cleaned}:{quant.strip()}" if quant and quant.strip() else cleaned
+    global _install_job
+    with _lock:
+        _install_job = {
+            "repo": cleaned,
+            "quant": quant.strip() if quant and quant.strip() else None,
+            "spec": spec,
+        }
     threading.Thread(
         target=_download,
         args=(binary, spec),
@@ -774,6 +862,25 @@ def install_model(repo: str, quant: str | None = None) -> dict[str, Any]:
         daemon=True,
     ).start()
     return {"ok": True, "spec": spec}
+
+
+def wait_until_serving(timeout: float = 20.0) -> bool:
+    """Start ``llama serve`` if needed and wait until it answers.
+
+    Picking a local model, or sending a chat to one, calls this so the request
+    is not aimed at a closed port.
+    """
+    if status().get("running"):
+        return True
+    if not llama_binary():
+        return False
+    ensure()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if status().get("running"):
+            return True
+        time.sleep(0.3)
+    return False
 
 
 def ensure() -> dict[str, Any]:

@@ -62,6 +62,10 @@ def build_openai_chat_model(config, *, temperature: float):
     api_key = config.llm_api_key("openai")
     if api_key:
         kwargs["api_key"] = api_key
+    elif not is_openai_cloud:
+        # Llama, Ollama, and other local servers ignore the key. The OpenAI
+        # SDK still refuses to start unless one is present.
+        kwargs["api_key"] = "sandwalk-local"
     if base_url:
         kwargs["base_url"] = base_url
     elif is_openai_cloud:

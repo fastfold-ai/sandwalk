@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronRight, Loader, Plus } from 'lucide-react'
 import { useState } from 'react'
 
 import {
+  LlamaInstallNotice,
   LlamaLibrary,
   type LlamaLibraryActions} from '@/components/agents/LlamaLibrary'
 import { Button } from '@/components/ui/button'
@@ -97,6 +98,7 @@ export function ModelsProfilesSection({
                 </span>
               ) : null}
             </div>
+            {llamaRuntime ? <LlamaInstallNotice actions={llamaRuntime} /> : null}
             <Button type="button" size="sm" onClick={() => setLlamaOpen(true)}>
               {llamaConnected ? 'Browse models' : 'Set up Llama'}
             </Button>

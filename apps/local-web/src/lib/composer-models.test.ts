@@ -4,8 +4,10 @@ import {
   composerModelPrefKey,
   formatComposerModelLabel,
   formatContextWindow,
+  formatLlamaModelLabel,
   formatPickerContextBadge,
   isComposerModelSelected,
+  isLlamaWeightId,
   modelOptionBadge,
   rankComposerModelOptions,
   resolveComposerModelOption,
@@ -314,6 +316,46 @@ describe('scoreComposerModelSearch', () => {
         section => section.options
       )
     ).toEqual([gemini])
+  })
+})
+
+describe('formatLlamaModelLabel', () => {
+  it('hides the raw repo id when Llama is not in the catalog', () => {
+    expect(isLlamaWeightId('ggml-org/gemma-3-270m-it-qat-GGUF:Q4_0')).toBe(true)
+    expect(isLlamaWeightId('gpt-6-luna')).toBe(false)
+    expect(formatLlamaModelLabel('ggml-org/gemma-3-270m-it-qat-GGUF:Q4_0')).toBe(
+      'Gemma 3 270M Q4_0'
+    )
+    expect(formatLlamaModelLabel('ggml-org/gemma-4-26B-A4B-it-GGUF:Q4_0')).toBe(
+      'Gemma 4 26B A4B Q4_0'
+    )
+  })
+})
+
+describe('scoreComposerModelSearch llama provider', () => {
+  it('finds local Gemma rows when the query is the Llama badge', () => {
+    const gemma = {
+      provider: 'local',
+      model: 'ggml-org/gemma-3-270m-it-qat-GGUF:Q4_0',
+      label: 'Gemma 3 270m It Qat',
+      speed: 'Llama',
+      source: 'profile' as const,
+      backend: 'llama',
+      profileId: 'llama_local'
+    }
+    const gpt = {
+      provider: 'openai-chatgpt',
+      model: 'gpt-6-luna',
+      label: 'GPT-6 Luna',
+      speed: 'ChatGPT plan'
+    }
+    expect(scoreComposerModelSearch(gemma, 'llama')).toBeGreaterThan(0)
+    expect(scoreComposerModelSearch(gpt, 'llama')).toBe(-1)
+    expect(
+      rankComposerModelOptions([gemma, gpt], 'llama').flatMap(
+        section => section.options
+      )
+    ).toEqual([gemma])
   })
 })
 

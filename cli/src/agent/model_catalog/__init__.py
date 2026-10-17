@@ -37,6 +37,7 @@ from agent.model_catalog.modality_support import (
 from agent.model_catalog.opencode import (
     OPENCODE_UNSUPPORTED_MODELS,
     format_discovered_model_label,
+    format_llama_model_label,
     openai_model_requires_responses_api,
     opencode_anthropic_base_url,
     opencode_model_is_supported,
@@ -116,6 +117,7 @@ __all__ = [
     "effective_unsloth_enable_thinking",
     "effective_xai_reasoning_effort",
     "format_discovered_model_label",
+    "format_llama_model_label",
     "format_reasoning_effort_label",
     "get_model_reasoning",
     "google_model_supports_thinking_level",

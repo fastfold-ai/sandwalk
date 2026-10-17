@@ -14,6 +14,10 @@ if [[ -z "${DEST}" ]]; then
   echo "usage: $0 <dest-dir>" >&2
   exit 2
 fi
+# Later steps run from cli/. A relative dest would point at a missing
+# interpreter there, and uv reports that as "no virtual environment".
+mkdir -p "${DEST}"
+DEST="$(cd "${DEST}" && pwd)"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"

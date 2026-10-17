@@ -405,6 +405,17 @@ def test_format_discovered_model_label():
     assert format_discovered_model_label("gpt-5.6-luna") == "GPT 5.6 Luna"
     assert format_discovered_model_label("glm-5") == "GLM 5"
     assert format_discovered_model_label("glm-5.2") == "GLM 5.2"
+    from agent.model_catalog import format_llama_model_label
+
+    assert (
+        format_llama_model_label("ggml-org/gemma-3-270m-it-qat-GGUF:Q4_0")
+        == "Gemma 3 270M Q4_0"
+    )
+    assert (
+        format_llama_model_label("ggml-org/gemma-4-26B-A4B-it-GGUF:Q4_0")
+        == "Gemma 4 26B A4B Q4_0"
+    )
+    assert format_llama_model_label("ggml-org/gemma-4-12B-it-GGUF:Q8_0") == "Gemma 4 12B Q8_0"
     assert opencode_model_uses_anthropic("claude-sonnet-5") is True
     assert opencode_model_uses_anthropic("qwen3.7-plus") is True
     assert opencode_model_uses_anthropic("minimax-m3") is False

@@ -14,6 +14,7 @@ from agent_server.llama_runtime import (
     load_model,
     memory_tiers,
     publish_profile,
+    remove_model,
     set_context,
     status,
     unload_model,
@@ -91,5 +92,12 @@ def register_llama_runtime_routes(app: FastAPI, deps: AppDeps) -> None:
     async def llama_runtime_install(body: _InstallBody) -> dict:
         try:
             return install_model(body.repo, body.quant)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/v1/local-runtimes/llama/remove")
+    async def llama_runtime_remove(body: _ModelBody) -> dict:
+        try:
+            return remove_model(body.model)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
