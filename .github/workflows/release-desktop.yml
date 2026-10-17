@@ -396,3 +396,39 @@ jobs:
           # The action's default token is the Actions bot. This PAT publishes as you.
           token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
           files: release-assets/*
+  publish-apt:
+    name: Publish APT repository
+    needs: linux-deb
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download debs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sandwalk-deb-*
+          path: debs
+          merge-multiple: true
+
+      - name: Install reprepro
+        run: sudo apt-get update && sudo apt-get install -y reprepro
+
+      - name: Publish to apt.sandwalk.sh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SANDWALK_APT_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SANDWALK_APT_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          SANDWALK_APT_S3_BUCKET: sandwalk-apt
+          SANDWALK_APT_GPG_PRIVATE_KEY: ${{ secrets.SANDWALK_APT_GPG_PRIVATE_KEY }}
+          SANDWALK_APT_GPG_PASSPHRASE: ${{ secrets.SANDWALK_APT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          debs=(debs/*.deb)
+          if [[ ${#debs[@]} -eq 0 ]]; then
+            echo "No .deb artifacts found" >&2
+            exit 1
+          fi
+          ./apps/packaging/linux/publish-apt-repo.sh "${debs[@]}"
