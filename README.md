@@ -23,6 +23,52 @@
   <img alt="Sandwalk desktop: a chat, the files it produced, and a terminal, side by side" src="images/showcase.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
+## Install
+
+### Desktop
+
+| Platform | Link |
+|----------|------|
+| macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
+| Ubuntu amd64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.10_amd64.deb) |
+| Ubuntu arm64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.10_arm64.deb) |
+
+macOS needs 12.0 or newer and Apple Silicon. Open the disk image and drag Sandwalk to Applications.
+
+On Ubuntu 24.04 or 26.04, add the repository and install:
+
+```bash
+curl -fsSL https://apt.sandwalk.sh/sandwalk.gpg | sudo gpg --dearmor -o /usr/share/keyrings/sandwalk.gpg
+echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/sandwalk.gpg] https://apt.sandwalk.sh stable main" | sudo tee /etc/apt/sources.list.d/sandwalk.list
+sudo apt update
+sudo apt install sandwalk
+```
+
+Or download the `.deb` from the table and run `sudo apt install ./Sandwalk_*.deb`. Installing the CLI first and running `sandwalk desktop` does the same download for this computer's architecture.
+
+### CLI
+
+```bash
+curl -fsSL https://sandwalk.sh/install | bash
+sandwalk setup
+sandwalk desktop
+```
+
+The installer detects macOS or Linux, installs `uv` if it is missing, and puts `sandwalk` on your `PATH`. `sandwalk setup` walks through providers, keys, and a default model. `sandwalk desktop` installs the desktop app from the latest release. Upgrade the CLI later with `sandwalk upgrade`.
+
+### From source
+
+```bash
+git clone https://github.com/fastfold-ai/sandwalk.git
+cd sandwalk
+pnpm install
+cd cli && uv sync --extra all && cd ..
+scripts/dev-api.sh        # agent API on :8787
+scripts/dev-ui.sh         # Tauri window + Vite on :1420 (`web` for browser only)
+```
+
+See [Development](#development) for the test and packaging loop.
+
 ## Why Sandwalk exists
 
 Sandwalk exists to turn individual curiosity into collective discovery.
@@ -120,39 +166,6 @@ Sandwalk is in developer preview.
 </tr>
 </table>
 
-## Install
-
-### macOS App
-
-| Platform | Link |
-|----------|------|
-| macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
-
-Requires macOS 12.0+ and Apple Silicon. Open the disk image and drag Sandwalk to Applications.
-
-### CLI
-
-```bash
-curl -fsSL https://sandwalk.sh/install | bash
-sandwalk setup
-```
-
-The installer puts `sandwalk` on your `PATH` with `uv`. `sandwalk setup` walks through providers, keys, and a default model. Upgrade later with `sandwalk upgrade`.
-
-### From source
-
-```bash
-git clone https://github.com/fastfold-ai/sandwalk.git
-cd sandwalk
-pnpm install
-cd cli && uv sync --extra all && cd ..
-scripts/dev-api.sh        # agent API on :8787
-scripts/dev-ui.sh         # Tauri window + Vite on :1420 (`web` for browser only)
-```
-
-See [Development](#development) for the test and packaging loop.
-
-
 ## Models
 
 Keys stay on this computer. Connected providers show up in the composer.
@@ -201,6 +214,7 @@ Same sessions, same files. Type `sandwalk` in a terminal, or press **⌘⇧T** a
 
 ```bash
 sandwalk setup                    # providers, keys, default model
+sandwalk desktop                  # install the Mac app or Ubuntu .deb
 sandwalk                          # interactive session
 sandwalk "question"               # one-shot
 sandwalk serve                    # local agent API on :8787
