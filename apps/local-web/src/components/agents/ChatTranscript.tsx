@@ -68,6 +68,8 @@ type ChatTranscriptProps = {
   liveDelta: string
   /** Server status for the active run, e.g. waiting in the capacity queue. */
   liveStatus?: string | null
+  /** Edit a past user message and send it again as a new turn. */
+  onResendMessage?: (text: string) => void | Promise<void>
   pendingApproval?: PendingHitlApproval | null
   approvalSubmitting?: boolean
   onSubmitApprovals?: (decisions: HitlDecision[]) => void | Promise<void>
@@ -104,6 +106,7 @@ export function ChatTranscript({
   builtPlanPaths = EMPTY_PLAN_PATHS,
   liveDelta,
   liveStatus = null,
+  onResendMessage,
   pendingApproval = null,
   approvalSubmitting = false,
   onSubmitApprovals,
@@ -231,6 +234,7 @@ export function ChatTranscript({
                 mcpServers={mcpServers}
                 workspaceFiles={workspaceFiles}
                 mentionChats={mentionChats}
+                onResendMessage={onResendMessage}
               />
             ))}
             {runActive && activeBuildPlan ? (
