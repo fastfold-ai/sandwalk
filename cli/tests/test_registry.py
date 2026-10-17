@@ -205,7 +205,12 @@ class TestGlobalRegistry:
             "code", "files", "claude", "ops", "dna",
             "cellxgene", "clue", "remote_data",
         }
-        assert expected.issubset(set(cats)), f"Missing categories: {expected - set(cats)}"
+        missing = expected - set(cats)
+        from tools import tool_load_errors
+
+        assert not missing, (
+            f"Missing categories: {missing}. Load errors: {tool_load_errors()}"
+        )
 
     def test_all_tools_have_required_fields(self):
         ensure_loaded()

@@ -1,11 +1,36 @@
 """Shared pytest configuration and fixtures."""
 
+import importlib.machinery
 import os
 import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+
+# scipy's vendored array_api_compat re-executes numpy.fft under coverage.
+# numpy 2.4 then raises "cannot load module more than once per process",
+# which drops the biomarker tools and fails the L1000 correlation test.
+_exec_module = importlib.machinery.SourceFileLoader.exec_module
+
+
+def _exec_module_once(self, module):
+    name = getattr(module, "__name__", "")
+    if name.startswith("numpy.fft"):
+        existing = sys.modules.get(name)
+        if existing is not None and existing is not module:
+            module.__dict__.update(
+                {
+                    key: value
+                    for key, value in existing.__dict__.items()
+                    if key != "__dict__"
+                }
+            )
+            return None
+    return _exec_module(self, module)
+
+
+importlib.machinery.SourceFileLoader.exec_module = _exec_module_once
 
 # Ensure `src/` packages import when running from repo root without editable install.
 SRC_PATH = Path(__file__).resolve().parents[1] / "src"
