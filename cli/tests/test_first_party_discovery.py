@@ -129,6 +129,29 @@ def test_fetch_failure_is_cached_briefly_and_keeps_static_catalog(tmp_path):
     assert calls["n"] == 1  # second call served from the error cache
 
 
+def test_list_models_hides_curated_ids_the_provider_did_not_return(tmp_path, monkeypatch):
+    from agent_server.models_service.catalog import list_models
+
+    monkeypatch.setattr("agent.config.CONFIG_DIR", tmp_path / "cfg")
+    monkeypatch.setattr("agent.config.CONFIG_FILE", tmp_path / "cfg" / "config.json")
+    (tmp_path / "cfg").mkdir(parents=True, exist_ok=True)
+    cfg = Config({})
+    cfg.set("llm.openai_api_key", "sk-test")
+    cfg.save()
+
+    def fake_get(url, headers, params=None):
+        if "openai" in url:
+            return {"data": [{"id": "gpt-6-sol"}, {"id": "gpt-5.4-mini"}]}
+        return {"data": [], "has_more": False}
+
+    with patch.object(fpd, "_get_json", side_effect=fake_get), patch.object(Config, "save", lambda self: None):
+        listed = list_models(Config.load(), enabled_only=True, discover=True)
+    openai_ids = {item.id for item in listed.data if item.provider == "openai"}
+    assert "gpt-6-sol" in openai_ids
+    assert "gpt-6-astra" not in openai_ids
+    assert "gpt-6-luna" not in openai_ids
+
+
 def test_no_key_means_no_request():
     cfg = Config.load()
     for key in ("llm.openai_api_key", "llm.anthropic_api_key"):

@@ -27,6 +27,8 @@ export function useIntegrationsDetailView({
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [openingTerminal, setOpeningTerminal] = useState(false)
   const [terminalStartupNonce, setTerminalStartupNonce] = useState(0)
+  const onAutofillRef = useRef(onAutofill)
+  onAutofillRef.current = onAutofill
 
   useEffect(() => {
     setSetupResult(null)
@@ -107,7 +109,7 @@ export function useIntegrationsDetailView({
     const attemptImport = async () => {
       if (cancelled) return
       try {
-        await onAutofill(selectedKey)
+        await onAutofillRef.current(selectedKey)
         if (cancelled) return
         setAutoFetchPending(false)
         toast.success(
@@ -135,7 +137,11 @@ export function useIntegrationsDetailView({
       cancelled = true
       if (timer !== null) window.clearTimeout(timer)
     }
-  }, [autoFetchPending, onAutofill, selectedKey])
+    // onAutofill is read from a ref. The parent passes a new function every
+    // render (terminal output, session reload). Depending on it restarted
+    // this effect and dropped a successful import, so the card stayed
+    // "not configured" until a full reload.
+  }, [autoFetchPending, selectedKey])
 
   return {
     validationBusy,

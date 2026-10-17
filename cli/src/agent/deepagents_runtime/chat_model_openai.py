@@ -37,7 +37,17 @@ def build_openai_chat_model(config, *, temperature: float):
     )
     from agent.model_catalog.param_heal import apply_effort_floor, get_param_heal
 
-    model = config.get("llm.model") or "gpt-5.6-sol"
+    model = str(config.get("llm.model") or "gpt-5.6-sol").strip()
+    base_url = config.llm_openai_base_url()
+    # Default to chat completions for OpenAI-compatible local endpoints
+    # (Ollama, LM Studio, vLLM, ...). Codex + GPT-5.6 on OpenAI cloud need
+    # Responses (tools + reasoning_effort are rejected on chat completions).
+    is_openai_cloud = (not base_url) or Config._is_openai_managed_base_url(base_url)
+    if is_openai_cloud and model.lower().startswith("openai/"):
+        # A composer id like openai/gpt-6-luna is the OpenRouter form. The
+        # cloud API wants the bare id, and the prefixed form has no Effort
+        # options and fails the request.
+        model = model.split("/", 1)[1]
     heal = get_param_heal(config.get("llm.param_heals"), "openai", model)
     kwargs = {}
     # GPT-5 / GPT-6 reject a custom temperature; learned heals do the same.
@@ -52,11 +62,6 @@ def build_openai_chat_model(config, *, temperature: float):
     api_key = config.llm_api_key("openai")
     if api_key:
         kwargs["api_key"] = api_key
-    base_url = config.llm_openai_base_url()
-    # Default to chat completions for OpenAI-compatible local endpoints
-    # (Ollama, LM Studio, vLLM, ...). Codex + GPT-5.6 on OpenAI cloud need
-    # Responses (tools + reasoning_effort are rejected on chat completions).
-    is_openai_cloud = (not base_url) or Config._is_openai_managed_base_url(base_url)
     if base_url:
         kwargs["base_url"] = base_url
     elif is_openai_cloud:

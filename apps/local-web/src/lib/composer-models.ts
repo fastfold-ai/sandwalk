@@ -186,7 +186,23 @@ export function resolveComposerModelOption(
     .trim()
     .toLowerCase()
   const profileId = String(runtime.openaiProfileId || '').trim() || null
-  const matches = options.filter(option => option.model === modelId)
+  let matches = options.filter(option => option.model === modelId)
+  if (matches.length === 0 && runtimeProvider) {
+    // Sessions sometimes store the OpenRouter-style id (`openai/gpt-6-luna`)
+    // on the OpenAI provider. Match the catalog row (`gpt-6-luna`) so Effort
+    // and the checkmark still show.
+    const prefix = `${runtimeProvider}/`
+    if (modelId.toLowerCase().startsWith(prefix)) {
+      const bare = modelId.slice(prefix.length)
+      matches = options.filter(
+        option =>
+          option.model === bare &&
+          String(option.provider || '')
+            .trim()
+            .toLowerCase() === runtimeProvider
+      )
+    }
+  }
   if (matches.length === 0) return null
   if (matches.length === 1) return matches[0]
 
