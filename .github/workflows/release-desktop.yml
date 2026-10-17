@@ -1,4 +1,5 @@
-# Build + publish Sandwalk macOS desktop (DMG + Tauri updater artifacts).
+# Build + publish Sandwalk desktop installers.
+# macOS arm64 DMG + updater artifacts, and Ubuntu .deb packages (amd64 and arm64).
 #
 # Apple Developer ID + notarization when APPLE_CERTIFICATE is set
 # (see apps/packaging/APPLE-SIGNING.md). Falls back to ad-hoc codesign.
@@ -170,6 +171,166 @@ jobs:
             apps/packaging/dist/latest.json
           if-no-files-found: error
 
+  linux-deb:
+    name: Ubuntu ${{ matrix.arch }} deb
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          INPUT="${{ inputs.version }}"
+          if [[ -n "${INPUT// }" ]]; then
+            VERSION="${INPUT#v}"
+          else
+            VERSION="$(node -p 'require("./apps/local-web/package.json").version')"
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: ${VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp versions
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const fs = require("fs");
+            const v = process.env.VERSION;
+            for (const p of [
+              "apps/local-web/package.json",
+              "apps/local-web/src-tauri/tauri.conf.json",
+            ]) {
+              const j = JSON.parse(fs.readFileSync(p, "utf8"));
+              j.version = v;
+              fs.writeFileSync(p, JSON.stringify(j, null, 2) + "\n");
+            }
+            const cargo = "apps/local-web/src-tauri/Cargo.toml";
+            let t = fs.readFileSync(cargo, "utf8");
+            t = t.replace(/^version = "[^"]+"/m, `version = "${v}"`);
+            fs.writeFileSync(cargo, t);
+          '
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.14.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/local-web/src-tauri -> target
+          cache-on-failure: true
+
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            curl \
+            file \
+            libasound2-dev \
+            libayatana-appindicator3-dev \
+            libclang-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            patchelf \
+            pkg-config
+
+      - name: Build deb
+        working-directory: apps/local-web
+        env:
+          # whisper-rs probes the host CPU. Some ARM hosts advertise SME
+          # without SVE2 and the build then fails. Ship a portable binary.
+          GGML_NATIVE: "OFF"
+        run: pnpm exec tauri build --bundles deb
+
+      - name: Check the package contains the user service
+        run: |
+          set -euo pipefail
+          deb="$(echo apps/local-web/src-tauri/target/release/bundle/deb/*.deb)"
+          test -f "$deb"
+          dpkg-deb -c "$deb" | grep -q 'usr/lib/systemd/user/sandwalk.service'
+          dpkg-deb -c "$deb" | grep -q 'usr/lib/sandwalk/sandwalk-serve'
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandwalk-deb-${{ matrix.arch }}-${{ steps.ver.outputs.version }}
+          path: apps/local-web/src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [macos-arm64, linux-deb]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          INPUT="${{ inputs.version }}"
+          if [[ -n "${INPUT// }" ]]; then
+            VERSION="${INPUT#v}"
+          else
+            VERSION="$(node -p 'require("./apps/local-web/package.json").version')"
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: ${VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          NAME="${{ inputs.name }}"
+          NAME="${NAME#"${NAME%%[![:space:]]*}"}"; NAME="${NAME%"${NAME##*[![:space:]]}"}"
+          if [[ -n "${NAME}" ]]; then
+            echo "title=v${VERSION}: ${NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "title=v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
       - name: Write release notes
         shell: bash
         env:
@@ -185,7 +346,11 @@ jobs:
             echo
             echo "One paragraph: what this release lets a person do."
             echo
-            echo "Download: [macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)"
+            echo "Download:"
+            echo
+            echo "- [macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)"
+            echo "- [Ubuntu amd64](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk_${VERSION}_amd64.deb)"
+            echo "- [Ubuntu arm64](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk_${VERSION}_arm64.deb)"
             echo
             echo "## Headline feature"
             echo
@@ -197,7 +362,7 @@ jobs:
             echo "## New Features and Improvements"
             echo
             if [[ -n "${PREV}" ]]; then
-              git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD" | grep -E '^- (feat|perf)' || true
+              git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD" | grep -E '^- (feat|perf|ci)' || true
             fi
             echo
             echo
@@ -211,6 +376,7 @@ jobs:
             echo "## Updating"
             echo
             echo "- Mac app: **Check for Updates** in the app menu, or wait for the banner."
+            echo "- Ubuntu: install the .deb for your architecture. The app starts a user service so the agent stays up after the window closes."
             echo "- CLI: \`sandwalk upgrade\`."
             echo
             if [[ -n "${PREV}" ]]; then
@@ -229,9 +395,4 @@ jobs:
           body_path: release-notes.md
           # The action's default token is the Actions bot. This PAT publishes as you.
           token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
-          files: |
-            apps/packaging/dist/Sandwalk-${{ steps.ver.outputs.version }}-macos-arm64.dmg
-            apps/packaging/dist/Sandwalk-macos-arm64.dmg
-            apps/packaging/dist/Sandwalk.app.tar.gz
-            apps/packaging/dist/Sandwalk.app.tar.gz.sig
-            apps/packaging/dist/latest.json
+          files: release-assets/*

@@ -88,6 +88,21 @@ def _check_model_providers(cfg: Config) -> list[DoctorCheck]:
     checks = gather_local_profile_checks(cfg)
     cloud = _configured_llm_providers(cfg)
 
+    try:
+        from agent.config.chatgpt_auth import is_connected
+
+        if is_connected():
+            checks.append(
+                DoctorCheck(
+                    name="ChatGPT plan",
+                    status="ok",
+                    detail="Signed in with ChatGPT",
+                    category="llm",
+                )
+            )
+    except Exception:  # noqa: BLE001 — a missing auth module should not fail Doctor
+        pass
+
     if not cloud and not checks:
         return [
             DoctorCheck(

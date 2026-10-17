@@ -1,0 +1,30 @@
+#!/bin/sh
+# Start the Sandwalk agent for the systemd user service.
+# The desktop package does not embed the Python CLI. Use a user install,
+# the checkout venv, or whatever `sandwalk` is already on PATH.
+set -eu
+
+if [ -n "${SANDWALK_BIN:-}" ] && [ -x "${SANDWALK_BIN}" ]; then
+  exec "${SANDWALK_BIN}" serve --host 127.0.0.1 --port 8787
+fi
+
+home="${HOME:-}"
+if [ -z "$home" ]; then
+  home="$(getent passwd "$(id -u)" | cut -d: -f6)"
+fi
+
+for candidate in \
+  "${home}/.local/bin/sandwalk" \
+  "${home}/Projects/sandwalk/cli/.venv/bin/sandwalk"
+do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" serve --host 127.0.0.1 --port 8787
+  fi
+done
+
+if command -v sandwalk >/dev/null 2>&1; then
+  exec sandwalk serve --host 127.0.0.1 --port 8787
+fi
+
+echo "sandwalk CLI not found. Install it in this account, then restart the service." >&2
+exit 1

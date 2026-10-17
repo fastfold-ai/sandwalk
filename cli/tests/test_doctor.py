@@ -349,8 +349,27 @@ def test_run_checks_core_is_small_and_includes_llm(monkeypatch):
     assert checks["python_runtime"].status in {"ok", "warn"}
 
 
-def test_run_checks_core_llm_errors_without_keys():
+def test_run_checks_core_llm_ok_when_chatgpt_is_connected(monkeypatch):
     from agent.doctor import run_checks_core
+
+    cfg = Config(
+        data={
+            "llm.provider": "openai-chatgpt",
+            "llm.model": "gpt-5.4",
+            "sandbox.backend": "builtin",
+        }
+    )
+    monkeypatch.setattr("agent.config.chatgpt_auth.is_connected", lambda: True)
+
+    checks = _checks_by_name(run_checks_core(cfg))
+    assert checks["llm"].status == "ok"
+    assert checks["llm"].detail == "ChatGPT plan"
+
+
+def test_run_checks_core_llm_errors_without_keys(monkeypatch):
+    from agent.doctor import run_checks_core
+
+    monkeypatch.setattr("agent.config.chatgpt_auth.is_connected", lambda: False)
 
     cfg = Config(
         data={
@@ -368,6 +387,21 @@ def test_run_checks_core_llm_errors_without_keys():
     )
     checks = _checks_by_name(run_checks_core(cfg))
     assert checks["llm"].status == "error"
+
+
+def test_model_provider_check_accepts_chatgpt_without_api_key(monkeypatch):
+    from agent.doctor.model_provider_probe import _check_model_providers
+
+    monkeypatch.setattr("agent.config.chatgpt_auth.is_connected", lambda: True)
+    monkeypatch.setattr(
+        "agent.doctor.model_provider_probe.gather_local_profile_checks",
+        lambda _cfg: [],
+    )
+    checks = _check_model_providers(
+        Config(data={"llm.provider": "openai-chatgpt", "llm.model": "gpt-5.4"})
+    )
+    assert any(check.name == "ChatGPT plan" and check.status == "ok" for check in checks)
+    assert all("No model provider" not in check.detail for check in checks)
 
 
 def test_config_trusts_stored_provider_over_model_id_heuristic():

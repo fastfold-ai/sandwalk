@@ -594,6 +594,200 @@ fn save_bytes_file(default_filename: String, contents_base64: String) -> Result<
     write_download_file(&default_filename, &bytes)
 }
 
+/// First executable token of a desktop file `Exec=` line.
+///
+/// Skips a leading `env KEY=VAL` wrapper. Field codes (`%u`, `%f`) are the
+/// URL, not the program.
+fn desktop_exec_program(exec_line: &str) -> Option<&str> {
+    let rest = exec_line
+        .trim()
+        .strip_prefix("Exec=")
+        .unwrap_or(exec_line)
+        .trim();
+    let mut parts = rest.split_whitespace();
+    let mut token = parts.next()?;
+    if token == "env" {
+        for next in parts.by_ref() {
+            if !next.contains('=') {
+                token = next;
+                break;
+            }
+        }
+    }
+    if token == "env" || token.starts_with('%') {
+        return None;
+    }
+    Some(token)
+}
+
+/// Browsers to try when the desktop has no default https handler.
+/// `xdg-open` is last: on GNOME it exits 0 even when it opens nothing.
+#[cfg(target_os = "linux")]
+const LINUX_BROWSER_NAMES: &[&str] = &[
+    "firefox",
+    "google-chrome",
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+    "microsoft-edge",
+    "brave-browser",
+    "xdg-open",
+];
+
+#[cfg(target_os = "linux")]
+fn path_lookup(name: &str) -> Option<PathBuf> {
+    let paths = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&paths) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn linux_data_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(value) = std::env::var_os("XDG_DATA_DIRS") {
+        dirs.extend(std::env::split_paths(&value));
+    }
+    for extra in [
+        "/usr/share/ubuntu",
+        "/usr/share/gnome",
+        "/usr/local/share",
+        "/usr/share",
+        "/var/lib/snapd/desktop",
+    ] {
+        let path = PathBuf::from(extra);
+        if !dirs.contains(&path) {
+            dirs.push(path);
+        }
+    }
+    dirs
+}
+
+#[cfg(target_os = "linux")]
+fn desktop_file_program(desktop_id: &str) -> Option<PathBuf> {
+    let id = desktop_id.trim();
+    if id.is_empty() || id.contains('/') || id.contains("..") {
+        return None;
+    }
+    for dir in linux_data_dirs() {
+        let path = dir.join("applications").join(id);
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Some(exec) = text.lines().find_map(|line| {
+            let trimmed = line.trim();
+            trimmed
+                .starts_with("Exec=")
+                .then(|| desktop_exec_program(trimmed))
+                .flatten()
+        }) else {
+            continue;
+        };
+        if exec.contains('/') {
+            let program = PathBuf::from(exec);
+            if program.is_file() {
+                return Some(program);
+            }
+        } else if let Some(program) = path_lookup(exec) {
+            return Some(program);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
+fn default_https_browser() -> Option<PathBuf> {
+    let output = Command::new("xdg-mime")
+        .args(["query", "default", "x-scheme-handler/https"])
+        .env(
+            "XDG_DATA_DIRS",
+            std::env::join_paths(linux_data_dirs()).unwrap_or_default(),
+        )
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let desktop_id = String::from_utf8_lossy(&output.stdout);
+    desktop_file_program(desktop_id.trim())
+}
+
+#[cfg(target_os = "linux")]
+fn linux_browser_program() -> Option<PathBuf> {
+    if let Some(program) = default_https_browser() {
+        return Some(program);
+    }
+    LINUX_BROWSER_NAMES.iter().find_map(|name| path_lookup(name))
+}
+
+/// A GUI process started without the session's X authority cannot open a
+/// window on Ubuntu's XWayland display. Mutter writes that cookie next to
+/// the user runtime dir.
+#[cfg(target_os = "linux")]
+fn discover_xauthority() -> Option<PathBuf> {
+    if let Some(existing) = std::env::var_os("XAUTHORITY") {
+        let path = PathBuf::from(existing);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from)?;
+    let mut matches: Vec<PathBuf> = fs::read_dir(&runtime)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(".mutter-Xwaylandauth."))
+        })
+        .collect();
+    matches.sort();
+    matches.pop()
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_linux_browser(program: &std::path::Path, url: &str) -> Result<(), String> {
+    let mut command = Command::new(program);
+    command
+        .arg(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    if std::env::var_os("XDG_DATA_DIRS").is_none() {
+        if let Ok(dirs) = std::env::join_paths(linux_data_dirs()) {
+            command.env("XDG_DATA_DIRS", dirs);
+        }
+    }
+    if std::env::var_os("XAUTHORITY").is_none() {
+        if let Some(authority) = discover_xauthority() {
+            command.env("XAUTHORITY", authority);
+        }
+    }
+    command.spawn().map_err(|err| {
+        format!(
+            "Could not open a browser ({}): {err}",
+            program.display()
+        )
+    })?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn open_url_linux(url: &str) -> Result<(), String> {
+    let Some(program) = linux_browser_program() else {
+        return Err(
+            "No web browser found. Install Firefox or Chrome, or set a default browser, then try again."
+                .into(),
+        );
+    };
+    spawn_linux_browser(&program, url)
+}
+
 /// Open a URL in the system browser (Safari / default handler).
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
@@ -609,13 +803,46 @@ fn open_external_url(url: String) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         return Ok(());
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(["/C", "start", "", trimmed])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return open_url_linux(trimmed);
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
         Command::new("xdg-open")
             .arg(trimmed)
             .spawn()
             .map_err(|e| e.to_string())?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod browser_exec_tests {
+    use super::desktop_exec_program;
+
+    #[test]
+    fn reads_the_program_from_an_exec_line() {
+        assert_eq!(
+            desktop_exec_program("Exec=/snap/bin/firefox %u"),
+            Some("/snap/bin/firefox")
+        );
+    }
+
+    #[test]
+    fn skips_an_env_wrapper() {
+        assert_eq!(
+            desktop_exec_program("Exec=env BAMF_DESKTOP_FILE_HINT=/tmp/firefox.desktop firefox %u"),
+            Some("firefox")
+        );
     }
 }
 
@@ -800,7 +1027,78 @@ fn ensure_server_helper() {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn ensure_server_helper() {}
+fn agent_port_open() -> bool {
+    std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::from(([127, 0, 0, 1], 8787)),
+        Duration::from_millis(250),
+    )
+    .is_ok()
+}
+
+/// Linux equivalent of the Mac menu-bar helper: a systemd user service.
+/// If the unit is not installed yet, start the CLI directly.
+#[cfg(not(target_os = "macos"))]
+fn linux_sandwalk_bin() -> Option<PathBuf> {
+    if let Some(home) = dirs::home_dir() {
+        for candidate in [
+            home.join(".local/bin/sandwalk"),
+            home.join("Projects/sandwalk/cli/.venv/bin/sandwalk"),
+        ] {
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    if let Ok(path) = which_sandwalk() {
+        return Some(path);
+    }
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn which_sandwalk() -> Result<PathBuf, String> {
+    let output = Command::new("sh")
+        .args(["-c", "command -v sandwalk"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let path = PathBuf::from(text.trim());
+    if output.status.success() && path.is_file() {
+        Ok(path)
+    } else {
+        Err("sandwalk not on PATH".into())
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn ensure_server_helper() {
+    if agent_port_open() {
+        return;
+    }
+    let started = Command::new("systemctl")
+        .args(["--user", "enable", "--now", "sandwalk.service"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+    if started {
+        for _ in 0..50 {
+            if agent_port_open() {
+                return;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+    let Some(bin) = linux_sandwalk_bin() else {
+        return;
+    };
+    let _ = Command::new(bin)
+        .args(["serve", "--host", "127.0.0.1", "--port", "8787"])
+        .env("OPENBLAS_CORETYPE", "ARMV8")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

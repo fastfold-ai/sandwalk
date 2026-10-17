@@ -1,0 +1,15 @@
+[Unit]
+Description=Sandwalk agent server
+After=default.target
+
+[Service]
+Type=simple
+# Parallels and some ARM VMs advertise CPU features OpenBLAS then
+# executes illegally. Pin a baseline core so the agent can start.
+Environment=OPENBLAS_CORETYPE=ARMV8
+ExecStart=/usr/lib/sandwalk/sandwalk-serve
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
