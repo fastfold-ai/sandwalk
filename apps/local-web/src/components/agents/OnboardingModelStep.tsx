@@ -370,7 +370,7 @@ export function OnboardingModelStep({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Llama</p>
             <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-              Run a model on this Mac. One click installs it, then you pick
+              Run a model on this machine. One click installs it, then you pick
               the model for your first chat.
             </p>
           </div>

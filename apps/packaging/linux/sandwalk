@@ -1,0 +1,28 @@
+#!/bin/sh
+# sandwalk on PATH. Runs the CLI bundled in this package, the same role as
+# the Mac app's ~/.local/bin/sandwalk shim.
+set -eu
+
+runtime=/usr/lib/sandwalk/agent-runtime
+python=""
+for name in python3.12 python3 python; do
+  if [ -x "${runtime}/bin/${name}" ]; then
+    python="${runtime}/bin/${name}"
+    break
+  fi
+done
+
+if [ -z "${python}" ]; then
+  echo "Sandwalk CLI runtime is not installed." >&2
+  exit 1
+fi
+
+# Parallels and some ARM VMs advertise CPU features OpenBLAS then executes
+# illegally. Pin a baseline core on those machines. x86_64 ignores this.
+case "$(uname -m)" in
+  aarch64|arm64)
+    export OPENBLAS_CORETYPE="${OPENBLAS_CORETYPE:-ARMV8}"
+    ;;
+esac
+
+exec "${python}" -m cli "$@"

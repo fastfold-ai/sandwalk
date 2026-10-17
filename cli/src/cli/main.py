@@ -26,6 +26,7 @@ SUBCOMMANDS = {
     "setup",
     "release-check",
     "upgrade",
+    "desktop",
     "report",
     "case-study",
     "bench",

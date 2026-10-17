@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
@@ -87,7 +86,7 @@ export function ModelsProfilesSection({
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">Llama</p>
                 <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-                  Run models on this Mac. See what is already installed, or
+                  Run models on this machine. See what is already installed, or
                   download one sized for this machine.
                 </p>
               </div>
@@ -104,13 +103,9 @@ export function ModelsProfilesSection({
           </div>
 
           <Dialog open={llamaOpen} onOpenChange={setLlamaOpen}>
-            <DialogContent className="max-h-[min(40rem,85vh)] max-w-lg overflow-y-auto">
+            <DialogContent className="flex h-[min(40rem,85vh)] w-[min(44rem,calc(100vw-2rem))] max-w-none flex-col gap-3 overflow-hidden sm:max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Llama</DialogTitle>
-                <DialogDescription>
-                  Pick an installed model as the default, or install one
-                  recommended for this Mac.
-                </DialogDescription>
               </DialogHeader>
               {llamaRuntime ? (
                 <LlamaLibrary

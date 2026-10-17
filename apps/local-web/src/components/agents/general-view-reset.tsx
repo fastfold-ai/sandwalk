@@ -28,7 +28,7 @@ export function GeneralViewResetSection({
             <p className="text-sm font-medium">Reset Sandwalk</p>
             <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
               Clears models, API keys, and app settings, then starts onboarding
-              again. Chats stay on this Mac.
+              again. Chats stay on this machine.
             </p>
           </div>
           <Button

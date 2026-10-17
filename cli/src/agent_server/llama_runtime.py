@@ -26,6 +26,7 @@ _INSTALL_URL = "https://llama.app/install.sh"
 
 _lock = threading.Lock()
 _state: dict[str, str] = {"phase": "idle", "detail": ""}
+_download_log: deque[str] = deque(maxlen=80)
 _debug: dict[str, Any] = {}
 _serve_log: deque[str] = deque(maxlen=80)
 _serve_command: list[str] = []
@@ -134,15 +135,18 @@ def status() -> dict[str, Any]:
     models = list_models()
     running = models is not None
     with _lock:
-        if _state["phase"] == "updating":
-            phase = "updating"
-            detail = _state["detail"]
-        else:
-            phase = "ready" if running else _state["phase"]
-            detail = "" if running else _state["detail"]
-            if running:
-                _state["phase"] = "ready"
-                _state["detail"] = ""
+        phase = _state["phase"]
+        detail = _state["detail"]
+        log = list(_download_log)
+        # A running server used to wipe an in-progress download. Keep install,
+        # update, and error text until that job finishes.
+        if running and phase not in {"installing", "updating", "error"}:
+            phase = "ready"
+            detail = ""
+            _state["phase"] = "ready"
+            _state["detail"] = ""
+        elif not running and phase == "ready":
+            phase = "idle"
     return {
         "baseUrl": LLAMA_BASE_URL,
         "installed": bool(llama_binary()) or app_installed(),
@@ -151,6 +155,7 @@ def status() -> dict[str, Any]:
         "models": models or [],
         "phase": phase,
         "detail": detail,
+        "log": log,
         "debug": _debug_public() if phase == "error" else {},
     }
 
@@ -481,23 +486,67 @@ def catalog(query: str = "") -> dict[str, Any]:
     return {"installed": installed_rows, "recommended": recommended}
 
 
-def _download(binary: str, spec: str) -> None:
-    _set("installing", f"Downloading {spec}…")
+def _note_download(line: str) -> None:
+    text = " ".join(line.replace("\r", " ").split())
+    if not text:
+        return
+    with _lock:
+        _download_log.append(text)
+        _state["phase"] = "installing"
+        _state["detail"] = text[-240:]
     try:
-        completed = subprocess.run(
+        from agent.diagnostics.logging_setup import LOGS_DIR
+
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        stamped = text + "\n"
+        for name in ("llama.log", "cli.log"):
+            with (LOGS_DIR / name).open("a", encoding="utf-8") as handle:
+                handle.write(stamped)
+    except OSError:
+        return
+
+
+def _download(binary: str, spec: str) -> None:
+    with _lock:
+        _download_log.clear()
+    _set("installing", f"Downloading {spec}…")
+    _note_download(f"$ llama download -hf {spec}")
+    try:
+        proc = subprocess.Popen(
             [binary, "download", "-hf", spec],
-            check=False,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
+            bufsize=1,
         )
     except OSError as exc:
         _set("error", f"Could not run llama download ({exc}).")
         return
-    if completed.returncode != 0:
-        tail = (completed.stderr or completed.stdout or "").strip().splitlines()
-        _set("error", tail[-1] if tail else f"llama download exited {completed.returncode}")
+    buffer = ""
+    stream = proc.stdout
+    if stream is not None:
+        while True:
+            chunk = stream.read(256)
+            if not chunk:
+                break
+            buffer += chunk
+            while True:
+                cut = min(
+                    (index for index in (buffer.find("\n"), buffer.find("\r")) if index >= 0),
+                    default=-1,
+                )
+                if cut < 0:
+                    break
+                _note_download(buffer[:cut])
+                buffer = buffer[cut + 1 :]
+        _note_download(buffer)
+    code = proc.wait()
+    if code != 0:
+        with _lock:
+            tail = _download_log[-1] if _download_log else ""
+        _set("error", tail or f"llama download exited {code}")
         return
-    _set("ready", "")
+    _set("ready", f"Installed {spec}")
 
 
 _CONTEXT_TIERS = (4096, 8192, 16384, 32768, 65536, 131072)

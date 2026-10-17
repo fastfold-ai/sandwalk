@@ -120,16 +120,22 @@ def _llama_process() -> ServiceProcess:
 def _log_tails() -> list[ServiceLogTail]:
     if not LOGS_DIR.exists():
         return []
-    files = [
+    preferred = ["agent-server.log", "llama.log", "cli.log"]
+    ordered: list[Path] = []
+    for name in preferred:
+        path = LOGS_DIR / name
+        if path.is_file():
+            ordered.append(path)
+    extras = [
         path
         for path in LOGS_DIR.iterdir()
-        if path.is_file() and (path.suffix == ".log" or path.name.startswith("agent-server.log"))
+        if path.is_file()
+        and path not in ordered
+        and (path.suffix == ".log" or path.name.startswith("agent-server.log"))
     ]
-    files.sort(key=lambda path: path.stat().st_mtime, reverse=True)
-    tails: list[ServiceLogTail] = []
-    for path in files[:4]:
-        tails.append(ServiceLogTail(name=path.name, tail=_tail(path)))
-    return tails
+    extras.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    ordered.extend(extras)
+    return [ServiceLogTail(name=path.name, tail=_tail(path)) for path in ordered[:6]]
 
 
 def _tail(path: Path) -> str:

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Sandwalk",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "identifier": "ai.fastfold.sandwalk",
   "build": {
     "frontendDist": "../dist",
@@ -39,7 +39,8 @@
       "deb": {
         "files": {
           "/usr/lib/systemd/user/sandwalk.service": "../../packaging/linux/sandwalk.service",
-          "/usr/lib/sandwalk/sandwalk-serve": "../../packaging/linux/sandwalk-serve"
+          "/usr/lib/sandwalk/sandwalk-serve": "../../packaging/linux/sandwalk-serve",
+          "/usr/bin/sandwalk": "../../packaging/linux/sandwalk"
         },
         "postInstallScript": "../../packaging/linux/deb-postinstall.sh"
       }

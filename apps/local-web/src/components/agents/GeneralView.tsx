@@ -327,7 +327,7 @@ export function GeneralView({
             <AlertDialogTitle>Reset Sandwalk?</AlertDialogTitle>
             <AlertDialogDescription>
               Models, API keys, and app settings go back to a fresh install.
-              Onboarding opens next. Chats on this Mac stay.
+              Onboarding opens next. Chats on this machine stay.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

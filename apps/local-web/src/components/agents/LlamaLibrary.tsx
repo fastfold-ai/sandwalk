@@ -80,6 +80,13 @@ export function LlamaLibrary({
   const somethingLoading = (catalog?.installed || []).some(
     model => model.state === 'loading'
   )
+  const installingNow = status?.phase === 'installing' || installing != null
+
+  useEffect(() => {
+    if (status?.phase === 'ready' || status?.phase === 'error') {
+      setInstalling(null)
+    }
+  }, [status?.phase])
 
   useEffect(() => {
     if (
@@ -87,15 +94,16 @@ export function LlamaLibrary({
       status.phase !== 'installing' &&
       status.phase !== 'opening' &&
       status.phase !== 'updating' &&
-      !somethingLoading
+      !somethingLoading &&
+      installing == null
     ) {
       return
     }
     const timer = window.setInterval(() => {
       void refresh()
-    }, 3000)
+    }, status?.phase === 'installing' ? 1000 : 3000)
     return () => window.clearInterval(timer)
-  }, [refresh, somethingLoading, status?.phase, status?.running])
+  }, [installing, refresh, somethingLoading, status?.phase, status?.running])
 
   if (!status?.running) {
     return <LlamaRuntimeButton load={actions.load} ensure={actions.ensure} />
@@ -107,13 +115,18 @@ export function LlamaLibrary({
     searching ? true : !item.installed
   )
 
+  const progress = status.log?.length
+    ? status.log
+    : status.detail
+      ? [status.detail]
+      : []
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Server running
-          {status.version ? ` · ${status.version}` : ''}. A model stays unloaded
-          until the first message, then llama.cpp loads it.
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-muted-foreground truncate font-mono text-[11px]">
+          localhost:9931
+          {status.version ? ` · ${status.version}` : ''}
         </p>
         <button
           type="button"
@@ -129,13 +142,22 @@ export function LlamaLibrary({
           Update
         </button>
       </div>
-      {status.detail ? (
-        <p className="text-muted-foreground text-xs">{status.detail}</p>
+      {installingNow || status.phase === 'error' ? (
+        <pre
+          className={cn(
+            'max-h-28 overflow-auto rounded-lg px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap',
+            status.phase === 'error'
+              ? 'bg-destructive/10 text-destructive'
+              : 'bg-muted/60 text-foreground'
+          )}
+        >
+          {progress.join('\n') || 'Starting download…'}
+        </pre>
       ) : null}
       <Input
         value={query}
         onChange={event => setQuery(event.target.value)}
-        placeholder="Search the Llama catalog"
+        placeholder="Search models"
       />
       {loading && !catalog ? (
         <p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -144,10 +166,11 @@ export function LlamaLibrary({
         </p>
       ) : null}
 
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
       {searching ? null : (
       <section className="space-y-1">
-        <p className="text-muted-foreground text-xs">Installed on this Mac</p>
-        <div className="max-h-40 space-y-1 overflow-y-auto pr-1">
+        <p className="text-muted-foreground text-xs">Installed</p>
+        <div className="space-y-1">
           {installed.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               No installed models match. Download one below.
@@ -199,9 +222,9 @@ export function LlamaLibrary({
 
       <section className="space-y-1">
         <p className="text-muted-foreground text-xs">
-          {query.trim() ? 'Catalog' : 'Recommended for your Mac'}
+          {query.trim() ? 'Catalog' : 'Recommended for this machine'}
         </p>
-        <div className="max-h-48 space-y-1 overflow-y-auto pr-1">
+        <div className="space-y-1">
           {recommended.map(item => (
             <CatalogRow
               key={`${item.repo}:${item.quant || ''}`}
@@ -209,15 +232,12 @@ export function LlamaLibrary({
               busy={installing === item.repo}
               onInstall={() => {
                 setInstalling(item.repo)
-                void actions
-                  .install(item.repo, item.quant)
-                  .then(() => {
-                    toast.success(`Downloading ${item.name}`)
-                  })
-                  .catch(err =>
-                    toast.error(err instanceof Error ? err.message : 'Could not start the download')
+                void actions.install(item.repo, item.quant).catch(err => {
+                  setInstalling(null)
+                  toast.error(
+                    err instanceof Error ? err.message : 'Could not start the download'
                   )
-                  .finally(() => setInstalling(null))
+                })
               }}
             />
           ))}
@@ -226,11 +246,12 @@ export function LlamaLibrary({
               {catalogError ||
                 (searching
                   ? 'No catalog matches.'
-                  : 'No recommendations for this Mac.')}
+                  : 'No recommendations for this machine.')}
             </p>
           ) : null}
         </div>
       </section>
+      </div>
     </div>
   )
 }
