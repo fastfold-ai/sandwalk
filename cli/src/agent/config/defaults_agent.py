@@ -51,6 +51,9 @@ DEFAULTS_AGENT = {
     "agent.recursion_limit": 100_000,
     # Legacy soft turn budget (only used if recursion_limit is explicitly cleared).
     "agent.max_sdk_turns": 500,
+    # Capacity gate (Runtime → Capacity). 0 = sized from the core count.
+    "agent.max_concurrent_runs": 0,
+    "agent.min_free_memory_mb": 2048,
     "agent.enable_experimental_tools": False,
     "skills.allow_agent_install": True,
     "agent.observer_model": None,

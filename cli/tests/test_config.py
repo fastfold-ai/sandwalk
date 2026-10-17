@@ -515,6 +515,36 @@ def test_llm_api_key_uses_active_profile_only_ignores_stale_env(monkeypatch):
     assert cfg.get("llm.openai_compatible_api_key") is None
 
 
+def test_openai_cloud_profile_ignores_base_url_env_from_a_local_profile(monkeypatch):
+    """A chat pinned to OpenAI cloud must not follow OPENAI_BASE_URL that the
+    server synced from the user's default local profile (Llama on :9931)."""
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://127.0.0.1:9931/v1")
+    cfg = Config(
+        {
+            "llm.provider": "openai",
+            "llm.model": "gpt-6-luna",
+            "llm.openai_active_profile": "openai_cloud",
+            "llm.openai_profiles": {
+                "openai_cloud": {
+                    "label": "OpenAI Cloud",
+                    "backend": "openai",
+                    "base_url": "https://api.openai.com/v1",
+                    "api_key": "sk-proj-cloud-key",
+                },
+                "llama_local": {
+                    "label": "Llama",
+                    "backend": "llama",
+                    "base_url": "http://127.0.0.1:9931/v1",
+                    "api_key": "",
+                },
+            },
+        }
+    )
+    assert cfg.llm_openai_base_url() is None  # managed OpenAI cloud
+    cfg.set_openai_active_profile("llama_local")
+    assert cfg.llm_openai_base_url() == "http://127.0.0.1:9931/v1"
+
+
 def test_load_bootstraps_compatible_profile_when_legacy_key_exists_without_endpoint(monkeypatch, tmp_path):
     config_path = tmp_path / "config.json"
     backup_path = tmp_path / "config.json.bak"

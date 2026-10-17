@@ -35,6 +35,15 @@ def list_models(
     items.extend(_cloud_catalog_items(cfg, hidden, known_ids, enabled_only=enabled_only))
     items.extend(_custom_model_items(cfg, hidden, known_ids, enabled_only=enabled_only))
     if discover:
+        # OpenAI + Anthropic: anything their /v1/models lists that the curated
+        # catalog does not, so a new family appears without a Sandwalk release.
+        from agent_server.models_service.first_party_discovery import (
+            first_party_discovered_items,
+        )
+
+        items.extend(
+            first_party_discovered_items(cfg, hidden, known_ids, enabled_only=enabled_only)
+        )
         items.extend(
             _provider_discovered_items(cfg, hidden, known_ids, enabled_only=enabled_only)
         )

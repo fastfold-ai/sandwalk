@@ -242,6 +242,22 @@ export function SessionChatBody({
     [sessionId]
   )
 
+  // Edit → resend: the original message stays; the edit goes out as a new
+  // turn. If the agent is mid-run we stop it first, and the send hook queues
+  // the text until the interrupt lands, so nothing is lost either way.
+  const runActiveRef = useRef(runActive)
+  runActiveRef.current = runActive
+  const handleResendMessage = useCallback(
+    async (text: string) => {
+      if (!sessionId) return
+      if (runActiveRef.current) {
+        await composerPropsRef.current.handleStop()
+      }
+      composerPropsRef.current.handleComposerSend(text)
+    },
+    [sessionId]
+  )
+
   // While hydrating a tab switch, keep the transcript dock (no empty Aura flash).
   // Empty chrome only after load confirms there is no history.
   const hasConversation = messages.length > 0 || runActive
@@ -343,6 +359,7 @@ export function SessionChatBody({
               builtPlanPaths={builtPlanPaths}
               liveDelta={liveDelta}
               liveStatus={liveStatus}
+              onResendMessage={handleResendMessage}
               pendingApproval={pendingApproval}
               approvalSubmitting={approvalSubmitting}
               onSubmitApprovals={onSubmitApprovals}

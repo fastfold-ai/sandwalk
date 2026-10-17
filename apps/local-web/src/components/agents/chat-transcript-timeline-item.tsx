@@ -46,6 +46,8 @@ type TimelineItemProps = {
   mcpServers?: McpServer[]
   workspaceFiles?: WorkspaceFile[]
   mentionChats?: AgentSession[]
+  /** Edit a user message and send the result as a new turn. */
+  onResendMessage?: (text: string) => void | Promise<void>
 }
 
 /** Memoized: history rows must not re-render on every streamed delta. */
@@ -70,7 +72,8 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
   skills = [],
   mcpServers = [],
   workspaceFiles = [],
-  mentionChats = []
+  mentionChats = [],
+  onResendMessage
 }: TimelineItemProps) {
   perfCount('render.TimelineItem')
   const hiddenPlans =
@@ -210,6 +213,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       mcpServers={mcpServers}
       workspaceFiles={workspaceFiles}
       mentionChats={mentionChats}
+      onResendMessage={onResendMessage}
     />
   )
 },

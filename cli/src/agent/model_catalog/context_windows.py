@@ -56,6 +56,8 @@ _PREFIX_CONTEXT_WINDOWS: list[tuple[str, int]] = [
     ("claude-opus-4-6", 1_000_000),
     ("claude-sonnet-5", 1_000_000),
     ("claude-sonnet-4-6", 1_000_000),
+    # Haiku 5.5 is the first 1M Haiku (Models API: max_input_tokens 1,000,000).
+    ("claude-haiku-5", 1_000_000),
     ("claude-fable-5-1", 1_000_000),
     ("claude-fable-5", 1_000_000),
     ("claude-mythos", 1_000_000),

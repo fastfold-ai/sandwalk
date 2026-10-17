@@ -49,6 +49,9 @@ DEFAULTS_LLM = {
     "llm.recent_models": [],
     # OpenRouter ids already default-disabled on first discovery (opt-in).
     "llm.openrouter_seen_models": [],
+    # First-party /v1/models discovery: ids seen once, so a user's enable sticks.
+    "llm.openai_seen_models": [],
+    "llm.anthropic_seen_models": [],
     "llm.custom_models": [],
     "llm.catalog_defaults_version": 0,
     "llm.temperature": 0.1,

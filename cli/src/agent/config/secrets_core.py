@@ -117,6 +117,12 @@ class SecretsCoreMixin:
             profile_base_url = self._normalize_openai_base_url((profile or {}).get("base_url"))
             if profile_base_url:
                 return profile_base_url
+        if backend == "openai":
+            # The active profile is OpenAI cloud. OPENAI_BASE_URL in this
+            # process was synced from whichever profile was active at startup
+            # (often a local server such as Llama on :9931); honouring it here
+            # sent cloud chats to that server and failed with "model not found".
+            return None
 
         env_override = self._normalize_openai_base_url(os.environ.get("OPENAI_BASE_URL"))
         if env_override:

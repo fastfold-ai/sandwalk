@@ -16,7 +16,6 @@ import pytest
 
 from agent import deepagents_runtime as dr
 
-
 # ---------------------------------------------------------------------------
 # Fakes for the astream_events stream
 # ---------------------------------------------------------------------------
@@ -173,6 +172,16 @@ class TestBuildChatModel:
         assert "temperature" not in captured["kwargs"]
         assert captured["kwargs"]["use_responses_api"] is True
         assert captured["kwargs"]["reasoning_effort"] == "medium"
+
+    def test_openai_cloud_pins_base_url_despite_env_from_local_profile(self, monkeypatch):
+        """OPENAI_BASE_URL in the server process points at whichever profile
+        was active at startup (Llama on :9931 for many users). A cloud chat
+        must still go to api.openai.com."""
+        captured = self._patch_init(monkeypatch)
+        monkeypatch.setenv("OPENAI_BASE_URL", "http://127.0.0.1:9931/v1")
+        dr.build_chat_model(_stub_config("openai", model="gpt-6-luna", api_key="k"))
+        assert captured["kwargs"]["base_url"] == "https://api.openai.com/v1"
+        assert captured["kwargs"]["use_responses_api"] is True
 
     def test_openai_gpt5_omits_temperature(self, monkeypatch):
         captured = self._patch_init(monkeypatch)
