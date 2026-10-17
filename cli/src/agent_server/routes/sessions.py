@@ -14,6 +14,7 @@ from agent_server.models import (
     CompactSessionResponse,
     CreateSessionRequest,
     DeleteSessionResponse,
+    DuplicateSessionRequest,
     InterruptRunResponse,
     SessionList,
     SessionRevision,
@@ -87,6 +88,30 @@ def register_session_routes(app: FastAPI, deps: AppDeps) -> None:
                 model=payload.model,
                 openai_profile_id=payload.openai_profile_id,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post(
+        "/v1/sessions/{session_id}/duplicate",
+        response_model=AgentSession,
+        status_code=201,
+    )
+    async def duplicate_session(
+        session_id: str,
+        payload: DuplicateSessionRequest | None = None,
+        x_sandwalk_client: str | None = Header(default=None, alias="X-Sandwalk-Client"),
+    ) -> AgentSession:
+        """Clone a chat with its settings and full message history into a new session."""
+        surface = resolve_client_surface(body=None, header=x_sandwalk_client)
+        try:
+            return await asyncio.to_thread(
+                service.duplicate_session,
+                session_id,
+                title=payload.title if payload else None,
+                client_surface=surface,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Session not found.") from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

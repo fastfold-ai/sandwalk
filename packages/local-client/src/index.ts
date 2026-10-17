@@ -2105,6 +2105,26 @@ export class LocalAgentClient
     })
   }
 
+  /**
+   * Clone a chat: same project, specialist, sandbox, model and the full
+   * message history, in a new session with its own workspace.
+   */
+  duplicateSession(
+    sessionId: string,
+    input: { title?: string } = {},
+    signal?: AbortSignal
+  ): Promise<AgentSession> {
+    return this.request<AgentSession>(
+      `/sessions/${encodeURIComponent(sessionId)}/duplicate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ title: input.title }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
   async getUsageOverview(
     signalOrOpts?:
       | AbortSignal

@@ -1,6 +1,7 @@
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
+  Copy,
   Download,
   Folder,
   Globe2,
@@ -32,6 +33,7 @@ import {
   TooltipTrigger
 } from '@/components/ui/tooltip'
 import { copyText } from '@/lib/clipboard'
+import { duplicateChat } from '@/lib/duplicate-chat'
 import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
@@ -324,6 +326,11 @@ function ChatSplitPanelHeaderInner({
                     onClick={closeMenuThen(() => onRename(session))}
                   />
                 ) : null}
+                <TabContextItem
+                  icon={<Copy />}
+                  label="Duplicate chat"
+                  onClick={closeMenuThen(() => void duplicateChat(session))}
+                />
                 {onMoveToProject && projects.length > 0 ? (
                   <ProjectPicker
                     projects={projects}

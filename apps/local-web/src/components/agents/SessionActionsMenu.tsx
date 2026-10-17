@@ -1,6 +1,7 @@
 import type { AgentProject, AgentSession } from '@sandwalk/agent-ui-core'
 import {
   Archive,
+  Copy,
   Download,
   Folder,
   Pencil,
@@ -16,6 +17,7 @@ import {
   TabContextSeparator,
   TabInlineColorRow
 } from '@/components/agents/tab-context-menu'
+import { duplicateChat } from '@/lib/duplicate-chat'
 
 /**
  * Sidebar ⋯ menu for a chat. Same primitives and row density as the tab
@@ -34,7 +36,8 @@ export function SessionActionsMenu({
   onInspect,
   onArchive,
   onDelete,
-  onContinueIn
+  onContinueIn,
+  onDuplicate
 }: {
   session: AgentSession
   projects: AgentProject[]
@@ -49,10 +52,20 @@ export function SessionActionsMenu({
   onDelete: () => void
   /** Called right before a "Continue in <CLI>" row runs — close the popover. */
   onContinueIn?: () => void
+  /** Called right before Duplicate runs — close the popover. */
+  onDuplicate?: () => void
 }) {
   return (
     <>
       <TabContextItem icon={<Pencil />} label="Rename chat…" onClick={onRename} />
+      <TabContextItem
+        icon={<Copy />}
+        label="Duplicate chat"
+        onClick={() => {
+          onDuplicate?.()
+          void duplicateChat(session)
+        }}
+      />
       <ProjectPicker
         projects={projects}
         value={session.projectId}

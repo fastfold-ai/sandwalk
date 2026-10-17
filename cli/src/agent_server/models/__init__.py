@@ -30,7 +30,7 @@ from agent_server.models.mcp_servers import CreateMcpServerRequest, McpServer, M
 from agent_server.models.model_profiles import DeleteModelProfileResponse, DiscoverModelEndpointRequest, ModelProfile, ModelProfileList, ModelProfileProbeResult, ModelProfileSecretResponse, UpsertModelProfileRequest
 from agent_server.models.models_catalog import AgentModel, AgentModelList, CreateAgentModelRequest, ModelPreferences, ToggleModelFavoriteRequest, ToggleModelFavoriteResponse, UpdateAgentModelRequest
 from agent_server.models.projects import AgentProject, CreateProjectRequest, DeleteProjectFolderFileResponse, DeleteProjectResponse, ProjectFolderFile, ProjectFolderListing, ProjectList, RenameProjectFolderFileRequest, UpdateProjectRequest, UseProjectFolderInChatRequest
-from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, ClientSurface, CompactSessionRequest, CompactSessionResponse, CreateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionRevision, SessionSandboxStatus, SessionSource, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest
+from agent_server.models.sessions import AgentSession, AutoTitleSessionRequest, ClientSurface, CompactSessionRequest, CompactSessionResponse, CreateSessionRequest, DuplicateSessionRequest, DeleteSessionResponse, HitlDecision, InterruptRunResponse, OrganizeLabel, SandboxBackendChoice, SessionList, SessionRevision, SessionSandboxStatus, SessionSource, SessionStatus, SubmitApprovalsRequest, SubmitApprovalsResponse, TitleSource, UpdateSessionRequest
 from agent_server.models.usage import (
     UsageBackfillResponse,
     UsageChartModel,

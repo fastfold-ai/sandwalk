@@ -28,6 +28,7 @@ import {
   ChevronDown,
   CircleX,
   Columns2,
+  Copy,
   Download,
   Folder,
   LayoutGrid,
@@ -67,6 +68,7 @@ import {
   DRAFT_AGENT_SESSION_ID,
   isDraftAgentSessionId
 } from '@/lib/draft-agent'
+import { duplicateChat } from '@/lib/duplicate-chat'
 import type { PaneSplitDirection, PaneSplitTarget } from '@/lib/pane-split'
 import { perfCount } from '@/lib/perf-probe'
 import { relativeTime } from '@/lib/sessions'
@@ -1051,6 +1053,11 @@ export function SessionTabs({
             icon={<Pencil className="size-3.5" />}
             label="Rename chat…"
             onClick={() => runAction(() => onRename(menuSession))}
+          />
+          <TabContextItem
+            icon={<Copy className="size-3.5" />}
+            label="Duplicate chat"
+            onClick={() => runAction(() => void duplicateChat(menuSession))}
           />
           <TabContextItem
             icon={<Pin className="size-3.5" />}
