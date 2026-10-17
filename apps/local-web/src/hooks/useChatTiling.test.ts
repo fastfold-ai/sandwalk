@@ -3,12 +3,18 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildDefaultTree,
+  buildDefaultTreeFromRefs,
   buildGridTree,
   closePane,
   extractChatIds,
+  extractItemRefs,
+  leafItemId,
+  leafItemRef,
   reconcileTree,
+  reconcileTreeFromRefs,
   setBranchRatios,
-  splitPane
+  splitPane,
+  splitPaneWithRef
 } from './useChatTiling'
 
 describe('buildDefaultTree', () => {
@@ -228,5 +234,80 @@ describe('buildGridTree', () => {
   it('falls back to the default tree for degenerate input', () => {
     expect(buildGridTree(['a'], 4, 4)).toEqual(buildDefaultTree(['a']))
     expect(buildGridTree(ids, 0, 4)).toEqual(buildDefaultTree(ids))
+  })
+})
+
+describe('split and close mixed panes', () => {
+  it('inserts a terminal beside a chat and ignores a missing target', () => {
+    const tree = buildDefaultTree(['a'])
+    const split = splitPane(tree, 'a', 'horizontal', 'term_1', 'before')
+    expect(extractItemRefs(split).map(ref => ref.kind)).toEqual([
+      'terminal',
+      'chat'
+    ])
+    expect(splitPane(tree, 'missing', 'vertical', 'b')).toEqual(tree)
+    expect(leafItemId(tree)).toBe('a')
+  })
+
+  it('inserts a sibling in the same direction and wraps a perpendicular split', () => {
+    const row = splitPane(buildDefaultTree(['a']), 'a', 'horizontal', 'b')
+    const wider = splitPane(row, 'a', 'horizontal', 'c', 'before')
+    expect(extractChatIds(wider)).toEqual(['c', 'a', 'b'])
+    const wrapped = splitPaneWithRef(row, 'b', 'vertical', {
+      kind: 'terminal',
+      id: 'term_2'
+    })
+    expect(wrapped.type).toBe('branch')
+    const closed = closePane(wider, 'a')
+    expect(extractChatIds(closed!)).toEqual(['c', 'b'])
+    expect(closePane(buildDefaultTree(['a']), 'a')).toBeNull()
+    expect(closePane(buildDefaultTree(['a']), 'nope')).toEqual(
+      buildDefaultTree(['a'])
+    )
+  })
+
+  it('renormalizes dragged ratios and reconciles terminals', () => {
+    const tree = buildDefaultTree(['a', 'b'])
+    const resized = setBranchRatios(tree, [], [1, 3])
+    expect(resized.type === 'branch' && resized.ratios).toEqual([0.25, 0.75])
+    expect(setBranchRatios(tree, [], [1])).toEqual(tree)
+    expect(setBranchRatios(buildDefaultTree(['a']), [0], [1, 1])).toEqual(
+      buildDefaultTree(['a'])
+    )
+    const withTerm = reconcileTree(buildDefaultTree(['a']), ['a', 'term_9'])
+    expect(extractItemRefs(withTerm).map(ref => ref.id)).toContain('term_9')
+    const refs = [
+      { kind: 'chat' as const, id: 'a' },
+      { kind: 'terminal' as const, id: 'term_1' }
+    ]
+    expect(extractItemRefs(reconcileTreeFromRefs(buildDefaultTree(['gone']), refs))).toEqual(
+      refs
+    )
+    expect(buildDefaultTreeFromRefs([])).toEqual({ type: 'chat', chatId: '' })
+  })
+
+  it('appends onto a vertical root and ignores an empty chat id', () => {
+    expect(leafItemRef({ type: 'chat', chatId: '' })).toBeNull()
+    const vertical: PaneNode = {
+      type: 'branch',
+      direction: 'vertical',
+      ratios: [1],
+      children: [{ type: 'chat', chatId: 'a' }]
+    }
+    const next = reconcileTreeFromRefs(vertical, [
+      { kind: 'chat', id: 'a' },
+      { kind: 'terminal', id: 'term_3' }
+    ])
+    expect(extractItemRefs(next).map(ref => ref.id)).toEqual(['a', 'term_3'])
+    const nested = splitPane(
+      splitPane(buildDefaultTree(['a', 'b']), 'b', 'vertical', 'c'),
+      'c',
+      'horizontal',
+      'd'
+    )
+    expect(extractChatIds(nested)).toContain('d')
+    expect(setBranchRatios(buildDefaultTree(['a', 'b']), [0], [1]).type).toBe(
+      'branch'
+    )
   })
 })

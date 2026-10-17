@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import { integrationRouteSegment } from '@/components/agents/dashboard-main-view-helpers'
 
-import { resolveSelectedIntegrationKey } from './app-display'
+import {
+  computeShowSessionTabs,
+  resolveActiveTitle,
+  resolveSelectedIntegrationKey
+} from './app-display'
 
 const integrations = [
   {
@@ -46,6 +50,78 @@ describe('resolveSelectedIntegrationKey', () => {
     expect(
       resolveSelectedIntegrationKey(segment, segment, [...integrations])
     ).toBe('google')
+  })
+
+  it('names every dashboard section and hides tabs on home', () => {
+    const flags = {
+      isDashboardOverview: false,
+      isDashboardStatus: false,
+      isDashboardGeneral: false,
+      isDashboardAppearance: false,
+      isDashboardAgentRuntime: false,
+      isDashboardAgentSecurity: false,
+      isDashboardAgentPrompts: false,
+      isDashboardVoice: false,
+      isDashboardModels: false,
+      isDashboardData: false,
+      isDashboardTools: false,
+      isDashboardDoctor: false,
+      isDashboardLogs: false,
+      isDashboardBench: false,
+      isDashboardStorage: false,
+      isDashboardEnvironment: false,
+      isSkills: false,
+      isDashboardSpecialists: false,
+      isIntegrations: false,
+      isDashboardMcp: false,
+      isHome: false,
+      isLibrary: false,
+      isSites: false,
+      isProjectHome: false,
+      sessionTitle: 'Chat'
+    }
+    expect(resolveActiveTitle({ ...flags, isLibrary: true })).toBe('Library')
+    expect(resolveActiveTitle({ ...flags, isSites: true })).toBe('Sites')
+    expect(resolveActiveTitle({ ...flags, isDashboardOverview: true })).toBe(
+      'Overview'
+    )
+    expect(resolveActiveTitle({ ...flags, isDashboardStatus: true })).toBe(
+      'Status'
+    )
+    expect(resolveActiveTitle({ ...flags, isDashboardModels: true })).toBe(
+      'Models'
+    )
+    expect(resolveActiveTitle({ ...flags, isDashboardBench: true })).toBe(
+      'Benchmarking'
+    )
+    expect(resolveActiveTitle({ ...flags, isHome: true })).toBe('Home')
+    expect(resolveActiveTitle(flags)).toBe('Chat')
+    expect(
+      computeShowSessionTabs({
+        isDashboard: false,
+        isHome: true,
+        isLibrary: false,
+        isSites: false,
+        isProjectHome: false,
+        isSkills: false,
+        isIntegrations: false,
+        sessionId: 'chat-1',
+        openTabsLength: 1
+      })
+    ).toBe(false)
+    expect(
+      computeShowSessionTabs({
+        isDashboard: false,
+        isHome: false,
+        isLibrary: false,
+        isSites: false,
+        isProjectHome: false,
+        isSkills: false,
+        isIntegrations: false,
+        sessionId: 'chat-1',
+        openTabsLength: 1
+      })
+    ).toBe(true)
   })
 
   it('returns null for unknown routes', () => {

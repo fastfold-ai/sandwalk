@@ -2,15 +2,20 @@ import { describe, expect, it } from 'vitest'
 
 import {
   chatChipToken,
+  chipTokenLength,
   composerToMessage,
   fileChipToken,
   mcpChipToken,
+  mentionDisplayName,
+  mentionPathIsDirectory,
+  normalizeMentionPath,
   parseComposerParts,
   parseMessageParts,
   removeComposerChipAt,
   serializeComposerParts,
   skillChipToken,
-  spaceAroundChips
+  spaceAroundChips,
+  splitTextWithChatMentions
 } from './composer-parts'
 
 describe('chip tokens', () => {
@@ -138,5 +143,32 @@ describe('removeComposerChipAt', () => {
 
   it('returns empty when all chips removed from chip-only input', () => {
     expect(removeComposerChipAt(fileChipToken('only.ts'), 0)).toBe('')
+  })
+})
+
+describe('message mentions and chip lengths', () => {
+  it('parses file, skill, mcp, and chat mentions in sent text', () => {
+    const text = 'see @src/a.ts and /fold and mcp:Linear and ⟦#:chat-1⟧'
+    const parts = parseMessageParts(text)
+    expect(parts.map(part => part.type)).toEqual([
+      'text',
+      'file',
+      'text',
+      'skill',
+      'text',
+      'mcp',
+      'text',
+      'chat'
+    ])
+    expect(mentionDisplayName('src/a.ts')).toBe('a.ts')
+    expect(mentionPathIsDirectory('evals/')).toBe(true)
+    expect(normalizeMentionPath('  src/a.ts  ')).toBe('src/a.ts')
+    expect(chipTokenLength({ type: 'chat', sessionId: 'chat-1' })).toBe(
+      chatChipToken('chat-1').length
+    )
+    expect(splitTextWithChatMentions('hi ⟦#:chat-1⟧')).toEqual([
+      { type: 'text', text: 'hi ' },
+      { type: 'chat', sessionId: 'chat-1' }
+    ])
   })
 })

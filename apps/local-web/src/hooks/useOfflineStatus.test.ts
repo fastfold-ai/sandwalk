@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 
-import { mergeOfflineSignals, normalizeOfflinePayload } from './useOfflineStatus'
+import {
+  mergeOfflineSignals,
+  normalizeOfflinePayload,
+  useOfflineStatus
+} from './useOfflineStatus'
 
 describe('normalizeOfflinePayload', () => {
   it('reads snake_case from the API', () => {
@@ -29,5 +34,61 @@ describe('mergeOfflineSignals', () => {
     const next = mergeOfflineSignals(true, null, false)
     expect(next.isOffline).toBe(false)
     expect(next.message).toBe('Back online')
+  })
+
+  it('prefers an unreachable API and a server message', () => {
+    expect(mergeOfflineSignals(true, null, true).message).toBe(
+      'Cannot reach the Sandwalk server'
+    )
+    expect(
+      mergeOfflineSignals(
+        true,
+        {
+          isOffline: true,
+          justOnline: false,
+          reason: null,
+          message: '',
+          featuresAffected: ['Slack'],
+          lastCheck: null,
+          targetsChecked: null,
+          forced: false
+        },
+        false
+      ).message
+    ).toMatch(/Offline/)
+  })
+})
+
+describe('useOfflineStatus', () => {
+  it('polls the server and flashes back online', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          isOffline: true,
+          message: 'dns',
+          featuresAffected: ['Slack'],
+          lastCheck: 'now',
+          targetsChecked: ['slack.com'],
+          forced: true
+        })
+      }))
+    )
+    const { result } = renderHook(() => useOfflineStatus(50_000))
+    await waitFor(() => expect(result.current.status.isOffline).toBe(true))
+    expect(result.current.status.featuresAffected).toEqual(['Slack'])
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ isOffline: false, message: 'ok' })
+      }))
+    )
+    await act(async () => {
+      await result.current.refetch()
+    })
+    await waitFor(() => expect(result.current.status.justOnline).toBe(true))
+    vi.unstubAllGlobals()
   })
 })
