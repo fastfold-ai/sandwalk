@@ -169,6 +169,7 @@ export function buildAppShellProps(input: AppShellBridgeInput): AppShellProps {
     isDashboardData: input.route.isDashboardData,
     isDashboardTools: input.route.isDashboardTools,
     isDashboardDoctor: input.route.isDashboardDoctor,
+    isDashboardLogs: input.route.isDashboardLogs,
     isDashboardBench: input.route.isDashboardBench,
     isDashboardStorage: input.route.isDashboardStorage,
     isDashboardEnvironment: input.route.isDashboardEnvironment,

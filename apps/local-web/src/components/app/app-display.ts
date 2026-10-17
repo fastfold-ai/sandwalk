@@ -46,6 +46,7 @@ export function resolveActiveTitle(input: {
   isDashboardData: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardLogs: boolean
   isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean
@@ -73,6 +74,7 @@ export function resolveActiveTitle(input: {
   if (input.isDashboardData) return 'Datasets'
   if (input.isDashboardTools) return 'Tools'
   if (input.isDashboardDoctor) return 'Doctor'
+  if (input.isDashboardLogs) return 'Logs'
   if (input.isDashboardBench) return 'Benchmarking'
   if (input.isDashboardStorage) return 'Storage'
   if (input.isDashboardEnvironment) return 'Environment'

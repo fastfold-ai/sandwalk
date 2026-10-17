@@ -109,6 +109,9 @@ export function resolveDashboardSection(pathname: string) {
   if (pathname.startsWith('/dashboard/doctor')) {
     return 'doctor' as const
   }
+  if (pathname.startsWith('/dashboard/logs')) {
+    return 'logs' as const
+  }
   if (pathname.startsWith('/dashboard/bench')) {
     return 'bench' as const
   }

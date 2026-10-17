@@ -43,8 +43,7 @@ export function useAppLegacyRouteRedirects({
       locationPathname.startsWith('/dashboard/server') ||
       locationPathname.startsWith('/dashboard/network') ||
       locationPathname.startsWith('/dashboard/advanced') ||
-      locationPathname.startsWith('/dashboard/security') ||
-      locationPathname.startsWith('/dashboard/logs')
+      locationPathname.startsWith('/dashboard/security')
     ) {
       navigate('/dashboard', { replace: true })
       return

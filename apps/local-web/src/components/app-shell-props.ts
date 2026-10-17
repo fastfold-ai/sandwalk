@@ -113,6 +113,7 @@ export type AppShellProps = {
   isDashboardData: boolean
   isDashboardTools: boolean
   isDashboardDoctor: boolean
+  isDashboardLogs: boolean
   isDashboardBench: boolean
   isDashboardStorage: boolean
   isDashboardEnvironment: boolean

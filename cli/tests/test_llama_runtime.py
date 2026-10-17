@@ -1,6 +1,9 @@
-"""Llama macOS app bridge: probe, open, and install without touching Homebrew."""
+"""Llama macOS app bridge: probe, open, and install the CLI."""
 
 from __future__ import annotations
+
+import subprocess
+from pathlib import Path
 
 from agent_server import llama_runtime as bridge
 
@@ -93,6 +96,34 @@ def test_write_ctx_replaces_an_existing_value(tmp_path):
     text = path.read_text()
     assert text.count("ctx-size") == 1
     assert "ctx-size = 16384" in text
+
+
+def test_install_reports_command_and_port_when_the_cli_is_missing(monkeypatch):
+    bridge._set("idle")
+    bridge._serve_proc = None
+
+    def which(name: str) -> str | None:
+        return "/usr/bin/curl" if name == "curl" else None
+
+    def run(cmd, **kwargs):
+        if cmd[0] == "/usr/bin/curl":
+            Path(cmd[-1]).write_text("echo installed\n", encoding="utf-8")
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        return subprocess.CompletedProcess(cmd, 0, "installer finished\n", "")
+
+    monkeypatch.setattr(bridge.shutil, "which", which)
+    monkeypatch.setattr(bridge.subprocess, "run", run)
+    monkeypatch.setattr(bridge, "llama_binary", lambda: None)
+    monkeypatch.setattr(bridge, "list_models", lambda: None)
+    bridge._install_cli_then_serve()
+    snapshot = bridge.status()
+    assert snapshot["phase"] == "error"
+    assert snapshot["detail"] == "The llama CLI did not appear after install."
+    assert "https://llama.app/install.sh" in snapshot["debug"]["command"]
+    assert snapshot["debug"]["port"] == 9931
+    assert snapshot["debug"]["exitCode"] == 0
+    assert any(path.endswith("/.local/bin/llama") for path in snapshot["debug"]["searched"])
+    assert "installer finished" in snapshot["debug"]["log"]
 
 
 def test_ensure_does_not_install_twice(monkeypatch):

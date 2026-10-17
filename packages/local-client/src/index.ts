@@ -446,6 +446,15 @@ export type LlamaCatalog = {
   recommended: LlamaCatalogModel[]
 }
 
+export type LlamaRuntimeDebug = {
+  command?: string
+  exitCode?: number | null
+  port?: number
+  binary?: string | null
+  searched?: string[]
+  log?: string
+}
+
 export type LlamaRuntimeStatus = {
   baseUrl: string
   installed: boolean
@@ -454,6 +463,25 @@ export type LlamaRuntimeStatus = {
   models: string[]
   phase: string
   detail: string
+  debug?: LlamaRuntimeDebug
+}
+
+export type ServiceProcess = {
+  id: string
+  name: string
+  status: 'running' | 'stopped'
+  pid: number | null
+  port: number | null
+  rssBytes: number | null
+  cpuPercent: number | null
+  command: string | null
+  detail: string | null
+}
+
+export type ServicesReport = {
+  processes: ServiceProcess[]
+  logs: { name: string; tail: string }[]
+  checkedAt: string
 }
 
 export class LocalAgentClient
@@ -996,6 +1024,10 @@ export class LocalAgentClient
 
   getEnvironment(signal?: AbortSignal): Promise<EnvironmentReport> {
     return this.request<EnvironmentReport>('/environment', { signal })
+  }
+
+  getServices(signal?: AbortSignal): Promise<ServicesReport> {
+    return this.request<ServicesReport>('/services', { signal })
   }
 
   installEnvironmentPackage(

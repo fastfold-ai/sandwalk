@@ -23,6 +23,7 @@ from agent_server.models import (
     ServerCacheInfo,
     ServerLifecycleResult,
     ServerStatusReport,
+    ServicesReport,
     StorageReport,
 )
 from agent_server.observability import OBSERVABILITY, thread_pool_snapshot
@@ -120,6 +121,12 @@ def register_health_routes(app: FastAPI, deps: AppDeps) -> None:
         from agent_server.status_service import clear_cache
 
         return await asyncio.to_thread(clear_cache)
+
+    @app.get("/v1/services", response_model=ServicesReport)
+    async def services_report() -> ServicesReport:
+        from agent_server.services_report import build_services_report
+
+        return await asyncio.to_thread(lambda: build_services_report(version=__version__))
 
     @app.get("/v1/doctor", response_model=DoctorReport)
     async def doctor(scope: str = "full") -> DoctorReport:

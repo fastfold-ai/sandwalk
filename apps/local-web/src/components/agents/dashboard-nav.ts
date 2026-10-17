@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  Terminal,
   Target,
   Wrench
 } from 'lucide-react'
@@ -141,6 +142,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
         label: 'Doctor',
         path: '/dashboard/doctor',
         icon: Stethoscope
+      },
+      {
+        id: 'logs',
+        label: 'Logs',
+        path: '/dashboard/logs',
+        icon: Terminal
       },
       {
         id: 'storage',
