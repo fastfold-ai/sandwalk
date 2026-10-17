@@ -62,6 +62,39 @@ def _deepseek_flash_display_label(model_id: str) -> str | None:
     return None
 
 
+def format_llama_model_label(model_id: str) -> str:
+    """Turn a Llama repo id into a short picker name.
+
+    ``ggml-org/gemma-3-270m-it-qat-GGUF:Q4_0`` becomes ``Gemma 3 270M Q4_0``.
+    """
+    import re
+
+    raw = str(model_id or "").strip()
+    if not raw:
+        return raw
+    repo, _, quant = raw.partition(":")
+    slug = repo.rsplit("/", 1)[-1]
+    slug = re.sub(r"-gguf$", "", slug, flags=re.IGNORECASE)
+    slug = re.sub(r"-it-qat$", "", slug, flags=re.IGNORECASE)
+    slug = re.sub(r"-it$", "", slug, flags=re.IGNORECASE)
+    parts: list[str] = []
+    for part in slug.replace("_", "-").split("-"):
+        if not part:
+            continue
+        if re.fullmatch(r"\d+(?:\.\d+)?[mMbB]", part):
+            parts.append(part[:-1] + part[-1].upper())
+            continue
+        if re.fullmatch(r"a\d+b", part, flags=re.IGNORECASE):
+            parts.append(part.upper())
+            continue
+        parts.append(part[:1].upper() + part[1:])
+    label = " ".join(parts) or raw
+    quant = quant.strip()
+    if quant:
+        return f"{label} {quant}"
+    return label
+
+
 def format_discovered_model_label(model_id: str) -> str:
     """Turn a raw model id like ``kimi-k2.7-code`` into ``Kimi K2.7 Code``.
 

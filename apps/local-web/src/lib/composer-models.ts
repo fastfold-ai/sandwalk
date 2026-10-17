@@ -72,6 +72,41 @@ export function formatComposerModelLabel(label: string): string {
     .trim()
 }
 
+/** True for a downloaded Llama weight id such as `org/name-GGUF:Q4_0`. */
+export function isLlamaWeightId(modelId: string): boolean {
+  const raw = String(modelId || '').trim()
+  if (!raw || raw.startsWith('gpt-')) return false
+  const repo = raw.split(':')[0] || ''
+  return /(?:^|\/)[^/]*gguf$/i.test(repo)
+}
+
+/**
+ * `ggml-org/gemma-3-270m-it-qat-GGUF:Q4_0` → `Gemma 3 270M Q4_0`.
+ * Used when Llama is stopped and the catalog row is missing, so the chip
+ * does not fall back to the raw repo id.
+ */
+export function formatLlamaModelLabel(modelId: string): string {
+  const raw = String(modelId || '').trim()
+  if (!raw) return raw
+  const colon = raw.indexOf(':')
+  const repo = colon === -1 ? raw : raw.slice(0, colon)
+  const quant = colon === -1 ? '' : raw.slice(colon + 1).trim()
+  let slug = repo.split('/').pop() || repo
+  slug = slug.replace(/-gguf$/i, '').replace(/-it-qat$/i, '').replace(/-it$/i, '')
+  const parts = slug
+    .split('-')
+    .filter(Boolean)
+    .map(part => {
+      if (/^\d+(?:\.\d+)?[mMbB]$/.test(part)) {
+        return part.slice(0, -1) + part.slice(-1).toUpperCase()
+      }
+      if (/^a\d+b$/i.test(part)) return part.toUpperCase()
+      return part.slice(0, 1).toUpperCase() + part.slice(1)
+    })
+  const label = parts.join(' ') || raw
+  return quant ? `${label} ${quant}` : label
+}
+
 const LOCAL_BACKEND_LABELS: Record<string, string> = {
   ollama: 'Ollama',
   unsloth: 'Unsloth',

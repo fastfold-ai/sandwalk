@@ -18,6 +18,7 @@ export type LlamaLibraryActions = {
   ensure: () => Promise<LlamaRuntimeStatus>
   catalog: (query?: string) => Promise<LlamaCatalog>
   install: (repo: string, quant?: string | null) => Promise<{ ok: boolean }>
+  remove: (modelId: string) => Promise<{ ok: boolean }>
   loadModel: (modelId: string) => Promise<{ ok: boolean }>
   unloadModel: (modelId: string) => Promise<{ ok: boolean }>
   update: () => Promise<LlamaRuntimeStatus>
@@ -113,6 +114,15 @@ export function LlamaLibrary({
   const installed = searching ? [] : catalog?.installed || []
   const recommended = (catalog?.recommended || []).filter(item =>
     searching ? true : !item.installed
+  )
+  const activeRepo = status.install?.repo || null
+  const activeQuant = status.install?.quant || null
+  const isDownloading = (item: LlamaCatalogModel) =>
+    status.phase === 'installing' &&
+    item.repo === activeRepo &&
+    (item.quant || null) === (activeQuant || null)
+  const orderedRecommended = [...recommended].sort(
+    (a, b) => Number(isDownloading(b)) - Number(isDownloading(a))
   )
 
   const progress = status.log?.length
@@ -213,6 +223,21 @@ export function LlamaLibrary({
                 onUse={
                   selectedId === model.id ? undefined : () => onUse(model.id)
                 }
+                onRemove={() => {
+                  const label = parseModelId(model.id).name || model.id
+                  if (
+                    !window.confirm(
+                      `Remove ${label} from this machine? The downloaded files will be deleted.`
+                    )
+                  ) {
+                    return
+                  }
+                  void actions.remove(model.id).then(() => refresh()).catch(err =>
+                    toast.error(
+                      err instanceof Error ? err.message : 'Could not remove the model'
+                    )
+                  )
+                }}
               />
             ))
           )}
@@ -225,11 +250,12 @@ export function LlamaLibrary({
           {query.trim() ? 'Catalog' : 'Recommended for this machine'}
         </p>
         <div className="space-y-1">
-          {recommended.map(item => (
+          {orderedRecommended.map(item => (
             <CatalogRow
               key={`${item.repo}:${item.quant || ''}`}
               item={item}
-              busy={installing === item.repo}
+              busy={installing === item.repo || isDownloading(item)}
+              downloading={isDownloading(item)}
               onInstall={() => {
                 setInstalling(item.repo)
                 void actions.install(item.repo, item.quant).catch(err => {
@@ -241,7 +267,7 @@ export function LlamaLibrary({
               }}
             />
           ))}
-          {recommended.length === 0 ? (
+          {orderedRecommended.length === 0 ? (
             <p className="text-muted-foreground text-sm">
               {catalogError ||
                 (searching
@@ -286,22 +312,30 @@ function ModelRow({
   selected,
   action,
   spinning,
+  downloading,
   onAction,
-  onUse
+  onUse,
+  onRemove
 }: {
   id: string
   detail: string
   selected: boolean
   action: string
   spinning?: boolean
+  downloading?: boolean
   onAction: () => void
   onUse?: () => void
+  onRemove?: () => void
 }) {
   return (
     <div
       className={cn(
         'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left',
-        selected ? 'border-foreground bg-muted/40' : 'border-border/60'
+        downloading
+          ? 'border-amber-500/70 bg-amber-500/10'
+          : selected
+            ? 'border-foreground bg-muted/40'
+            : 'border-border/60'
       )}
     >
       <span className="min-w-0 flex-1">
@@ -326,14 +360,28 @@ function ModelRow({
           Default
         </span>
       ) : null}
+      {onRemove ? (
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-destructive shrink-0 text-xs"
+          onClick={onRemove}
+        >
+          Remove
+        </button>
+      ) : null}
       <button
         type="button"
         disabled={spinning}
-        className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs disabled:opacity-70"
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1 text-xs disabled:opacity-70',
+          downloading
+            ? 'text-amber-700 dark:text-amber-300'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
         onClick={onAction}
       >
         {spinning ? <Loader className="size-3.5 animate-spin" /> : null}
-        {action}
+        {downloading ? 'Downloading' : action}
       </button>
     </div>
   )
@@ -342,10 +390,12 @@ function ModelRow({
 function CatalogRow({
   item,
   busy,
+  downloading,
   onInstall
 }: {
   item: LlamaCatalogModel
   busy: boolean
+  downloading?: boolean
   onInstall: () => void
 }) {
   return (
@@ -353,9 +403,54 @@ function CatalogRow({
       id={item.id || item.repo}
       detail={item.size || ''}
       selected={item.installed}
+      downloading={downloading}
       action={item.installed ? 'Installed' : busy ? 'Installing…' : 'Install'}
       spinning={busy}
       onAction={onInstall}
     />
+  )
+}
+
+/** Stays on the Llama card after the dialog closes, so a long download remains visible. */
+export function LlamaInstallNotice({
+  actions
+}: {
+  actions: LlamaLibraryActions
+}) {
+  const [status, setStatus] = useState<LlamaRuntimeStatus | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const next = await actions.load()
+        if (!cancelled) setStatus(next)
+      } catch {
+        // The card stays quiet if the status call fails.
+      }
+    }
+    void tick()
+    const timer = window.setInterval(() => void tick(), 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [actions])
+
+  if (status?.phase !== 'installing' && status?.phase !== 'error') return null
+  const line = status.detail || status.log?.at(-1) || status.install?.spec || ''
+  const failed = status.phase === 'error'
+  return (
+    <div
+      className={cn(
+        'rounded-lg px-3 py-2 text-xs',
+        failed
+          ? 'bg-destructive/10 text-destructive'
+          : 'bg-amber-500/10 text-amber-800 dark:text-amber-200'
+      )}
+    >
+      <p className="font-medium">{failed ? 'Download failed' : 'Downloading'}</p>
+      {line ? <p className="mt-1 font-mono text-[11px] leading-relaxed">{line}</p> : null}
+    </div>
   )
 }

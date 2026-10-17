@@ -210,6 +210,7 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
           ensure: () => client.llamaRuntimeEnsure(),
           catalog: query => client.llamaRuntimeCatalog(query),
           install: (repo, quant) => client.llamaRuntimeInstall(repo, quant),
+          remove: modelId => client.llamaRuntimeRemove(modelId),
           loadModel: modelId => client.llamaRuntimeLoad(modelId),
           unloadModel: modelId => client.llamaRuntimeUnload(modelId),
           update: () => client.llamaRuntimeUpdate()

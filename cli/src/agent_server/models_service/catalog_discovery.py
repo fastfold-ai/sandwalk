@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import time
+
 from agent.config import OPENAI_COMPATIBLE_PROVIDERS, Config
 from agent.model_catalog import (
     context_window_for_model,
     format_discovered_model_label,
+    format_llama_model_label,
     opencode_model_is_supported,
 )
 from agent_server.models import AgentModel
@@ -205,6 +208,27 @@ def _bedrock_discovered_items(
     return items
 
 
+def _wake_llama_profile(base_url: str, api_key: str | None, probe: dict) -> dict:
+    """Start llama serve and re-probe until its models show up."""
+    from agent_server import models_service
+    from agent_server.llama_runtime import ensure, llama_binary
+
+    if not llama_binary():
+        return probe
+    ensure()
+    latest = probe
+    for _ in range(20):
+        time.sleep(0.4)
+        latest = models_service.probe_compatible_profile(
+            base_url=base_url,
+            backend="llama",
+            api_key=api_key,
+        )
+        if latest.get("models"):
+            return latest
+    return latest
+
+
 def _profile_discovered_items(
     cfg: Config, hidden: set[str], *, enabled_only: bool, discover: bool
 ) -> list[AgentModel]:
@@ -226,6 +250,11 @@ def _profile_discovered_items(
                 api_key=api_key,
             )
             discovered = list(probe.get("models") or [])
+            # A stopped llama serve makes the picker drop every local model and
+            # fall back to the raw repo id. Start it and wait once.
+            if not discovered and backend.strip().lower() == "llama":
+                probe = _wake_llama_profile(base_url, api_key, probe)
+                discovered = list(probe.get("models") or [])
             context_windows = dict(probe.get("context_windows") or {})
             health = str(probe.get("health") or "") or None
         else:
@@ -238,10 +267,15 @@ def _profile_discovered_items(
             if enabled_only and not enabled:
                 continue
             context_window = context_windows.get(model_id)
+            display = (
+                format_llama_model_label(model_id)
+                if backend.strip().lower() == "llama"
+                else format_discovered_model_label(model_id)
+            )
             items.append(
                 AgentModel(
                     id=model_id,
-                    label=format_discovered_model_label(model_id),
+                    label=display,
                     description=f"{label} ({backend})",
                     provider="local",
                     source="profile",

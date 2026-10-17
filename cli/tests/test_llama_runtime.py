@@ -46,6 +46,22 @@ def test_ensure_starts_the_cli_server_when_the_port_is_down(monkeypatch):
     assert snapshot["running"] is False
 
 
+def test_wait_until_serving_starts_llama_then_waits(monkeypatch):
+    calls = {"n": 0}
+
+    def fake_status():
+        calls["n"] += 1
+        return {"running": calls["n"] > 1}
+
+    started: list[bool] = []
+    monkeypatch.setattr(bridge, "status", fake_status)
+    monkeypatch.setattr(bridge, "llama_binary", lambda: "/tmp/llama")
+    monkeypatch.setattr(bridge, "ensure", lambda: started.append(True))
+    monkeypatch.setattr(bridge.time, "sleep", lambda _seconds: None)
+    assert bridge.wait_until_serving(timeout=5) is True
+    assert started == [True]
+
+
 def test_status_keeps_download_progress_while_the_server_is_up(monkeypatch):
     class _Response:
         status_code = 200
@@ -98,6 +114,20 @@ def test_download_streams_cli_lines_into_the_log(monkeypatch, tmp_path):
     assert "Fetching 100%" in snapshot["log"]
     assert "Fetching 100%" in (tmp_path / "llama.log").read_text(encoding="utf-8")
     assert "Fetching 100%" in (tmp_path / "cli.log").read_text(encoding="utf-8")
+
+
+def test_remove_deletes_the_huggingface_cache_folder(monkeypatch, tmp_path):
+    repo = tmp_path / ".cache" / "huggingface" / "hub" / "models--ggml-org--gemma"
+    snapshot = repo / "snapshots" / "abc"
+    snapshot.mkdir(parents=True)
+    (snapshot / "model-Q4_0.gguf").write_bytes(b"weights")
+    monkeypatch.setattr(bridge.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(bridge, "unload_model", lambda _model_id: {"ok": True})
+
+    result = bridge.remove_model("ggml-org/gemma:Q4_0")
+
+    assert result["ok"] is True
+    assert not repo.exists()
 
 
 def test_catalog_keeps_featured_models_that_fit(monkeypatch):

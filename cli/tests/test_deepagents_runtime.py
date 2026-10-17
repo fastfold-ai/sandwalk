@@ -165,6 +165,19 @@ class TestBuildChatModel:
         assert captured["kwargs"]["use_responses_api"] is False
         assert captured["kwargs"]["stream_chunk_timeout"] == 300.0
 
+    def test_local_openai_endpoint_does_not_require_an_api_key(self, monkeypatch):
+        captured = self._patch_init(monkeypatch)
+        dr.build_chat_model(
+            _stub_config(
+                "openai",
+                model="unsloth/gemma-3-270m-it-qat-GGUF:Q4_0",
+                base_url="http://127.0.0.1:9931/v1",
+            )
+        )
+        assert captured["kwargs"]["base_url"] == "http://127.0.0.1:9931/v1"
+        assert captured["kwargs"]["api_key"] == "sandwalk-local"
+        assert captured["kwargs"]["use_responses_api"] is False
+
     def test_openai_cloud_strips_provider_prefix(self, monkeypatch):
         captured = self._patch_init(monkeypatch)
         dr.build_chat_model(_stub_config("openai", model="openai/gpt-6-luna", api_key="k"))

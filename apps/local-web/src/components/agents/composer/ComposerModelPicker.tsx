@@ -18,8 +18,10 @@ import {
   type ComposerModelOption,
   type ComposerModelPreferences,
   formatContextWindow,
+  formatLlamaModelLabel,
   formatReasoningEffortLabel,
   isComposerModelSelected,
+  isLlamaWeightId,
   rankComposerModelOptions,
   resolveComposerModelOption
 } from '@/lib/composer-models'
@@ -76,14 +78,25 @@ export function ComposerModelPicker({
     recent: []
   })
 
+  const unresolvedLlama =
+    runtimeSettings?.model && isLlamaWeightId(runtimeSettings.model)
+      ? runtimeSettings.model
+      : null
   const selectedModel: ComposerModelOption =
     resolveComposerModelOption(modelOptions, runtimeSettings) ||
     (runtimeSettings
       ? {
-          provider: runtimeSettings.provider,
+          provider: unresolvedLlama ? 'local' : runtimeSettings.provider,
           model: runtimeSettings.model,
-          label: runtimeSettings.model,
-          speed: '',
+          label: unresolvedLlama
+            ? formatLlamaModelLabel(unresolvedLlama)
+            : runtimeSettings.model,
+          speed: unresolvedLlama ? 'Llama' : '',
+          source: unresolvedLlama ? 'profile' : undefined,
+          backend: unresolvedLlama ? 'llama' : null,
+          profileId: unresolvedLlama
+            ? runtimeSettings.openaiProfileId || 'llama_local'
+            : runtimeSettings.openaiProfileId,
           contextWindow: null
         }
       : modelOptions[0] || {
@@ -190,6 +203,14 @@ export function ComposerModelPicker({
   }
 
   const selectModelAndClose = (option: ComposerModelOption) => {
+    if (
+      client &&
+      (option.backend === 'llama' ||
+        option.profileId === 'llama_local' ||
+        isLlamaWeightId(option.model))
+    ) {
+      void client.llamaRuntimeEnsure()
+    }
     void onModelSelect(option.provider, option.model, option.profileId)
     closePicker()
     focusComposerSoon()
