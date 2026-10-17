@@ -210,6 +210,68 @@ def test_install_reports_command_and_port_when_the_cli_is_missing(monkeypatch):
     assert "installer finished" in snapshot["debug"]["log"]
 
 
+def test_weights_label_and_installed_row_states(tmp_path, monkeypatch):
+    missing = tmp_path / "gone.gguf"
+    assert bridge._weights_label(None) is None
+    assert bridge._weights_label(str(missing)) is None
+    assert bridge._arg(["--ctx-size"], "--ctx-size") is None
+    assert bridge._arg([], "--model") is None
+
+    small = tmp_path / "a.gguf"
+    other = tmp_path / "b.gguf"
+    small.write_bytes(b"x")
+    sizes = {small: 2_000_000}
+    real_stat = Path.stat
+
+    class _Size:
+        def __init__(self, nbytes: int):
+            self.st_size = nbytes
+
+    def sized_stat(self, *args, **kwargs):
+        if self in sizes:
+            return _Size(sizes[self])
+        return real_stat(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", sized_stat)
+    assert bridge._weights_label(str(small)) == "2 MB"
+    other.write_bytes(b"y")
+    sizes[small] = 500_000_000
+    sizes[other] = 500_000_000
+    assert bridge._weights_label(str(small)) == "1 GB"
+
+    bridge._load_jobs["org/loading:Q4"] = "loading"
+    bridge._load_jobs["org/failed:Q4"] = "disk full"
+    rows = bridge._installed_rows(
+        [
+            {"id": "  "},
+            {
+                "id": "org/loading:Q4",
+                "status": {"value": "unloaded", "args": ["--ctx-size", "4096", "--model"]},
+                "architecture": {"input_modalities": ["image", "text"]},
+            },
+            {
+                "id": "org/failed:Q4",
+                "status": {"value": "ready", "args": ["--ctx-size", "nope"]},
+            },
+        ]
+    )
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["org/loading:Q4"]["state"] == "loading"
+    assert by_id["org/loading:Q4"]["vision"] is True
+    assert by_id["org/loading:Q4"]["context"] == 4096
+    assert by_id["org/failed:Q4"]["state"] == "failed"
+    assert by_id["org/failed:Q4"]["error"] == "disk full"
+    assert by_id["org/failed:Q4"]["context"] is None
+    bridge._load_jobs.pop("org/loading:Q4", None)
+    bridge._load_jobs.pop("org/failed:Q4", None)
+
+
+def test_wait_until_serving_does_nothing_without_a_binary(monkeypatch):
+    monkeypatch.setattr(bridge, "status", lambda: {"running": False})
+    monkeypatch.setattr(bridge, "llama_binary", lambda: None)
+    assert bridge.wait_until_serving() is False
+
+
 def test_ensure_does_not_install_twice(monkeypatch):
     monkeypatch.setattr(bridge, "list_models", lambda: None)
     monkeypatch.setattr(bridge, "app_installed", lambda: False)
