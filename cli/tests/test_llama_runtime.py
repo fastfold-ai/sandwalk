@@ -7,6 +7,20 @@ from pathlib import Path
 
 from agent_server import llama_runtime as bridge
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_llama_runtime_state():
+    """Workers share this module. A leftover install phase hides a live server."""
+    bridge._set("idle")
+    bridge._load_jobs.clear()
+    bridge._install_job = None
+    yield
+    bridge._set("idle")
+    bridge._load_jobs.clear()
+    bridge._install_job = None
+
 
 def test_status_reports_models_when_the_server_answers(monkeypatch):
     class _Response:
