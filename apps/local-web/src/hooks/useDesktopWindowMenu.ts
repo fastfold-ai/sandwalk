@@ -17,7 +17,7 @@ import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
  * File → New Window (Remote) / Open Recent + Sandwalk → Check for Updates.
  * Remote opens a dialog; Open Recent opens directly when a key is remembered,
  * otherwise opens the dialog prefilled with that URL.
- * About Sandwalk uses the native macOS About panel (handled in Rust).
+ * About Sandwalk opens the custom about window (handled in Rust).
  */
 export function useDesktopWindowMenu(options?: {
   hideLauncherAfterOpen?: boolean
