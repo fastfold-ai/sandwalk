@@ -126,6 +126,103 @@ def test_cli_collector_auto_rejects_without_tty(monkeypatch):
     assert "Non-interactive" in decisions[0]["message"]
 
 
+def test_cli_collector_interactive_decisions(monkeypatch):
+    from agent.hitl import cli_prompt
+
+    class _Bad:
+        def __str__(self):
+            raise RuntimeError("unprintable")
+
+    answers = iter(
+        [
+            "nope",
+            "approve",
+            "aa",
+            "r",
+            "no thanks",
+            "respond",
+            "looks good",
+            "e",
+            "not-json",
+            "e",
+            "[]",
+            "e",
+            '{"path": "x"}',
+        ]
+    )
+    monkeypatch.setattr(cli_prompt, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(cli_prompt, "_prompt_line", lambda prompt: next(answers))
+    printed: list[str] = []
+    decisions = collect_cli_decisions(
+        action_requests=[
+            {"name": "skills_manage", "args": {"action": "install"}},
+            {"name": "skills_manage", "args": {"blob": _Bad()}},
+            {"name": "skills_manage", "args": {}},
+            {"name": "ask", "args": {}},
+            {"name": "skills_manage", "args": {"path": "old"}},
+        ],
+        review_configs=[
+            {
+                "action_name": "skills_manage",
+                "allowed_decisions": ["approve", "edit", "reject"],
+            },
+            {
+                "action_name": "ask",
+                "allowed_decisions": ["respond", "reject"],
+            },
+        ],
+        console=type("C", (), {"print": staticmethod(printed.append)})(),
+    )
+    kinds = [item["type"] for item in decisions]
+    assert kinds == ["approve", "approve", "reject", "respond", "edit"]
+    assert any("Enter one of" in line for line in printed)
+    assert any("Invalid JSON" in line for line in printed)
+
+
+def test_cli_prompt_line_cancel_and_fallback(monkeypatch):
+    from agent.hitl import cli_prompt
+
+    monkeypatch.setattr(cli_prompt.sys.stdin, "isatty", lambda: True)
+    assert cli_prompt._stdin_is_tty() is True
+
+    def _broken_tty():
+        raise RuntimeError("stdin")
+
+    monkeypatch.setattr(cli_prompt.sys.stdin, "isatty", _broken_tty)
+    assert cli_prompt._stdin_is_tty() is False
+
+    class _Session:
+        def prompt(self, prompt):
+            raise KeyboardInterrupt
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "prompt_toolkit",
+        type("M", (), {"PromptSession": _Session})(),
+    )
+    with pytest.raises(InterruptedError):
+        cli_prompt._prompt_line("go")
+
+    class _Missing:
+        def prompt(self, prompt):
+            raise ImportError("no toolkit")
+
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "prompt_toolkit",
+        type("M", (), {"PromptSession": _Missing})(),
+    )
+
+    def _eof(prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", _eof)
+    with pytest.raises(InterruptedError):
+        cli_prompt._prompt_line("go")
+    monkeypatch.setattr("builtins.input", lambda prompt: "yes")
+    assert cli_prompt._prompt_line("go") == "yes"
+
+
 def test_approval_broker_wait_and_submit():
     broker = ApprovalBroker()
     iid = broker.begin(
@@ -158,7 +255,7 @@ def test_ptc_gate_skips_find_action():
 
 
 def test_ptc_gate_blocks_install_until_approve(monkeypatch):
-    from agent.hitl import set_hitl_context, reset_hitl_context
+    from agent.hitl import reset_hitl_context, set_hitl_context
     from agent.hitl.ptc_gate import apply_skills_manage_hitl
 
     events: list[str] = []
@@ -197,7 +294,7 @@ def test_ptc_gate_blocks_install_until_approve(monkeypatch):
 
 
 def test_ptc_gate_reject_returns_blocked_result(monkeypatch):
-    from agent.hitl import set_hitl_context, reset_hitl_context
+    from agent.hitl import reset_hitl_context, set_hitl_context
     from agent.hitl.ptc_gate import apply_skills_manage_hitl
 
     monkeypatch.setattr(

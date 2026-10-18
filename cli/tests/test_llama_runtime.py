@@ -5,9 +5,9 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from agent_server import llama_runtime as bridge
-
 import pytest
+
+from agent_server import llama_runtime as bridge
 
 
 @pytest.fixture(autouse=True)
@@ -284,6 +284,76 @@ def test_wait_until_serving_does_nothing_without_a_binary(monkeypatch):
     monkeypatch.setattr(bridge, "status", lambda: {"running": False})
     monkeypatch.setattr(bridge, "llama_binary", lambda: None)
     assert bridge.wait_until_serving() is False
+
+
+def test_memory_tiers_context_and_update(monkeypatch, tmp_path):
+    bridge._mem_cache.clear()
+    monkeypatch.setattr(
+        bridge.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess([], 0, "100 0 0\n", ""),
+    )
+    monkeypatch.setattr(bridge, "llama_binary", lambda: None)
+    assert bridge.memory_tiers("org/name:Q4") == {"tiers": []}
+    monkeypatch.setattr(bridge, "llama_binary", lambda: "/bin/llama")
+    monkeypatch.setattr(bridge, "_model_path", lambda model_id: None)
+    assert bridge.memory_tiers("org/name:Q4") == {"tiers": []}
+    monkeypatch.setattr(bridge, "_model_path", lambda model_id: str(tmp_path / "m.gguf"))
+    monkeypatch.setattr(bridge, "_probe_mib", lambda binary, path, ctx: 100 if ctx == 4096 else 200)
+    tiers = bridge.memory_tiers("org/name:Q4")
+    assert tiers["tiers"]
+    assert bridge.memory_tiers("org/name:Q4") is not None
+    monkeypatch.setattr(bridge, "_probe_mib", lambda *a, **k: None)
+    bridge._mem_cache.clear()
+    assert bridge.memory_tiers("org/name:Q8") == {"tiers": []}
+
+    monkeypatch.setattr(bridge.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(bridge.httpx, "get", lambda *a, **k: (_ for _ in ()).throw(bridge.httpx.HTTPError("down")))
+    set_result = bridge.set_context("org/name:Q4", 4096)
+    assert set_result["ok"] is True
+    try:
+        bridge.set_context("nope", 4096)
+        raise AssertionError("expected id error")
+    except ValueError:
+        pass
+
+    class _Resp:
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(bridge.httpx, "post", lambda *a, **k: _Resp())
+    bridge._load("org/name:Q4")
+    assert "org/name:Q4" not in bridge._load_jobs
+    monkeypatch.setattr(bridge.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(bridge.httpx.HTTPError("no")))
+    bridge._load("org/name:Q8")
+    assert "org/name:Q8" in bridge._load_jobs
+
+    monkeypatch.setattr(bridge, "llama_binary", lambda: None)
+    try:
+        bridge.update_engine()
+        raise AssertionError("expected missing cli")
+    except ValueError:
+        pass
+
+    class _InlineThread:
+        def __init__(self, target=None, **kwargs):
+            self.target = target
+
+        def start(self):
+            if self.target is not None:
+                self.target()
+
+    monkeypatch.setattr(bridge.threading, "Thread", _InlineThread)
+    monkeypatch.setattr(bridge, "llama_binary", lambda: "/bin/llama")
+    monkeypatch.setattr(bridge, "_llama_version", lambda: "1.2.3")
+    monkeypatch.setattr(
+        bridge.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess([], 0, "ok", ""),
+    )
+    bridge._set("idle")
+    started = bridge.update_engine()
+    assert "Updated to 1.2.3" in started["detail"]
 
 
 def test_ensure_does_not_install_twice(monkeypatch):
