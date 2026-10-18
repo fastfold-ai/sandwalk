@@ -367,20 +367,13 @@ jobs:
           {
             echo "# ${TITLE}"
             echo
-            echo "One paragraph: what this release lets a person do."
+            echo "Sandwalk ${VERSION} for Mac and Ubuntu."
             echo
             echo "Download:"
             echo
             echo "- [macOS (Apple Silicon)](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk-macos-arm64.dmg)"
             echo "- [Ubuntu amd64](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk_${VERSION}_amd64.deb)"
             echo "- [Ubuntu arm64](https://github.com/${REPO}/releases/download/${TAG}/Sandwalk_${VERSION}_arm64.deb)"
-            echo
-            echo "## Headline feature"
-            echo
-            echo "A paragraph in plain words, ending with the PR. #NN"
-            echo
-            echo "<!-- screenshot -->"
-            echo "<br><br><br><br><br>"
             echo
             echo "## New Features and Improvements"
             echo
