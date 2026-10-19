@@ -54,7 +54,7 @@ Or download the `.deb` from the table and run `sudo apt install ./Sandwalk_*.deb
 ### CLI
 
 ```bash
-curl -fsSL https://sandwalk.sh/install | bash
+curl -fsSL https://sandwalk.sh/install.sh | bash
 sandwalk setup
 sandwalk desktop
 ```
