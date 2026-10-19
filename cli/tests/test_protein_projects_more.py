@@ -308,10 +308,8 @@ def _use_scanpy(monkeypatch, adata=None, error=None):
 
 
 def test_annotation_load_paths(tmp_path, monkeypatch):
-    _use_scanpy(monkeypatch, adata=_adata([[0.0]], ["ZZZ"], ["A"]))
-    csv_path = tmp_path / "cells.csv"
-    csv_path.write_text(",ZZZ\nc0,0\n")
-    loaded = cell_type_annotate(str(csv_path), reference="tissue")
+    _use_scanpy(monkeypatch, adata=_adata([[0.0]], ["ZZZ"], ["A"], cluster_key="batch"))
+    loaded = cell_type_annotate(str(tmp_path / "cells.h5ad"), reference="tissue")
     assert "cluster" in loaded["error"].lower()
 
     unsupported = cell_type_annotate(str(tmp_path / "matrix.mtx"))

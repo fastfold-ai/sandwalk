@@ -13,12 +13,14 @@ import data.loaders as loaders
 def clear_loader_caches():
     loaders.load_crispr.cache_clear()
     loaders.load_model_metadata.cache_clear()
+    loaders.load_mutations.cache_clear()
     loaders.load_proteomics.cache_clear()
     loaders.load_l1000.cache_clear()
     loaders.load_prism.cache_clear()
     yield
     loaders.load_crispr.cache_clear()
     loaders.load_model_metadata.cache_clear()
+    loaders.load_mutations.cache_clear()
     loaders.load_proteomics.cache_clear()
     loaders.load_l1000.cache_clear()
     loaders.load_prism.cache_clear()
