@@ -406,6 +406,7 @@ def test_remove_model_edges_and_weight_links(monkeypatch, tmp_path):
 
     assert bridge._hf_hub_dir("nope") is None
     assert bridge._hf_hub_dir("org/../name") is None
+    assert bridge._hf_hub_dir("..org/name") is None
     assert bridge._delete_downloaded_weights("nope", "Q4") is False
 
     outside = tmp_path / "outside"
@@ -777,7 +778,7 @@ def test_resume_skips_exhausted_and_recovers_project(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(
         "agent_server.bench_service.results_store._terminal_question_ids",
-        lambda _prior: {"q1"},
+        lambda _prior: {"q1", "kept"},
     )
     result = _run(
         deps,
