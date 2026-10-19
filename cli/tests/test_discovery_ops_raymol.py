@@ -940,7 +940,12 @@ def test_apps_on_volumes_scans_and_skips_failures(tmp_path, monkeypatch):
             raise OSError("unmount")
         return real_iter(self)
 
-    monkeypatch.setattr(Path, "is_dir", real_is_dir)
+    def volumes_is_dir(self):
+        if str(self) == "/Volumes":
+            return True
+        return real_is_dir(self)
+
+    monkeypatch.setattr(Path, "is_dir", volumes_is_dir)
     monkeypatch.setattr(Path, "iterdir", fake_iter)
     assert raymol_paths._apps_on_volumes() == [vol / "RayMol.app"]
 
