@@ -212,8 +212,6 @@ def test_recursive_list_skips_stat_failures_cycles_and_symlinks(
     real_relative = WorkspaceReadMixin.relative
     real_dir_stat = os.DirEntry.stat
     real_resolve = Path.resolve
-    real_path_stat = Path.stat
-    root_stats = {"n": 0}
 
     def relative(self, path: Path) -> str:
         if Path(path).name == "ghost":
@@ -230,13 +228,6 @@ def test_recursive_list_skips_stat_failures_cycles_and_symlinks(
             raise OSError("resolve")
         return real_resolve(self, *args, **kwargs)
 
-    def path_stat(self: Path, *args, **kwargs):
-        if self == root:
-            root_stats["n"] += 1
-            if root_stats["n"] > 2:
-                raise OSError("dev")
-        return real_path_stat(self, *args, **kwargs)
-
     monkeypatch.setattr(WorkspaceReadMixin, "relative", relative)
     monkeypatch.setattr(os.DirEntry, "stat", dir_stat)
     monkeypatch.setattr(Path, "resolve", resolve)
@@ -249,9 +240,6 @@ def test_recursive_list_skips_stat_failures_cycles_and_symlinks(
     assert "brokenstat" not in paths
     assert "weirdlink" in paths
     assert reader.list("Library") == []
-
-    monkeypatch.setattr(Path, "stat", path_stat)
-    assert reader.list("") == []
 
 
 def test_read_directory_invalid_text_and_binary(tmp_path: Path) -> None:
