@@ -203,7 +203,7 @@ export function SkillsCatalogDetailView({
                 <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                   Summary
                 </p>
-                <div className="bg-card rounded-lg border p-3 text-sm leading-relaxed">
+                <div className="border-border/50 bg-muted/20 rounded-xl border p-3 text-sm leading-relaxed">
                   <MarkdownContent
                     content={catalogSummary}
                     className="max-w-none text-sm [&_p]:my-0 [&_p+p]:mt-2 [&_ul]:my-2 [&_li]:my-0.5"

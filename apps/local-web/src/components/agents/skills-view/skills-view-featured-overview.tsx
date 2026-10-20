@@ -85,7 +85,7 @@ export function SkillsFeaturedOverview({
                 <div
                   key={skill.name}
                   className={cn(
-                    'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
+                    'border-border/50 bg-muted/20 hover:border-border hover:bg-muted/35 flex items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all',
                     !skill.enabled && 'opacity-60'
                   )}
                 >

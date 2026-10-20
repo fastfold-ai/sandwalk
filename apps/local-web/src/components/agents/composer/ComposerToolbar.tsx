@@ -17,6 +17,8 @@ import {
   type SandboxActionPhase,
   type SandboxComputeChange
 } from '@/components/agents/composer/sandbox-utils'
+import { openPlusMenu } from '@/components/agents/empty-start'
+import { SpecialistAvatar } from '@/components/agents/SpecialistsView'
 import { Button } from '@/components/ui/button'
 import {
   type ComposerModelOption,
@@ -133,6 +135,8 @@ export function ComposerToolbar({
   client?: LocalAgentClient
 }) {
   const planMode = Boolean(runtimeSettings?.planMode)
+  const selectedSpecialist =
+    specialists.find(item => item.id === selectedSpecialistId) || null
 
   return (
     <div
@@ -182,6 +186,40 @@ export function ComposerToolbar({
             >
               <X className="size-3" />
             </button>
+          </span>
+        ) : null}
+        {selectedSpecialist ? (
+          <span
+            data-testid="composer-selected-specialist-chip"
+            className="border-border/70 bg-muted/60 text-foreground inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border pl-1.5 pr-1 text-xs font-medium"
+          >
+            <button
+              type="button"
+              onClick={() => openPlusMenu('specialist')}
+              className="inline-flex items-center gap-1.5"
+              title={`Active specialist: ${selectedSpecialist.name}${selectedSpecialist.roleLabel ? ` · ${selectedSpecialist.roleLabel}` : ''}`}
+            >
+              <SpecialistAvatar
+                color={selectedSpecialist.color}
+                icon={selectedSpecialist.icon}
+                avatarUrl={selectedSpecialist.avatarUrl}
+                slug={selectedSpecialist.slug}
+                className="size-5"
+              />
+              <span className="max-w-[8.5rem] truncate">
+                {selectedSpecialist.name}
+              </span>
+            </button>
+            {onSpecialistSelect ? (
+              <button
+                type="button"
+                aria-label={`Clear specialist ${selectedSpecialist.name}`}
+                className="text-muted-foreground hover:text-foreground hover:bg-black/10 inline-flex size-4 items-center justify-center rounded-full dark:hover:bg-white/10"
+                onClick={() => void onSpecialistSelect(null)}
+              >
+                <X className="size-3" />
+              </button>
+            ) : null}
           </span>
         ) : null}
         <ComposerModelPicker

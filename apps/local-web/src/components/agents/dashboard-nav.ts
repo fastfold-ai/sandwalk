@@ -1,6 +1,7 @@
 import {
   Box,
   Boxes,
+  Brain,
   Container,
   Cpu,
   Database,
@@ -15,8 +16,8 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
-  Terminal,
   Target,
+  Terminal,
   Wrench
 } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -87,6 +88,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
         label: 'Context',
         path: '/dashboard/context',
         icon: ScrollText
+      },
+      {
+        id: 'memory',
+        label: 'Memory & Wiki',
+        path: '/dashboard/memory',
+        icon: Brain
       },
       {
         id: 'voice',

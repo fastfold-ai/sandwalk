@@ -56,7 +56,7 @@ export function emptySpecialistForm(): SpecialistFormState {
     description: '',
     instructions: '',
     color: 'ink',
-    icon: 'git-branch',
+    icon: 'capybara',
     skillNames: [],
     toolNames: [],
     mcpServerIds: [],

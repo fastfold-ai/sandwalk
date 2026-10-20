@@ -190,7 +190,7 @@ export function buildMarkdownComponents({
           )
         }
         return (
-          <code className="bg-muted text-foreground rounded px-[0.3rem] py-[0.2rem] font-mono text-[0.9em]">
+          <code className="border-border/50 bg-muted/35 text-foreground rounded border px-[0.3rem] py-[0.15rem] font-mono text-[0.9em]">
             {children}
           </code>
         )

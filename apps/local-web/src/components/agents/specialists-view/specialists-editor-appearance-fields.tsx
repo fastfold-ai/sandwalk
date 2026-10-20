@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Search } from 'lucide-react'
 
 import {
+  PERSONA_CHARACTERS,
   SPECIALIST_COLORS,
   SPECIALIST_ICONS,
   SpecialistAvatar
@@ -67,12 +68,44 @@ export function SpecialistsEditorAppearanceFields({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="w-64 p-0"
+            className="w-72 p-0"
             onCloseAutoFocus={event => event.preventDefault()}
           >
-            <div className="space-y-2 p-2">
+            <div className="space-y-2 p-2.5">
               <p className="text-muted-foreground px-1 text-[11px] font-medium uppercase tracking-wide">
-                Color
+                O’Reilly Animal Presets
+              </p>
+              <div className="grid grid-cols-5 gap-1.5 px-1">
+                {PERSONA_CHARACTERS.map(char => (
+                  <button
+                    key={char.id}
+                    type="button"
+                    title={`${char.label} — ${char.archetype}`}
+                    className={cn(
+                      'flex flex-col items-center rounded-xl p-1 transition-all hover:bg-muted',
+                      form.icon === char.id &&
+                        'ring-foreground bg-muted/60 ring-2'
+                    )}
+                    onClick={() =>
+                      setForm((current: SpecialistFormState) => ({
+                        ...current,
+                        icon: char.id as SpecialistFormState['icon']
+                      }))
+                    }
+                  >
+                    <SpecialistAvatar
+                      color={form.color}
+                      icon={char.id}
+                      size="sm"
+                      className="size-9"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="border-t space-y-2 p-2.5">
+              <p className="text-muted-foreground px-1 text-[11px] font-medium uppercase tracking-wide">
+                Accent Color
               </p>
               <div className="flex flex-wrap gap-1.5 px-1">
                 {SPECIALIST_COLORS.map(color => (

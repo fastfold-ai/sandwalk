@@ -57,7 +57,7 @@ export function McpSuggestedStrip({
         {suggested.map(entry => (
           <div
             key={entry.id}
-            className="bg-card flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+            className="border-border/50 bg-muted/20 flex items-center gap-2 rounded-xl border px-2.5 py-1.5"
           >
             <button
               type="button"

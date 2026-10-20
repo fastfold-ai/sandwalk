@@ -148,7 +148,7 @@ export function IntegrationsMainListView({
                 value={integrationSearch}
                 onChange={event => setIntegrationSearch(event.target.value)}
                 placeholder="Search integrations, descriptions..."
-                className="border-border/70 bg-background/70 h-11 pl-10"
+                className="border-border/60 bg-muted/20 h-10 rounded-xl pl-10"
               />
             </div>
             <Button

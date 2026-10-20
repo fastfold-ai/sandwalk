@@ -65,6 +65,7 @@ _TOOL_MODULES = (
     "clue",
     "remote_data",
     "environment",
+    "memory",
 )
 
 

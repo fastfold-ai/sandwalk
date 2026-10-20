@@ -133,5 +133,8 @@ export function resolveDashboardSection(pathname: string) {
   if (pathname.startsWith('/dashboard/mcp')) {
     return 'mcp' as const
   }
+  if (pathname.startsWith('/dashboard/memory')) {
+    return 'memory' as const
+  }
   return 'overview' as const
 }

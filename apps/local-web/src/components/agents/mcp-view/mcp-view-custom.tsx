@@ -137,7 +137,7 @@ export function McpCustomSection({
       ) : null}
 
       {showAddForm ? (
-        <div className="bg-card space-y-3 rounded-xl border p-4">
+        <div className="border-border/50 bg-muted/20 space-y-3 rounded-2xl border p-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold">Add custom MCP</p>
             <Button

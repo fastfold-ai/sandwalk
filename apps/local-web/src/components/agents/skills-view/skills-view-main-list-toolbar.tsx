@@ -44,7 +44,7 @@ export function SkillsMainListToolbar({
   onOpenTrustedSources: () => void
 }) {
   return (
-    <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2 backdrop-blur">
+    <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center gap-2 pb-3 pt-2">
       <div className="relative min-w-[200px] flex-1 max-w-3xl">
         <Search className="text-muted-foreground/70 pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2" />
         <Input
@@ -55,7 +55,7 @@ export function SkillsMainListToolbar({
               ? 'Search skills.sh...'
               : 'Search skills, descriptions...'
           }
-          className="border-border/70 bg-background/70 h-11 pl-10 pr-[9.5rem]"
+          className="border-border/60 bg-muted/20 h-10 rounded-xl pl-10 pr-[9.5rem]"
         />
         <button
           type="button"

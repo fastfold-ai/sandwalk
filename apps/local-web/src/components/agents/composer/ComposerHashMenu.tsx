@@ -113,7 +113,7 @@ export const ComposerHashMenu = forwardRef<
   if (!open) return null
 
   return (
-    <div className="border-border bg-popover absolute bottom-full left-0 z-20 mb-2 w-full overflow-hidden rounded-xl border shadow-lg">
+    <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute bottom-full left-0 z-20 mb-2 w-full overflow-hidden rounded-2xl border shadow-lg backdrop-blur-xl">
       <div ref={listRootRef}>
         <ScrollArea className="max-h-56">
           <div className="p-1" role="listbox">

@@ -210,7 +210,7 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-mai
   .bg-background\/95,
   .supports-\[backdrop-filter\]\:bg-background\/80
 ) {
-  background-color: rgb(255 255 255 / 0.72) !important;
+  background-color: hsl(var(--muted) / 0.2) !important;
 }
 
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main :is(
@@ -222,25 +222,25 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main :is(
   .bg-background\/95,
   .supports-\[backdrop-filter\]\:bg-background\/80
 ) {
-  background-color: rgb(40 40 44 / 0.72) !important;
+  background-color: hsl(var(--muted) / 0.25) !important;
 }
 
 /* Sticky search strips blur the desktop into a color stain. The page frost
- * is already the surface, so the strip stays clear and the field stays solid. */
+ * is already the surface, so the strip stays clear and the field stays subtle. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active .sandwalk-shell-main .sticky.backdrop-blur {
   background-color: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main input,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main :is(input, select, textarea):not(.bg-transparent),
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark) .sandwalk-shell-main input.bg-background\/70 {
-  background-color: rgb(255 255 255 / 0.96) !important;
+  background-color: hsl(var(--muted) / 0.2) !important;
 }
 
-html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main input,
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main :is(input, select, textarea):not(.bg-transparent),
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-shell-main input.bg-background\/70 {
-  background-color: rgb(44 44 48 / 0.96) !important;
+  background-color: hsl(var(--muted) / 0.25) !important;
 }
 
 /* Tab strip sits on the same frost. The 6px floor under the tabs was a
@@ -381,19 +381,29 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark [data-capy-root] {
 /* Menus portal to the document root, so they miss the shell frost and paint
  * solid. Same glass as Capy, only while liquid glass is on. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off):not(.dark)
-  .sandwalk-glass-menu {
-  background-color: rgb(246 246 247 / 0.62) !important;
+  .sandwalk-glass-menu:not(.bg-transparent) {
+  background-color: rgb(218 218 222 / 0.78) !important;
   border-color: rgb(0 0 0 / 0.1) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.4);
   backdrop-filter: blur(28px) saturate(1.4);
 }
 
+html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off):not(.dark)
+  .sandwalk-glass-menu :is(.bg-muted, .hover\:bg-muted:hover) {
+  background-color: rgb(0 0 0 / 0.06) !important;
+}
+
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
-  .sandwalk-glass-menu {
-  background-color: rgb(28 28 31 / 0.55) !important;
+  .sandwalk-glass-menu:not(.bg-transparent) {
+  background-color: rgb(28 28 31 / 0.72) !important;
   border-color: rgb(255 255 255 / 0.12) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.5);
   backdrop-filter: blur(28px) saturate(1.5);
+}
+
+html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark:not(.sandwalk-liquid-glass-off)
+  .sandwalk-glass-menu :is(.bg-muted, .hover\:bg-muted:hover) {
+  background-color: rgb(255 255 255 / 0.08) !important;
 }
 
 /* Files / site preview column. It sits inside the main frost, so without

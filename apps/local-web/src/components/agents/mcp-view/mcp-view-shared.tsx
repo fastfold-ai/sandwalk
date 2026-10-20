@@ -36,6 +36,7 @@ export const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> 
   huggingface: { src: '/integrations/huggingface.png' },
   tavily: { src: '/tavily-color.png' },
   linear: { src: '/integrations/linear.png' },
+  omnigraph: { src: '/integrations/omnigraph.png' },
 }
 
 export function McpToggle({

@@ -18,7 +18,14 @@ import {
   Plus,
   Sparkles
 } from 'lucide-react'
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 
 import {
   cleanSkillDescription,
@@ -34,10 +41,7 @@ import {
   type PlusMenuFlyout,
   takeQueuedPlusMenu
 } from '@/components/agents/empty-start'
-import {
-  specialistColorClass,
-  SpecialistGlyph
-} from '@/components/agents/SpecialistsView'
+import { SpecialistAvatar } from '@/components/agents/SpecialistsView'
 import {
   Popover,
   PopoverContent,
@@ -48,6 +52,15 @@ import {
   skillIconInvertInDark
 } from '@/lib/skill-icons'
 import { cn } from '@/lib/utils'
+
+type MainRowId =
+  | 'agent'
+  | 'plan'
+  | 'files'
+  | 'skills'
+  | 'mcp'
+  | 'specialist'
+  | 'sandbox'
 
 export function ComposerPlusMenu({
   runtimeSettings,
@@ -100,6 +113,7 @@ export function ComposerPlusMenu({
 }) {
   const uploadRef = useRef<HTMLInputElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [open, setOpen] = useState(false)
   const [menuWidth, setMenuWidth] = useState<number | undefined>()
   const [sideOffset, setSideOffset] = useState(8)
@@ -108,19 +122,54 @@ export function ComposerPlusMenu({
   const [flyout, setFlyout] = useState<
     'skills' | 'mcp' | 'specialist' | 'sandbox' | null
   >(null)
+  const [activeRow, setActiveRow] = useState<MainRowId | null>(null)
+  const [searchHitIndex, setSearchHitIndex] = useState(0)
+  const [inFlyout, setInFlyout] = useState(false)
+  const [flyoutIndex, setFlyoutIndex] = useState(0)
+
   const planMode = Boolean(runtimeSettings?.planMode)
+  const selectedSpecialist = useMemo(
+    () => specialists.find(item => item.id === selectedSpecialistId) || null,
+    [selectedSpecialistId, specialists]
+  )
   const needle = search.trim().toLowerCase()
+  const enabledSkills = useMemo(
+    () => skills.filter(skill => skill.enabled),
+    [skills]
+  )
+  const enabledSpecialists = useMemo(
+    () => specialists.filter(item => item.enabled !== false),
+    [specialists]
+  )
 
   const skillHits = useMemo(() => {
     if (!needle || !onPickSkill) return []
-    return skills
-      .filter(skill => skill.enabled)
+    return enabledSkills
       .filter(skill => {
         const haystack = `${skill.name} ${skill.description}`.toLowerCase()
         return haystack.includes(needle)
       })
       .slice(0, 8)
-  }, [needle, onPickSkill, skills])
+  }, [enabledSkills, needle, onPickSkill])
+
+  const mainRows = useMemo<MainRowId[]>(() => {
+    const rows: MainRowId[] = []
+    if (onPlanModeChange) {
+      rows.push('agent', 'plan')
+    }
+    rows.push('files')
+    if (onPickSkill) rows.push('skills')
+    if (onPickMcp) rows.push('mcp')
+    if (onSpecialistSelect) rows.push('specialist')
+    if (onSandboxBackendSelect) rows.push('sandbox')
+    return rows
+  }, [
+    onPickMcp,
+    onPickSkill,
+    onPlanModeChange,
+    onSandboxBackendSelect,
+    onSpecialistSelect
+  ])
 
   const placeMenu = () => {
     const button = triggerRef.current
@@ -133,9 +182,28 @@ export function ComposerPlusMenu({
     setSideOffset(Math.max(8, buttonBox.top - formBox.top + 8))
   }
 
+  const syncRowState = (row: MainRowId | null) => {
+    setActiveRow(row)
+    setInFlyout(false)
+    setFlyoutIndex(0)
+    if (
+      row === 'skills' ||
+      row === 'mcp' ||
+      row === 'specialist' ||
+      row === 'sandbox'
+    ) {
+      setFlyout(row)
+    } else {
+      setFlyout(null)
+    }
+  }
+
   const reveal = (next: PlusMenuFlyout) => {
     placeMenu()
+    setActiveRow(next)
     setFlyout(next)
+    setInFlyout(false)
+    setFlyoutIndex(0)
     setOpen(true)
   }
 
@@ -143,9 +211,11 @@ export function ComposerPlusMenu({
     const queued = takeQueuedPlusMenu()
     if (queued) reveal(queued)
     const onOpen = (event: Event) => {
-      const flyout = (event as CustomEvent<{ flyout?: PlusMenuFlyout }>).detail
-        ?.flyout
-      if (flyout) reveal(flyout)
+      const targetFlyout = (event as CustomEvent<{ flyout?: PlusMenuFlyout }>)
+        .detail?.flyout
+      if (targetFlyout) {
+        window.requestAnimationFrame(() => reveal(targetFlyout))
+      }
     }
     window.addEventListener(PLUS_MENU_OPEN_EVENT, onOpen)
     return () => window.removeEventListener(PLUS_MENU_OPEN_EVENT, onOpen)
@@ -155,6 +225,154 @@ export function ComposerPlusMenu({
     setOpen(false)
     setSearch('')
     setFlyout(null)
+    setActiveRow(null)
+    setInFlyout(false)
+    setFlyoutIndex(0)
+  }
+
+  const flyoutItemCount = useMemo(() => {
+    if (flyout === 'skills') return enabledSkills.length
+    if (flyout === 'mcp') return mcpServers.length
+    if (flyout === 'specialist') {
+      return 1 + enabledSpecialists.length + (onCreateSpecialist ? 1 : 0)
+    }
+    return 0
+  }, [
+    enabledSkills.length,
+    enabledSpecialists.length,
+    flyout,
+    mcpServers.length,
+    onCreateSpecialist
+  ])
+
+  const triggerMainRow = (row: MainRowId) => {
+    if (row === 'agent' && onPlanModeChange) {
+      void onPlanModeChange(false)
+      close()
+    } else if (row === 'plan' && onPlanModeChange) {
+      void onPlanModeChange(true)
+      close()
+    } else if (row === 'files') {
+      uploadRef.current?.click()
+      close()
+    } else if (
+      row === 'skills' ||
+      row === 'mcp' ||
+      row === 'specialist' ||
+      row === 'sandbox'
+    ) {
+      setFlyout(row)
+      if (row !== 'sandbox') {
+        setInFlyout(true)
+        setFlyoutIndex(0)
+      }
+    }
+  }
+
+  const triggerFlyoutItem = (idx: number) => {
+    if (flyout === 'skills' && onPickSkill) {
+      const target = enabledSkills[idx]
+      if (target) {
+        onPickSkill(target)
+        close()
+      }
+    } else if (flyout === 'mcp' && onPickMcp) {
+      const target = mcpServers[idx]
+      if (target) {
+        onPickMcp(target)
+        close()
+      }
+    } else if (flyout === 'specialist' && onSpecialistSelect) {
+      if (idx === 0) {
+        void onSpecialistSelect(null)
+        close()
+      } else if (idx <= enabledSpecialists.length) {
+        const spec = enabledSpecialists[idx - 1]
+        if (spec) {
+          void onSpecialistSelect(spec.id)
+          close()
+        }
+      } else if (onCreateSpecialist) {
+        close()
+        onCreateSpecialist()
+      }
+    }
+  }
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      close()
+      return
+    }
+
+    if (needle) {
+      if (skillHits.length === 0) return
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setSearchHitIndex(prev => (prev + 1) % skillHits.length)
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setSearchHitIndex(
+          prev => (prev - 1 + skillHits.length) % skillHits.length
+        )
+      } else if (event.key === 'Enter') {
+        event.preventDefault()
+        const hit = skillHits[searchHitIndex] || skillHits[0]
+        if (hit && onPickSkill) {
+          onPickSkill(hit)
+          close()
+        }
+      }
+      return
+    }
+
+    if (inFlyout && flyout && flyout !== 'sandbox' && flyoutItemCount > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setFlyoutIndex(prev => (prev + 1) % flyoutItemCount)
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setFlyoutIndex(prev => (prev - 1 + flyoutItemCount) % flyoutItemCount)
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setInFlyout(false)
+      } else if (event.key === 'Enter') {
+        event.preventDefault()
+        triggerFlyoutItem(flyoutIndex)
+      }
+      return
+    }
+
+    if (mainRows.length === 0) return
+    const currentIdx = activeRow ? mainRows.indexOf(activeRow) : -1
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      const nextIdx = currentIdx < 0 ? 0 : (currentIdx + 1) % mainRows.length
+      syncRowState(mainRows[nextIdx] ?? null)
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      const nextIdx =
+        currentIdx <= 0 ? mainRows.length - 1 : currentIdx - 1
+      syncRowState(mainRows[nextIdx] ?? null)
+    } else if (event.key === 'ArrowRight') {
+      if (
+        activeRow &&
+        (activeRow === 'skills' ||
+          activeRow === 'mcp' ||
+          activeRow === 'specialist') &&
+        flyoutItemCount > 0
+      ) {
+        event.preventDefault()
+        setFlyout(activeRow)
+        setInFlyout(true)
+        setFlyoutIndex(0)
+      }
+    } else if (event.key === 'Enter' && activeRow) {
+      event.preventDefault()
+      triggerMainRow(activeRow)
+    }
   }
 
   return (
@@ -172,11 +390,19 @@ export function ComposerPlusMenu({
       <Popover
         open={open}
         onOpenChange={next => {
-          if (next) placeMenu()
+          if (next) {
+            placeMenu()
+            window.requestAnimationFrame(() => {
+              searchInputRef.current?.focus()
+            })
+          }
           setOpen(next)
           if (!next) {
             setSearch('')
             setFlyout(null)
+            setActiveRow(null)
+            setInFlyout(false)
+            setFlyoutIndex(0)
           }
         }}
       >
@@ -197,32 +423,42 @@ export function ComposerPlusMenu({
           sideOffset={sideOffset}
           avoidCollisions={false}
           style={menuWidth ? { width: menuWidth } : undefined}
-          className="z-[90] w-auto max-w-none overflow-visible rounded-xl p-1.5"
-          onOpenAutoFocus={event => event.preventDefault()}
+          className="sandwalk-glass-menu border-border/60 bg-popover/90 z-[90] w-auto max-w-none overflow-visible rounded-2xl p-1.5 shadow-lg backdrop-blur-xl"
+          onOpenAutoFocus={event => {
+            event.preventDefault()
+            searchInputRef.current?.focus()
+          }}
         >
-          <div className="relative">
+          <div className="relative" onKeyDown={handleKeyDown}>
             <input
+              ref={searchInputRef}
               value={search}
               onChange={event => {
                 setSearch(event.target.value)
+                setSearchHitIndex(0)
                 setFlyout(null)
+                setActiveRow(null)
+                setInFlyout(false)
               }}
+              onMouseEnter={() => syncRowState(null)}
               placeholder="Search skills, context, chats..."
-              className="placeholder:text-muted-foreground w-full bg-transparent px-2 py-1.5 text-sm outline-none"
+              className="placeholder:text-muted-foreground w-full bg-transparent px-2.5 py-1.5 text-sm outline-none"
             />
             {needle ? (
               <div className="py-1">
                 {skillHits.length === 0 ? (
-                  <div className="text-muted-foreground px-2 py-2 text-sm">
+                  <div className="text-muted-foreground px-2.5 py-2 text-sm">
                     No matches
                   </div>
                 ) : (
-                  skillHits.map(skill => (
+                  skillHits.map((skill, idx) => (
                     <MenuRow
                       key={skill.name}
                       icon={<SkillIcon skill={skill} />}
                       label={skill.name}
                       detail={cleanSkillDescription(skill.description)}
+                      active={idx === searchHitIndex}
+                      onMouseEnter={() => setSearchHitIndex(idx)}
                       onClick={() => {
                         onPickSkill?.(skill)
                         close()
@@ -236,13 +472,11 @@ export function ComposerPlusMenu({
                 {onPlanModeChange ? (
                   <>
                     <MenuRow
-                      icon={
-                        <InfinityIcon
-                          className={cnIcon(!planMode)}
-                        />
-                      }
+                      icon={<InfinityIcon className={cnIcon(!planMode)} />}
                       label="Agent"
                       detail="Work with tools in this project"
+                      active={activeRow === 'agent'}
+                      onMouseEnter={() => syncRowState('agent')}
                       onClick={() => {
                         void onPlanModeChange(false)
                         close()
@@ -254,17 +488,23 @@ export function ComposerPlusMenu({
                       }
                       label="Plan"
                       detail="Generate an implementation plan"
+                      active={activeRow === 'plan'}
+                      onMouseEnter={() => syncRowState('plan')}
                       onClick={() => {
                         void onPlanModeChange(true)
                         close()
                       }}
                     />
-                    <div className="bg-border my-1 h-px" />
+                    <div className="bg-border/60 my-1 h-px" />
                   </>
                 ) : null}
                 <MenuRow
-                  icon={<Paperclip className="text-muted-foreground size-4 shrink-0" />}
+                  icon={
+                    <Paperclip className="text-muted-foreground size-4 shrink-0" />
+                  }
                   label="Files"
+                  active={activeRow === 'files'}
+                  onMouseEnter={() => syncRowState('files')}
                   onClick={() => {
                     uploadRef.current?.click()
                     close()
@@ -272,103 +512,145 @@ export function ComposerPlusMenu({
                 />
                 {onPickSkill ? (
                   <MenuRow
-                    icon={<Sparkles className="text-muted-foreground size-4 shrink-0" />}
+                    icon={
+                      <Sparkles className="text-muted-foreground size-4 shrink-0" />
+                    }
                     label="Skills"
                     trailing={<FlyoutChevron />}
-                    active={flyout === 'skills'}
-                    onMouseEnter={() => setFlyout('skills')}
+                    active={activeRow === 'skills' || flyout === 'skills'}
+                    onMouseEnter={() => syncRowState('skills')}
+                    onClick={() => syncRowState('skills')}
                   />
                 ) : null}
                 {onPickMcp ? (
                   <MenuRow
-                    icon={<Plug className="text-muted-foreground size-4 shrink-0" />}
+                    icon={
+                      <Plug className="text-muted-foreground size-4 shrink-0" />
+                    }
                     label="MCP"
                     trailing={<FlyoutChevron />}
-                    active={flyout === 'mcp'}
-                    onMouseEnter={() => setFlyout('mcp')}
+                    active={activeRow === 'mcp' || flyout === 'mcp'}
+                    onMouseEnter={() => syncRowState('mcp')}
+                    onClick={() => syncRowState('mcp')}
                   />
                 ) : null}
                 {onSpecialistSelect ? (
                   <MenuRow
-                    icon={<GitBranch className="text-muted-foreground size-4 shrink-0" />}
+                    icon={
+                      selectedSpecialist ? (
+                        <SpecialistAvatar
+                          color={selectedSpecialist.color}
+                          icon={selectedSpecialist.icon}
+                          avatarUrl={selectedSpecialist.avatarUrl}
+                          slug={selectedSpecialist.slug}
+                          className="size-5"
+                        />
+                      ) : (
+                        <GitBranch className="text-muted-foreground size-4 shrink-0" />
+                      )
+                    }
                     label="Specialist"
+                    detail={selectedSpecialist?.name}
                     trailing={<FlyoutChevron />}
-                    active={flyout === 'specialist'}
-                    onMouseEnter={() => setFlyout('specialist')}
+                    active={
+                      activeRow === 'specialist' || flyout === 'specialist'
+                    }
+                    onMouseEnter={() => syncRowState('specialist')}
+                    onClick={() => syncRowState('specialist')}
                   />
                 ) : null}
                 {onSandboxBackendSelect ? (
                   <MenuRow
-                    icon={<Container className="text-muted-foreground size-4 shrink-0" />}
+                    icon={
+                      <Container className="text-muted-foreground size-4 shrink-0" />
+                    }
                     label="Sandbox"
                     trailing={<FlyoutChevron />}
-                    active={flyout === 'sandbox'}
-                    onMouseEnter={() => setFlyout('sandbox')}
+                    active={activeRow === 'sandbox' || flyout === 'sandbox'}
+                    onMouseEnter={() => syncRowState('sandbox')}
+                    onClick={() => syncRowState('sandbox')}
                   />
                 ) : null}
               </div>
             )}
             {flyout ? (
-              <div className="bg-popover absolute top-8 left-full z-10 ml-2 max-h-72 overflow-y-auto rounded-xl border p-1 shadow-md">
-                {flyout === 'skills' && onPickSkill ? (
-                  <SkillFlyout
-                    skills={skills.filter(skill => skill.enabled)}
-                    onPick={skill => {
-                      onPickSkill(skill)
-                      close()
-                    }}
-                  />
-                ) : null}
-                {flyout === 'mcp' && onPickMcp ? (
-                  <McpFlyout
-                    servers={mcpServers}
-                    onPick={server => {
-                      onPickMcp(server)
-                      close()
-                    }}
-                  />
-                ) : null}
-                {flyout === 'specialist' && onSpecialistSelect ? (
-                  <SpecialistFlyout
-                    specialists={specialists}
-                    selectedSpecialistId={selectedSpecialistId}
-                    onSelect={id => {
-                      void onSpecialistSelect(id)
-                      close()
-                    }}
-                    onCreate={
-                      onCreateSpecialist
-                        ? () => {
-                            close()
-                            onCreateSpecialist()
-                          }
-                        : undefined
-                    }
-                    onManage={
-                      onManageSpecialists
-                        ? () => {
-                            close()
-                            onManageSpecialists()
-                          }
-                        : undefined
-                    }
-                  />
-                ) : null}
-                {flyout === 'sandbox' && onSandboxBackendSelect ? (
-                  <ComposerSandboxPicker
-                    embedded
-                    sandboxStatus={sandboxStatus}
-                    sandboxPhase={sandboxPhase}
-                    onRequestClose={close}
-                    onSandboxBackendSelect={onSandboxBackendSelect}
-                    onSandboxComputeChange={onSandboxComputeChange}
-                    onSandboxStart={onSandboxStart}
-                    onSandboxStop={onSandboxStop}
-                    onSandboxRestart={onSandboxRestart}
-                    onLoadLocalSystem={onLoadLocalSystem}
-                    onRefreshSandbox={onRefreshSandbox}
-                  />
-                ) : null}
+              <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-8 left-full z-10 ml-2 overflow-hidden rounded-2xl border p-1 shadow-lg backdrop-blur-xl">
+                <div className="chat-scrollbar max-h-72 overflow-x-hidden overflow-y-auto p-0.5">
+                  {flyout === 'skills' && onPickSkill ? (
+                    <SkillFlyout
+                      skills={enabledSkills}
+                      activeIndex={inFlyout ? flyoutIndex : -1}
+                      onHoverIndex={idx => {
+                        setInFlyout(true)
+                        setFlyoutIndex(idx)
+                      }}
+                      onPick={skill => {
+                        onPickSkill(skill)
+                        close()
+                      }}
+                    />
+                  ) : null}
+                  {flyout === 'mcp' && onPickMcp ? (
+                    <McpFlyout
+                      servers={mcpServers}
+                      activeIndex={inFlyout ? flyoutIndex : -1}
+                      onHoverIndex={idx => {
+                        setInFlyout(true)
+                        setFlyoutIndex(idx)
+                      }}
+                      onPick={server => {
+                        onPickMcp(server)
+                        close()
+                      }}
+                    />
+                  ) : null}
+                  {flyout === 'specialist' && onSpecialistSelect ? (
+                    <SpecialistFlyout
+                      specialists={enabledSpecialists}
+                      selectedSpecialistId={selectedSpecialistId}
+                      activeIndex={inFlyout ? flyoutIndex : -1}
+                      onHoverIndex={idx => {
+                        setInFlyout(true)
+                        setFlyoutIndex(idx)
+                      }}
+                      onSelect={id => {
+                        void onSpecialistSelect(id)
+                        close()
+                      }}
+                      onCreate={
+                        onCreateSpecialist
+                          ? () => {
+                              close()
+                              onCreateSpecialist()
+                            }
+                          : undefined
+                      }
+                      onManage={
+                        onManageSpecialists
+                          ? () => {
+                              close()
+                              onManageSpecialists()
+                            }
+                          : undefined
+                      }
+                    />
+                  ) : null}
+                  {flyout === 'sandbox' && onSandboxBackendSelect ? (
+                    <ComposerSandboxPicker
+                      embedded
+                      sandboxStatus={sandboxStatus}
+                      sandboxPhase={sandboxPhase}
+                      onRequestClose={close}
+                      onSandboxBackendSelect={onSandboxBackendSelect}
+                      onSandboxComputeChange={onSandboxComputeChange}
+                      onSandboxStart={onSandboxStart}
+                      onSandboxStop={onSandboxStop}
+                      onSandboxRestart={onSandboxRestart}
+                      onLoadLocalSystem={onLoadLocalSystem}
+                      onRefreshSandbox={onRefreshSandbox}
+                    />
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -432,27 +714,42 @@ function McpIcon({ server }: { server: McpServer }) {
 
 function SkillFlyout({
   skills,
+  activeIndex,
+  onHoverIndex,
   onPick
 }: {
   skills: AgentSkill[]
+  activeIndex: number
+  onHoverIndex: (index: number) => void
   onPick: (skill: AgentSkill) => void
 }) {
   if (skills.length === 0) {
     return (
-      <div className="text-muted-foreground w-56 px-2 py-2 text-sm">No skills</div>
+      <div className="text-muted-foreground w-56 px-2.5 py-2 text-sm">
+        No skills
+      </div>
     )
   }
   return (
     <div className="w-64">
-      {skills.map(skill => (
+      <div className="flex items-center justify-between px-2.5 py-1">
+        <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          Skills
+        </span>
+      </div>
+      {skills.map((skill, idx) => (
         <button
           key={skill.name}
           type="button"
-          className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left"
+          onMouseEnter={() => onHoverIndex(idx)}
+          className={cn(
+            'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors',
+            idx === activeIndex && 'bg-foreground/[0.07] dark:bg-white/[0.1]'
+          )}
           onClick={() => onPick(skill)}
         >
           <SkillIcon skill={skill} />
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{skill.name}</span>
             <span className="text-muted-foreground block truncate text-xs">
               {cleanSkillDescription(skill.description) || skill.name}
@@ -466,29 +763,42 @@ function SkillFlyout({
 
 function McpFlyout({
   servers,
+  activeIndex,
+  onHoverIndex,
   onPick
 }: {
   servers: McpServer[]
+  activeIndex: number
+  onHoverIndex: (index: number) => void
   onPick: (server: McpServer) => void
 }) {
   if (servers.length === 0) {
     return (
-      <div className="text-muted-foreground w-56 px-2 py-2 text-sm">
+      <div className="text-muted-foreground w-56 px-2.5 py-2 text-sm">
         No MCP servers
       </div>
     )
   }
   return (
     <div className="w-64">
-      {servers.map(server => (
+      <div className="flex items-center justify-between px-2.5 py-1">
+        <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          MCP Servers
+        </span>
+      </div>
+      {servers.map((server, idx) => (
         <button
           key={server.id}
           type="button"
-          className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left"
+          onMouseEnter={() => onHoverIndex(idx)}
+          className={cn(
+            'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors',
+            idx === activeIndex && 'bg-foreground/[0.07] dark:bg-white/[0.1]'
+          )}
           onClick={() => onPick(server)}
         >
           <McpIcon server={server} />
-          <span className="min-w-0">
+          <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{server.name}</span>
             <span className="text-muted-foreground block truncate text-xs">
               {String(server.description || '').trim() || server.transport}
@@ -503,26 +813,30 @@ function McpFlyout({
 function SpecialistFlyout({
   specialists,
   selectedSpecialistId,
+  activeIndex,
+  onHoverIndex,
   onSelect,
   onCreate,
   onManage
 }: {
   specialists: Specialist[]
   selectedSpecialistId: string | null
+  activeIndex: number
+  onHoverIndex: (index: number) => void
   onSelect: (id: string | null) => void
   onCreate?: () => void
   onManage?: () => void
 }) {
   return (
     <div className="w-64">
-      <div className="flex items-center justify-between px-2 py-1">
+      <div className="flex items-center justify-between px-2.5 py-1">
         <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
           Specialist
         </span>
         {onManage ? (
           <button
             type="button"
-            className="text-muted-foreground hover:text-foreground text-[11px]"
+            className="text-muted-foreground hover:text-foreground text-[11px] transition-colors"
             onClick={onManage}
           >
             Manage
@@ -531,40 +845,67 @@ function SpecialistFlyout({
       </div>
       <button
         type="button"
-        className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+        onMouseEnter={() => onHoverIndex(0)}
+        className={cn(
+          'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+          activeIndex === 0
+            ? 'bg-foreground/[0.07] dark:bg-white/[0.1]'
+            : !selectedSpecialistId && 'bg-foreground/[0.04] dark:bg-white/[0.05]'
+        )}
         onClick={() => onSelect(null)}
       >
-        <span className="bg-muted-foreground/40 size-2.5 shrink-0 rounded-full" />
-        <span className="flex-1 truncate">None</span>
-        {!selectedSpecialistId ? <Check className="size-3.5" /> : null}
+        <span className="border-border/70 bg-muted/40 flex size-6 shrink-0 items-center justify-center rounded-full border">
+          <span className="bg-muted-foreground/50 size-2 rounded-full" />
+        </span>
+        <span className="flex-1 truncate font-medium">None</span>
+        {!selectedSpecialistId ? <Check className="size-3.5 shrink-0" /> : null}
       </button>
-      {specialists
-        .filter(item => item.enabled !== false)
-        .map(item => (
+      {specialists.map((item, idx) => {
+        const isSelected = item.id === selectedSpecialistId
+        const rowIndex = idx + 1
+        return (
           <button
             key={item.id}
             type="button"
-            className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+            onMouseEnter={() => onHoverIndex(rowIndex)}
+            className={cn(
+              'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+              activeIndex === rowIndex
+                ? 'bg-foreground/[0.07] dark:bg-white/[0.1]'
+                : isSelected && 'bg-foreground/[0.04] dark:bg-white/[0.05]'
+            )}
             onClick={() => onSelect(item.id)}
           >
-            <span
-              className={cn(
-                'flex size-4 shrink-0 items-center justify-center rounded-full text-white [&_svg]:text-white',
-                specialistColorClass(item.color)
-              )}
-            >
-              <SpecialistGlyph icon={item.icon} className="size-2.5" />
+            <SpecialistAvatar
+              color={item.color}
+              icon={item.icon}
+              avatarUrl={item.avatarUrl}
+              slug={item.slug}
+              className="size-6"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                {item.name}
+              </span>
+              {item.roleLabel && item.roleLabel !== item.name ? (
+                <span className="text-muted-foreground block truncate text-[11px]">
+                  {item.roleLabel}
+                </span>
+              ) : null}
             </span>
-            <span className="min-w-0 flex-1 truncate">{item.name}</span>
-            {item.id === selectedSpecialistId ? (
-              <Check className="size-3.5" />
-            ) : null}
+            {isSelected ? <Check className="size-3.5 shrink-0" /> : null}
           </button>
-        ))}
+        )
+      })}
       {onCreate ? (
         <button
           type="button"
-          className="hover:bg-muted flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+          onMouseEnter={() => onHoverIndex(specialists.length + 1)}
+          className={cn(
+            'mt-0.5 flex w-full items-center gap-2.5 rounded-lg border-t border-border/50 px-2.5 pt-2 pb-1.5 text-left text-sm transition-colors',
+            activeIndex === specialists.length + 1 &&
+              'bg-foreground/[0.07] dark:bg-white/[0.1]'
+          )}
           onClick={onCreate}
         >
           <Plus className="size-3.5" />
@@ -596,8 +937,8 @@ function MenuRow({
     <button
       type="button"
       className={cn(
-        'hover:bg-muted flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left',
-        active && 'bg-muted'
+        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors',
+        active && 'bg-foreground/[0.07] dark:bg-white/[0.1]'
       )}
       onClick={onClick}
       onMouseEnter={onMouseEnter}

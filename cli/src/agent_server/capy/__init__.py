@@ -36,6 +36,10 @@ CAPY_TOOL_NAMES = [
     "capy.import_external_session",
     "capy.launch_external_agent",
     "capy.handoff_session",
+    "capy.list_specialists",
+    "capy.memory_search",
+    "capy.wiki_digest",
+    "capy.distill_session",
 ]
 
 # Deep Agents builtins Capy must not see (no sandbox / PTC).

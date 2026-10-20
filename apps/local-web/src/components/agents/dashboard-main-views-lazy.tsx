@@ -124,3 +124,8 @@ export const LibraryView = lazy(() =>
     default: m.LibraryView
   }))
 )
+export const MemoryView = lazy(() =>
+  import('@/components/agents/MemoryView').then(m => ({
+    default: m.MemoryView
+  }))
+)

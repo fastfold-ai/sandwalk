@@ -786,6 +786,25 @@ export type SpecialistColor =
   | 'pink'
 
 export type SpecialistIcon =
+  | 'capybara'
+  | 'owl'
+  | 'fox'
+  | 'wolf'
+  | 'badger'
+  | 'octopus'
+  | 'falcon'
+  | 'chameleon'
+  | 'capy-field'
+  | 'bumble'
+  | 'fizz'
+  | 'honey'
+  | 'soren'
+  | 'nova'
+  | 'atlas'
+  | 'milo'
+  | 'helix'
+  | 'orbit'
+  | 'spark'
   | 'agent'
   | 'organization'
   | 'chat'
@@ -816,6 +835,14 @@ export type Specialist = {
   instructions: string | null
   color: SpecialistColor | string
   icon: SpecialistIcon | string
+  roleLabel?: string | null
+  avatarUrl?: string | null
+  provider?: string | null
+  model?: string | null
+  openaiProfileId?: string | null
+  cookbookId?: string | null
+  priors?: string | null
+  memoryCount?: number
   skillNames: string[]
   toolNames: string[]
   mcpServerIds: string[]
@@ -1937,6 +1964,13 @@ export interface AgentClient {
       instructions?: string | null
       color?: string
       icon?: string
+      roleLabel?: string | null
+      avatarUrl?: string | null
+      provider?: string | null
+      model?: string | null
+      openaiProfileId?: string | null
+      cookbookId?: string | null
+      priors?: string | null
       skillNames?: string[]
       toolNames?: string[]
       mcpServerIds?: string[]
@@ -1954,6 +1988,15 @@ export interface AgentClient {
       instructions?: string | null
       color?: string
       icon?: string
+      roleLabel?: string | null
+      avatarUrl?: string | null
+      provider?: string | null
+      model?: string | null
+      openaiProfileId?: string | null
+      clearLlm?: boolean
+      cookbookId?: string | null
+      priors?: string | null
+      clearPriors?: boolean
       skillNames?: string[]
       toolNames?: string[]
       mcpServerIds?: string[]
@@ -2117,3 +2160,224 @@ export interface AgentClient {
     }
   ): Promise<void>
 }
+
+export type MemoryEntry = {
+  id: string
+  scope: string
+  target: 'user' | 'memory' | 'project' | 'specialist'
+  layer: 'L1' | 'L2' | 'L3'
+  content: string
+  tags: string[]
+  pinned: boolean
+  status: 'active' | 'pending' | 'rejected'
+  sourceSessionId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type MemoryEntryList = {
+  data: MemoryEntry[]
+  scope: string
+  charUsed: number
+  charLimit: number
+  userCharUsed: number
+  userCharLimit: number
+}
+
+export type PendingMemoryWrite = {
+  id: string
+  scope: string
+  kind: 'memory' | 'wiki' | 'graph_claim' | 'graph_node'
+  action: 'add' | 'patch' | 'remove' | 'write' | 'claim' | 'node'
+  summary: string
+  payload: Record<string, unknown>
+  sourceSessionId?: string | null
+  createdAt: string
+}
+
+export type WikiPageSummary = {
+  slug: string
+  title: string
+  scope: string
+  summary: string
+  tags: string[]
+  links: string[]
+  backlinks: string[]
+  updatedAt: string
+  path: string
+}
+
+export type WikiPageDetail = WikiPageSummary & {
+  content: string
+}
+
+export type OntologyPropertyDef = {
+  name: string
+  type: string
+  isKey: boolean
+  isIndexed: boolean
+  optional: boolean
+}
+
+export type OntologyNodeTypeDef = {
+  name: string
+  layer: string
+  color: string
+  description: string
+  count: number
+  properties: OntologyPropertyDef[]
+}
+
+export type OntologyEdgeTypeDef = {
+  predicate: string
+  sourceType: string
+  targetType: string
+  polarity: 'support' | 'contradict' | 'neutral'
+  count: number
+}
+
+export type OntologyLayerDef = {
+  id: string
+  label: string
+  description: string
+  nodeTypes: string[]
+}
+
+export type StoredQueryDef = {
+  name: string
+  label: string
+  description: string
+  gqSource: string
+}
+
+export type CookbookSummary = {
+  id: string
+  number: string
+  name: string
+  tagline: string
+  description: string
+  defaultFor: string
+  layers: OntologyLayerDef[]
+  nodeTypes: OntologyNodeTypeDef[]
+  edgeTypes: OntologyEdgeTypeDef[]
+  storedQueries: StoredQueryDef[]
+  pgSchema: string
+}
+
+export type GraphNode = {
+  id: string
+  slug: string
+  nodeType: string
+  layer: string
+  name: string
+  summary: string
+  tags: string[]
+  properties: Record<string, unknown>
+  sourceRef?: string | null
+  branch: string
+  updatedAt: string
+}
+
+export type GraphEdge = {
+  id: string
+  sourceId: string
+  targetId: string
+  predicate: string
+  polarity: 'support' | 'contradict' | 'neutral'
+  score: number
+  summary: string
+  sourceRef?: string | null
+  branch: string
+  updatedAt: string
+}
+
+export type GraphBranch = {
+  name: string
+  isDefault: boolean
+  nodeCount: number
+  edgeCount: number
+  updatedAt: string
+}
+
+export type GraphSnapshot = {
+  scope: string
+  branch: string
+  activeCookbook: CookbookSummary
+  branches: GraphBranch[]
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  contradictionCount: number
+  matchedNodeIds: string[]
+  activeQueryName?: string | null
+}
+
+export type OmnigraphEngineStatus = {
+  installed: boolean
+  binaryPath?: string | null
+  serverBinaryPath?: string | null
+  version?: string | null
+  storePath: string
+  mcpEnabled: boolean
+  phase: 'idle' | 'installing' | 'ready' | 'error'
+  detail: string
+}
+
+export type MemorySettings = {
+  enabled: boolean
+  userProfileEnabled: boolean
+  wikiEnabled: boolean
+  graphEnabled: boolean
+  defaultCookbook: string
+  globalCookbook: string
+  memoryCharLimit: number
+  userCharLimit: number
+  wikiTocMaxChars: number
+  writeApproval: boolean
+  graphBranchOnWrite: boolean
+  distillerMode: 'hybrid' | 'manual' | 'auto'
+  distillerProvider: string
+  distillerModel: string
+  distillerOpenaiProfileId: string
+  distillerDeferOnLocalGpu: boolean
+  distillerMaxInputTokens: number
+  embeddingsProvider:
+    | 'none'
+    | 'openrouter'
+    | 'openai'
+    | 'gemini'
+    | 'local_llama'
+    | 'custom_profile'
+  embeddingsModel: string
+  embeddingsProfileId: string
+}
+
+export type MemoryOverview = {
+  scope: string
+  activeCookbookId: string
+  memoryCount: number
+  userMemoryCount: number
+  pendingCount: number
+  wikiPageCount: number
+  graphNodeCount: number
+  graphEdgeCount: number
+  contradictionCount: number
+  charUsed: number
+  charLimit: number
+  userCharUsed: number
+  userCharLimit: number
+  omnigraph: OmnigraphEngineStatus
+  settings: MemorySettings
+}
+
+export type DistillSessionResponse = {
+  ok: boolean
+  sessionId: string
+  scope: string
+  memoriesAdded: number
+  wikiSlug?: string | null
+  nodesAdded: number
+  claimsAdded: number
+  stagedForApproval: boolean
+  summary: string
+}
+

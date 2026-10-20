@@ -6,6 +6,10 @@ import type { DashboardMainViewsProps } from './dashboard-main-views-types'
 export function DashboardMainSpecialistsPanel({
   client,
   navigate,
+  health,
+  activeProjectId,
+  openSessionTab,
+  loadSessions,
   specialistsViewMode,
   specialistsEditId,
   specialists,
@@ -20,6 +24,10 @@ export function DashboardMainSpecialistsPanel({
   DashboardMainViewsProps,
   | 'client'
   | 'navigate'
+  | 'health'
+  | 'activeProjectId'
+  | 'openSessionTab'
+  | 'loadSessions'
   | 'specialistsViewMode'
   | 'specialistsEditId'
   | 'specialists'
@@ -39,6 +47,8 @@ export function DashboardMainSpecialistsPanel({
       skills={skills}
       mcpServers={mcpServers}
       mcpCatalog={mcpCatalog}
+      client={client}
+      userName={health?.userName ?? null}
       loading={specialistsLoading || (connecting && specialists.length === 0)}
       onRefresh={loadSpecialists}
       onCreate={input => client.createSpecialist(input)}
@@ -48,6 +58,24 @@ export function DashboardMainSpecialistsPanel({
       onOpenEdit={id =>
         navigate(`/dashboard/specialists/${encodeURIComponent(id)}`)
       }
+      onStartChat={spec => {
+        void client
+          .createSession({
+            title: `Chat with ${spec.name}`,
+            projectId: activeProjectId,
+            specialistId: spec.id,
+            clientSurface: 'ui'
+          })
+          .then(async created => {
+            await loadSessions()
+            openSessionTab(created.id, activeProjectId ?? undefined)
+            navigate(`/agents/${created.id}`)
+          })
+      }}
+      onExploreBrain={spec => {
+        navigate(`/dashboard/memory?scope=${encodeURIComponent(`specialist:${spec.id}`)}`)
+      }}
+      onOpenDefaults={() => navigate('/dashboard/memory?tab=settings')}
       onBack={() => navigateBack(navigate, '/dashboard/specialists')}
       onManageSkills={() => navigate('/dashboard/skills')}
       onManageMcps={() => navigate('/dashboard/mcp')}

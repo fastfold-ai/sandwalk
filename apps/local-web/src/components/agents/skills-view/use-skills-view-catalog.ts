@@ -5,7 +5,7 @@ import type {
   AgentCatalogSkillDetail,
   AgentSkillDetail
 } from '@sandwalk/agent-ui-core'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   formatSkillInstallError,
@@ -107,10 +107,14 @@ export function useSkillsViewCatalog({
     onListCatalogLeaderboard
   })
 
+  const onBackRef = useRef(onBack)
+  onBackRef.current = onBack
+  const catalogRouteId = catalogSkillRoute?.id || ''
+
   useEffect(() => {
-    if (mode !== 'catalog_detail' || !catalogSkillRoute) return
+    if (mode !== 'catalog_detail' || !catalogRouteId) return
     setCatalogInstallError(null)
-  }, [catalogSkillRoute, mode])
+  }, [catalogRouteId, mode])
 
   useEffect(() => {
     if (!copiedCatalogInstall) return
@@ -121,12 +125,12 @@ export function useSkillsViewCatalog({
   useEffect(() => {
     if (!openCatalogSearchInitially) return
     if (!catalogSearchEnabled) {
-      onBack()
+      onBackRef.current()
       return
     }
     setCatalogSearchMode(true)
-    onBack()
-  }, [catalogSearchEnabled, onBack, openCatalogSearchInitially])
+    onBackRef.current()
+  }, [catalogSearchEnabled, openCatalogSearchInitially])
 
   useEffect(() => {
     if (catalogSearchEnabled) return

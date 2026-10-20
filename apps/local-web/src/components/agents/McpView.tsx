@@ -133,8 +133,9 @@ export function McpView({
       {canEditJson ? (
         <Button
           type="button"
-          variant="secondary"
+          variant="outline"
           size="sm"
+          className="border-border/60 bg-muted/20 hover:bg-muted/35 rounded-xl"
           onClick={() => setJsonOpen(true)}
         >
           <Code2 className="size-3.5" />

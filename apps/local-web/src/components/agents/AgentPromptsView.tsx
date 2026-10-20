@@ -267,7 +267,9 @@ export function AgentPromptsView({
                       <SpecialistAvatar
                         color={selectedSpecialist.color}
                         icon={selectedSpecialist.icon}
-                        className="size-7 rounded-lg"
+                        avatarUrl={selectedSpecialist.avatarUrl}
+                        slug={selectedSpecialist.slug}
+                        className="size-7"
                       />
                     ) : (
                       <span className="bg-muted/40 flex size-7 shrink-0 items-center justify-center rounded-lg">
@@ -312,7 +314,9 @@ export function AgentPromptsView({
                       <SpecialistAvatar
                         color={item.color}
                         icon={item.icon}
-                        className="size-7 rounded-lg"
+                        avatarUrl={item.avatarUrl}
+                        slug={item.slug}
+                        className="size-7"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">
