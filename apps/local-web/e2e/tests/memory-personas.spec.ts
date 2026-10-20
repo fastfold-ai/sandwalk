@@ -61,20 +61,22 @@ test.describe('Memory, Omnigraph Cookbooks, and Persona Specialists UI', () => {
     await specialistChip.locator('button').first().click()
     await expect(page.getByText('SPECIALIST', { exact: false }).first()).toBeVisible()
 
-    // 2. Navigate to Memory & Wiki (/dashboard/memory)
+    // 2. Navigate to Memory & Wiki (/dashboard/memory) — opens on Memories tab by default
     await page.goto('/dashboard/memory')
     await expect(
       page.getByRole('heading', { name: /Memory & Knowledge/i })
     ).toBeVisible({ timeout: 15_000 })
-
-    // Verify Level 1 Ontology Blueprint view renders layers and node types
     await expect(
-      page.getByRole('button', { name: /Level 1 · Ontology Blueprint/i })
+      page.getByRole('heading', { name: /About You \(USER\.md Profile\)/i })
     ).toBeVisible()
 
-    // Switch to Level 2 Instance Graph view
+    // Switch to Knowledge Graph tab (defaults to Level 2 Instance Graph)
+    await page.getByRole('button', { name: /Knowledge Graph/i }).click()
+    await expect(
+      page.getByRole('button', { name: /Level 2 · Instance Graph/i })
+    ).toBeVisible()
     await page
-      .getByRole('button', { name: /Level 2 · Instance Graph/i })
+      .getByRole('button', { name: /Level 1 · Ontology Blueprint/i })
       .click()
 
     // Switch to Cookbooks Studio tab and verify 06 Second brain is Active Mode

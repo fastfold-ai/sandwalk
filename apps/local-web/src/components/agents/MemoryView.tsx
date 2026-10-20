@@ -80,11 +80,11 @@ export function MemoryView({
   const initialScope =
     searchParams.get('scope') ||
     (activeProjectId ? `project:${activeProjectId}` : 'global')
-  const initialTab = (searchParams.get('tab') as MemoryTab) || 'graph'
+  const initialTab = (searchParams.get('tab') as MemoryTab) || 'memories'
 
   const [scope, setScope] = useState<string>(initialScope)
   const [activeTab, setActiveTab] = useState<MemoryTab>(initialTab)
-  const [visualMode, setVisualMode] = useState<GraphVisualMode>('blueprint')
+  const [visualMode, setVisualMode] = useState<GraphVisualMode>('instances')
   const [branch, setBranch] = useState<string>('main')
   const [activeQueryName, setActiveQueryName] = useState<string | null>(null)
   const [selectedNodeTypeFilter, setSelectedNodeTypeFilter] = useState<
@@ -154,6 +154,26 @@ export function MemoryView({
       setWikiPages(wiki)
       if (gr.activeCookbook.nodeTypes.length > 0) {
         setNewNodeType(gr.activeCookbook.nodeTypes[0].name)
+      }
+      if (wiki.length > 0) {
+        const preferred =
+          wiki.find(w => w.slug === 'index') ?? wiki[0]
+        if (preferred) {
+          client
+            .getWikiPage(preferred.slug, scope)
+            .then(detail => {
+              setActiveWikiPage(detail)
+              setWikiSlug(detail.slug)
+              setWikiTitle(detail.title)
+              setWikiContent(detail.content)
+            })
+            .catch(() => {})
+        }
+      } else {
+        setActiveWikiPage(null)
+        setWikiSlug('')
+        setWikiTitle('')
+        setWikiContent('')
       }
     } catch (err) {
       toast.error(
@@ -438,12 +458,20 @@ export function MemoryView({
   }
 
   const cb = graph?.activeCookbook
+  const userMemories = useMemo(
+    () => memories.filter(m => m.scope === 'user' || m.target === 'user'),
+    [memories]
+  )
+  const scopeMemories = useMemo(
+    () => memories.filter(m => m.scope !== 'user' && m.target !== 'user'),
+    [memories]
+  )
 
   return (
     <div className="chat-scrollbar flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-5 pt-6 pb-10 md:px-8 md:pt-8">
-        {/* Top Header + Scope Selector + Distill Session Bar */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 pt-6 pb-10 md:px-8 md:pt-8">
+        {/* Single Clean Header Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {activeSpecialist ? (
               <SpecialistAvatar
@@ -454,34 +482,34 @@ export function MemoryView({
                 size="md"
               />
             ) : (
-              <span className="bg-primary/10 text-primary flex size-11 items-center justify-center rounded-2xl">
+              <span className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-2xl">
                 <Brain className="size-5" />
               </span>
             )}
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-2xl font-semibold tracking-tight">
+                <h2 className="text-xl font-semibold tracking-tight">
                   {activeSpecialist
                     ? `${activeSpecialist.name}’s Brain`
                     : 'Memory & Knowledge'}
                 </h2>
                 {cb ? (
-                  <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  <span className="bg-muted/40 text-muted-foreground border-border/50 rounded-full border px-2.5 py-0.5 text-[11px] font-medium">
                     {cb.number} {cb.name}
                   </span>
                 ) : null}
               </div>
-              <p className="text-muted-foreground mt-0.5 text-sm">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 {activeSpecialist
                   ? activeSpecialist.priors ||
                     activeSpecialist.description ||
                     'Persona priors, learned memories, and ontology lens.'
-                  : 'Curated session-start snapshots, Living Markdown Wiki, and Omnigraph Cookbook ontologies.'}
+                  : 'What Sandwalk remembers about you, your Living Wiki notes, and your local Knowledge Graph.'}
               </p>
             </div>
           </div>
 
-          {/* Scope Picker + Session Distiller */}
+          {/* Right Header Controls: Brain Scope + Load Demo + Settings */}
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={scope}
@@ -514,122 +542,52 @@ export function MemoryView({
               )}
             </select>
 
-            <div className="flex items-center gap-1">
-              <select
-                value={distillSessionId}
-                onChange={e => setDistillSessionId(e.target.value)}
-                className="border-border/60 bg-muted/25 h-9 max-w-[210px] rounded-xl border px-2.5 text-xs"
-              >
-                <option value="">Distill a chat session…</option>
-                {sessions.slice(0, 25).map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                  </option>
-                ))}
-              </select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  await client.seedMemoryDemo(true)
+                  await loadAll()
+                  toast.success('Loaded starter Memories, Wiki & Second Brain demo')
+                } finally {
+                  setBusy(false)
+                }
+              }}
+              className="h-9 gap-1.5 rounded-xl text-xs"
+              title="Populate realistic Memories, Living Wiki pages, Omnigraph branches/claims, and multi-turn Otium & Soren example chats"
+            >
+              <RefreshCw className="size-3.5" />
+              Load Demo
+            </Button>
+
+            {activeSpecialist ? (
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                disabled={!distillSessionId || busy}
-                onClick={() => void handleDistillSession()}
-                className="h-9 gap-1.5 rounded-xl text-xs"
+                className="h-9 rounded-xl text-xs"
+                onClick={() => navigate('/dashboard/specialists')}
               >
-                <Sparkles className="size-3.5" />
-                Distill
+                Back to Agents
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true)
-                  try {
-                    await client.seedMemoryDemo(true)
-                    await loadAll()
-                  } finally {
-                    setBusy(false)
-                  }
-                }}
-                className="h-9 gap-1.5 rounded-xl text-xs"
-                title="Populate realistic Memories, Living Wiki pages, Omnigraph branches/claims, and multi-turn Otium & Soren example chats"
-              >
-                <RefreshCw className="size-3.5" />
-                Load Demo
-              </Button>
-            </div>
+            ) : null}
           </div>
         </div>
 
-        {/* Summary Strip */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="border-border/50 bg-muted/20 rounded-2xl border p-3.5">
-            <div className="text-muted-foreground text-[11px]">
-              MEMORY.md Snapshot
-            </div>
-            <div className="mt-1 text-base font-semibold">
-              {overview?.charUsed ?? 0}{' '}
-              <span className="text-muted-foreground text-xs font-normal">
-                / {overview?.charLimit ?? 2200} chars
-              </span>
-            </div>
-          </div>
-          <div className="border-border/50 bg-muted/20 rounded-2xl border p-3.5">
-            <div className="text-muted-foreground text-[11px]">
-              USER.md Profile
-            </div>
-            <div className="mt-1 text-base font-semibold">
-              {overview?.userCharUsed ?? 0}{' '}
-              <span className="text-muted-foreground text-xs font-normal">
-                / {overview?.userCharLimit ?? 1375} chars
-              </span>
-            </div>
-          </div>
-          <div className="border-border/50 bg-muted/20 rounded-2xl border p-3.5">
-            <div className="text-muted-foreground text-[11px]">
-              Living Wiki Pages
-            </div>
-            <div className="mt-1 text-base font-semibold">
-              {wikiPages.length}
-            </div>
-          </div>
-          <div className="border-border/50 bg-muted/20 rounded-2xl border p-3.5">
-            <div className="text-muted-foreground text-[11px]">
-              Graph Nodes & Edges
-            </div>
-            <div className="mt-1 text-base font-semibold">
-              {graph?.nodes.length ?? 0} nodes · {graph?.edges.length ?? 0}{' '}
-              edges
-            </div>
-          </div>
-          <div className="border-border/50 bg-muted/20 rounded-2xl border p-3.5">
-            <div className="text-muted-foreground text-[11px]">
-              Contested Claims
-            </div>
-            <div className="mt-1 flex items-center gap-1.5 text-base font-semibold">
-              {(graph?.contradictionCount ?? 0) > 0 ? (
-                <AlertTriangle className="size-4 text-amber-500" />
-              ) : null}
-              {graph?.contradictionCount ?? 0}
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Pills */}
-        <div className="border-border/60 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        {/* Clean 3-Tab Navigation Bar + Compact Status & Secondary Tools */}
+        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          {/* Primary 3 Tabs: Memories -> Living Wiki -> Knowledge Graph */}
           <div className="flex flex-wrap items-center gap-1.5">
             {(
               [
                 {
-                  id: 'graph',
-                  label: 'Ontology & Graph Explorer',
-                  icon: Network
-                },
-                {
-                  id: 'cookbooks',
-                  label: 'Cookbook Modes (01–06)',
-                  icon: Layers
+                  id: 'memories',
+                  label: `Memories (${memories.length}${pendingWrites.length ? ` · ${pendingWrites.length} pending` : ''})`,
+                  icon: Database
                 },
                 {
                   id: 'wiki',
@@ -637,14 +595,9 @@ export function MemoryView({
                   icon: BookOpen
                 },
                 {
-                  id: 'memories',
-                  label: `Memories & Approvals (${memories.length}${pendingWrites.length ? ` · ${pendingWrites.length} pending` : ''})`,
-                  icon: Database
-                },
-                {
-                  id: 'settings',
-                  label: 'Models, Control & Omnigraph',
-                  icon: Settings2
+                  id: 'graph',
+                  label: `Knowledge Graph (${graph?.nodes.length ?? 0})`,
+                  icon: Network
                 }
               ] as const
             ).map(tab => {
@@ -658,7 +611,7 @@ export function MemoryView({
                     'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors',
                     activeTab === tab.id
                       ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
                   )}
                 >
                   <Icon className="size-3.5" />
@@ -668,54 +621,107 @@ export function MemoryView({
             })}
           </div>
 
-          {activeSpecialist ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => navigate('/dashboard/specialists')}
+          {/* Right side of Tab Bar: Compact Capacity Pills + Cookbook Modes + Settings */}
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span
+              className="border-border/50 bg-muted/20 text-muted-foreground rounded-full border px-2.5 py-1"
+              title="MEMORY.md session-start snapshot budget"
             >
-              Back to Agents
-            </Button>
-          ) : null}
+              MEMORY{' '}
+              <strong className="text-foreground font-medium">
+                {overview?.charUsed ?? 0}
+              </strong>
+              /{overview?.charLimit ?? 2200}
+            </span>
+            <span
+              className="border-border/50 bg-muted/20 text-muted-foreground rounded-full border px-2.5 py-1"
+              title="USER.md profile snapshot budget"
+            >
+              USER{' '}
+              <strong className="text-foreground font-medium">
+                {overview?.userCharUsed ?? 0}
+              </strong>
+              /{overview?.userCharLimit ?? 1375}
+            </span>
+            {(graph?.contradictionCount ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('graph')
+                  setVisualMode('instances')
+                }}
+                className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-400 transition-colors hover:bg-amber-500/20"
+              >
+                <AlertTriangle className="size-3" />
+                {graph?.contradictionCount} contested
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('cookbooks')}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                activeTab === 'cookbooks'
+                  ? 'bg-foreground text-background border-transparent'
+                  : 'border-border/50 bg-muted/20 text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Layers className="size-3.5" />
+              Cookbook Modes
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              title="Models, Control & Omnigraph"
+              aria-label="Models, Control & Omnigraph"
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                activeTab === 'settings'
+                  ? 'bg-foreground text-background border-transparent'
+                  : 'border-border/50 bg-muted/20 text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Settings2 className="size-3.5" />
+              <span>Settings</span>
+              <span className="sr-only">Models, Control & Omnigraph</span>
+            </button>
+          </div>
         </div>
 
-        {/* TAB 1: ONTOLOGY & GRAPH EXPLORER */}
+        {/* TAB: KNOWLEDGE GRAPH EXPLORER */}
         {activeTab === 'graph' && cb && (
           <div className="space-y-4">
-            {/* Toolbar: Visual Mode Toggle + Stored Queries + Branch Bar */}
-            <div className="border-border/60 bg-muted/20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3">
+            {/* Toolbar: Instance Graph (Default) vs Schema Blueprint + Inline Mode Picker + Stored Queries + Branch */}
+            <div className="border-border/50 bg-muted/20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3">
               <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setVisualMode('blueprint')}
-                  className={cn(
-                    'rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
-                    visualMode === 'blueprint'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  Level 1 · Ontology Blueprint
-                </button>
                 <button
                   type="button"
                   onClick={() => setVisualMode('instances')}
                   className={cn(
                     'rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
                     visualMode === 'instances'
-                      ? 'bg-background text-foreground shadow-sm'
+                      ? 'bg-foreground text-background shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
                   Level 2 · Instance Graph ({graph?.nodes.length ?? 0})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setVisualMode('blueprint')}
+                  className={cn(
+                    'rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+                    visualMode === 'blueprint'
+                      ? 'bg-foreground text-background shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Level 1 · Ontology Blueprint
+                </button>
 
                 <span className="text-muted-foreground mx-1 text-xs">|</span>
-                <span className="text-muted-foreground text-xs font-medium">
-                  Stored Queries:
-                </span>
                 {cb.storedQueries.map(sq => {
                   const active = activeQueryName === sq.name
                   return (
@@ -731,7 +737,7 @@ export function MemoryView({
                         'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                         active
                           ? 'border-primary bg-primary/15 text-primary'
-                          : 'border-border/60 bg-background/60 text-muted-foreground hover:text-foreground'
+                          : 'border-border/50 bg-muted/25 text-muted-foreground hover:text-foreground'
                       )}
                     >
                       {sq.label}
@@ -752,14 +758,28 @@ export function MemoryView({
                 )}
               </div>
 
-              {/* Branch Switcher + Seed Quick Button */}
+              {/* Right Graph Controls: Inline Mode Picker + Branch Switcher */}
               <div className="flex flex-wrap items-center gap-2">
+                {cookbooks.length > 0 && (
+                  <select
+                    value={cb.id}
+                    aria-label="Cookbook mode"
+                    onChange={e => void handleSelectCookbook(e.target.value, false)}
+                    className="border-border/60 bg-muted/25 h-8 rounded-lg border px-2.5 text-xs font-medium"
+                  >
+                    {cookbooks.map(item => (
+                      <option key={item.id} value={item.id}>
+                        Mode: {item.number} {item.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <div className="flex items-center gap-1">
                   <GitBranch className="text-muted-foreground size-3.5" />
                   <select
                     value={branch}
                     onChange={e => setBranch(e.target.value)}
-                    className="border-border/60 bg-background h-8 rounded-lg border px-2 text-xs"
+                    className="border-border/60 bg-muted/25 h-8 rounded-lg border px-2 text-xs"
                   >
                     {(graph?.branches ?? []).map(b => (
                       <option key={b.name} value={b.name}>
@@ -1355,7 +1375,7 @@ export function MemoryView({
           </div>
         )}
 
-        {/* TAB 4: MEMORIES & PENDING APPROVALS */}
+        {/* TAB 1 (DEFAULT): MEMORIES & PENDING APPROVALS */}
         {activeTab === 'memories' && (
           <div className="space-y-4">
             {pendingWrites.length > 0 && (
@@ -1366,7 +1386,7 @@ export function MemoryView({
                 {pendingWrites.map(pw => (
                   <div
                     key={pw.id}
-                    className="bg-background/80 flex items-center justify-between gap-3 rounded-xl p-2.5 text-xs"
+                    className="bg-muted/30 flex items-center justify-between gap-3 rounded-xl p-2.5 text-xs"
                   >
                     <span>{pw.summary}</span>
                     <div className="flex items-center gap-1.5">
@@ -1402,72 +1422,195 @@ export function MemoryView({
               </div>
             )}
 
-            <div className="border-border/60 bg-muted/15 flex flex-wrap items-center gap-2 rounded-2xl border p-3">
-              <select
-                value={newMemoryTarget}
-                onChange={e =>
-                  setNewMemoryTarget(e.target.value as 'memory' | 'user')
-                }
-                className="border-border/60 bg-background h-9 rounded-xl border px-2.5 text-xs"
-              >
-                <option value="memory">MEMORY.md ({scope})</option>
-                <option value="user">USER.md (User Profile)</option>
-              </select>
-              <Input
-                value={newMemoryContent}
-                onChange={e => setNewMemoryContent(e.target.value)}
-                placeholder="Add a compact, high-signal memory entry or rule..."
-                className="h-9 flex-1 text-xs"
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    void handleAddMemory()
+            {/* Quick Add Memory + Inline Session Distiller Bar */}
+            <div className="border-border/50 bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-2xl border p-3">
+              <div className="flex min-w-[280px] flex-1 items-center gap-2">
+                <select
+                  value={newMemoryTarget}
+                  onChange={e =>
+                    setNewMemoryTarget(e.target.value as 'memory' | 'user')
                   }
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                className="h-9 rounded-xl px-4 text-xs"
-                onClick={() => void handleAddMemory()}
-              >
-                Add Entry
-              </Button>
+                  className="border-border/60 bg-muted/25 h-9 rounded-xl border px-2.5 text-xs font-medium"
+                >
+                  <option value="memory">MEMORY.md ({scope})</option>
+                  <option value="user">USER.md (About You)</option>
+                </select>
+                <Input
+                  value={newMemoryContent}
+                  onChange={e => setNewMemoryContent(e.target.value)}
+                  placeholder="Teach Sandwalk a preference, rule, or fact to remember..."
+                  className="h-9 flex-1 text-xs"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void handleAddMemory()
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 rounded-xl px-4 text-xs"
+                  onClick={() => void handleAddMemory()}
+                >
+                  Add Memory
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={distillSessionId}
+                  onChange={e => setDistillSessionId(e.target.value)}
+                  className="border-border/60 bg-muted/25 h-9 max-w-[210px] rounded-xl border px-2.5 text-xs"
+                >
+                  <option value="">Distill from chat session…</option>
+                  {sessions.slice(0, 25).map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={!distillSessionId || busy}
+                  onClick={() => void handleDistillSession()}
+                  className="h-9 gap-1.5 rounded-xl text-xs"
+                >
+                  <Sparkles className="size-3.5" />
+                  Distill
+                </Button>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              {memories.map(entry => (
-                <div
-                  key={entry.id}
-                  className="border-border/60 bg-muted/15 flex items-start justify-between gap-3 rounded-2xl border p-3.5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="bg-background border-border/60 rounded-full border px-2 py-0.5 font-mono text-[10px]">
-                        {entry.scope === 'user' ? 'USER.md' : entry.scope}
-                      </span>
-                      <span className="text-muted-foreground text-[11px]">
-                        {entry.content.length} chars
-                      </span>
-                    </div>
-                    <p className="mt-1.5 text-sm leading-relaxed">
-                      {entry.content}
+            {/* Clean 2-Column Split: Workspace/Persona Memory (MEMORY.md) vs About You (USER.md) */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* Left Column: MEMORY.md (Scope Rules & Facts) */}
+              <div className="border-border/50 bg-muted/15 space-y-3 rounded-2xl border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">
+                      {activeSpecialist
+                        ? `${activeSpecialist.name}’s Learned Memory (MEMORY.md)`
+                        : 'Workspace & Operating Rules (MEMORY.md)'}
+                    </h3>
+                    <p className="text-muted-foreground text-[11px]">
+                      Injected at the start of every session in this scope
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void client
-                        .deleteMemoryEntry(entry.id)
-                        .then(() => loadAll())
-                    }}
-                    className="text-muted-foreground hover:text-destructive p-1"
-                    title="Delete entry"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <span className="text-muted-foreground font-mono text-xs">
+                    {overview?.charUsed ?? 0} / {overview?.charLimit ?? 2200} chars
+                  </span>
                 </div>
-              ))}
+
+                {scopeMemories.length === 0 ? (
+                  <p className="text-muted-foreground py-6 text-center text-xs">
+                    No scope memories saved yet. Add one above or click Load Demo.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {scopeMemories.map(entry => (
+                      <div
+                        key={entry.id}
+                        className="border-border/50 bg-muted/20 flex items-start justify-between gap-3 rounded-xl border p-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs leading-relaxed">
+                            {entry.content}
+                          </p>
+                          {entry.tags && entry.tags.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {entry.tags.map(tag => (
+                                <span
+                                  key={tag}
+                                  className="border-border/50 bg-muted/30 text-muted-foreground rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void client
+                              .deleteMemoryEntry(entry.id)
+                              .then(() => loadAll())
+                          }}
+                          className="text-muted-foreground hover:text-destructive p-1"
+                          title="Delete entry"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: USER.md (About You) */}
+              <div className="border-border/50 bg-muted/15 space-y-3 rounded-2xl border p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold">
+                      About You (USER.md Profile)
+                    </h3>
+                    <p className="text-muted-foreground text-[11px]">
+                      Your personal preferences, role, and communication style
+                    </p>
+                  </div>
+                  <span className="text-muted-foreground font-mono text-xs">
+                    {overview?.userCharUsed ?? 0} / {overview?.userCharLimit ?? 1375} chars
+                  </span>
+                </div>
+
+                {userMemories.length === 0 ? (
+                  <p className="text-muted-foreground py-6 text-center text-xs">
+                    No personal profile notes yet. Switch target to USER.md above to add one.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {userMemories.map(entry => (
+                      <div
+                        key={entry.id}
+                        className="border-border/50 bg-muted/20 flex items-start justify-between gap-3 rounded-xl border p-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs leading-relaxed">
+                            {entry.content}
+                          </p>
+                          {entry.tags && entry.tags.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {entry.tags.map(tag => (
+                                <span
+                                  key={tag}
+                                  className="border-border/50 bg-muted/30 text-muted-foreground rounded-md border px-1.5 py-0.5 font-mono text-[10px]"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void client
+                              .deleteMemoryEntry(entry.id)
+                              .then(() => loadAll())
+                          }}
+                          className="text-muted-foreground hover:text-destructive p-1"
+                          title="Delete entry"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
