@@ -1,0 +1,48 @@
+---
+title: Benchmarking & Evaluation
+description: Measure models, Specialists, skills, tools, and sandboxes end-to-end.
+---
+
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/bench.png"
+    alt="Sandwalk Benchmarking: Eval results with suite filter and side-by-side comparison"
+    className="w-full"
+  />
+</div>
+
+In science and ambitious engineering, changing a model, a Specialist, a skill, or a memory architecture should be **measured, not guessed**. Sandwalk includes a built-in evaluation harness (**Dashboard → Benchmarking** and `sandwalk eval` in the CLI) that runs real agent sessions end-to-end.
+
+## Shipped Benchmark Suites
+
+| Suite | Domain | What it measures |
+|-------|--------|------------------|
+| **MMLU / MMLU-Pro** | General & Scientific Reasoning | Multi-discipline knowledge and 10-option reasoning under the full agent harness |
+| **ARC-C** | Scientific Reasoning | Challenge-grade natural science questions |
+| **MBPP / LiveCodeBench** | Software Engineering | Code generation, sandbox execution, and test verification |
+| **BixBench** | Bioinformatics & CompBio | Real-world multi-step computational biology capsules and data analysis |
+| **Bio-Capybara** | Biomedical Research | Literature synthesis, target/compound lookup, and multi-tool biological workflows |
+
+## Running Evaluations
+
+From **Dashboard → Benchmarking**, pick one or more suites, select a model (or queue multiple models/Specialists for an A/B comparison), set concurrency and sample size, and click **Launch**.
+
+Or run headlessly from the CLI:
+
+```bash
+sandwalk eval
+```
+
+You can also ask **Capy** in any session: *"Run a 20-question BixBench comparison between Claude Sonnet and GPT-5 with the Single-cell Analyst specialist."*
+
+---
+
+## Benchmarking Roadmap (`TODO`)
+
+We are actively expanding the evaluation harness to benchmark long-horizon memory, multi-agent collaboration, and skill crystallization:
+
+- [ ] **Long-Horizon Memory & Omnigraph Recall Bench (`TODO`)** — Measure multi-session fact retention, `Supports` vs. `Contradicts` claim resolution, and KV-cache token efficiency across Cookbook modes `01–06`.
+- [ ] **Skill Crystallization Lift Eval (`TODO`)** — Quantify accuracy and step-count improvements before vs. after crystallizing domain sessions into reusable `~/.sandwalk/skills/<slug>/SKILL.md` skills.
+- [ ] **Multi-Specialist Grid vs. Single-Agent Ablations (`TODO`)** — Benchmark parallel Specialist cohorts (e.g., *Nova* + *Soren* + *Otium*) orchestrated by Capy against single-session baselines.
+- [ ] **SWE-bench Verified & Terminal-Bench Suites (`TODO`)** — First-class software engineering and PTY terminal benchmark suites alongside `BixBench` and `Bio-Capybara`.
+- [ ] **Automated CI Harness Regression Gates (`TODO`)** — Per-Specialist accuracy, latency, and token-budget gates enforced via `sandwalk eval` in CI.

@@ -1,37 +1,40 @@
 ---
 title: Configuration
-description: Config directory, keys, and local server auth.
+description: Everything under ~/.sandwalk/, environment variables, and LAN server authentication.
 ---
 
-## Config directory
+## On-Disk Layout (`~/.sandwalk/`)
 
-Runtime config and local data live under:
+Everything Sandwalk stores lives in open formats under `~/.sandwalk/`:
 
-```text
-~/.sandwalk/
-```
+| Path | Contents |
+|------|----------|
+| `config.json` | Providers, API keys, default model, sandbox & memory preferences |
+| `mcp.json` | MCP servers (`mcpServers`), Cursor-compatible (including `omnigraph` stdio MCP) |
+| `skills/` | Installed & crystallized skills (`<slug>/SKILL.md` + `references/`) |
+| `memory/` | `USER.md`, `MEMORY.md`, `memory.db`, `wiki/<scope>/*.md`, and `omni/<scope>/graph.omni` |
+| `bin/` | Managed local binaries (`omnigraph`, `omnigraph-server`, `sandwalk-omnigraph-mcp`) |
+| `workspaces/<session>/` | Per-session artifacts: `uploads/`, `outputs/`, `plans/`, `project/` |
+| `data/` | Local scientific datasets from `sandwalk data pull` (DepMap, MSigDB, STRING) |
+| `agent-server.db` | Sessions, Specialists, and messages shared by the CLI and Desktop/Web UI |
 
-Main file: `~/.sandwalk/config.json`. On first run, sandwalk copy-migrates from legacy `~/.fastfold-cli/` or `~/.ct/` if present (never overwrites existing files).
+Inspect or update configuration from the CLI:
 
 ```bash
 sandwalk config show
 sandwalk config set <key> <value>
 ```
 
-## Fastfold Cloud API key
+## Environment Variables
 
-Skills that call Fastfold Cloud resolve `FASTFOLD_API_KEY` from:
+Provider keys can also be supplied via standard environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `MOONSHOT_API_KEY`). Modal cloud sandboxes use `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` (or `modal setup`).
 
-1. Environment variable
-2. `.env` in the working directory (or parents)
-3. `~/.sandwalk/config.json` → `api.fastfold_cloud_key`
-4. Legacy fallback: `~/.fastfold-cli/config.json`
+## Protecting a LAN / Remote Server (`sandwalk auth`)
 
-## Protect the local server
+When exposing `sandwalk serve --host 0.0.0.0` across your LAN, Mac mini, or HPC node, enable API key authentication:
 
 ```bash
 sandwalk auth generate
 sandwalk auth enable
+sandwalk serve --host 0.0.0.0
 ```
-
-On macOS, auth and bind settings are also editable in Sandwalk.app → Settings.

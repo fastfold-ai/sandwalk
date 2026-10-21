@@ -1,15 +1,27 @@
 ---
 title: Composer
-description: Control model, specialist, sandbox, and attachments for every turn.
+description: Control model, Specialist, Plan mode, skills, MCPs, sandbox, and attachments from one bar.
 ---
 
-The composer drives every turn: model and effort, specialist profile, sandbox, plus `@` files and `/` skills & MCPs.
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/new-agent.png"
+    alt="Sandwalk Composer: Model, Plan, Skills, Specialist, and Sandbox"
+    className="w-full"
+  />
+</div>
 
-{/* TODO: expand with screenshots and step-by-step */}
+The Composer drives every turn of a session:
 
-## Coming soon
-
-- Model picker, effort, and Fast mode
-- Specialist profiles
-- Local Sandbox vs Modal
-- Attachment chips and slash menus
+- **Model Picker & Effort**: Switch between any enabled cloud provider, ChatGPT plan model, or local `llama.cpp` / Ollama model, set thinking effort (**Low** / **Medium** / **High**), or toggle **Fast** mode.
+- **`+` Menu (Full Keyboard & Hover Navigation)**:
+  - Toggle **Agent** vs. **Plan** mode
+  - Attach workspace **Files**
+  - Toggle **Skills** and **MCP** servers
+  - Pick a **Specialist** (showing its woodcut animal portrait or custom avatar; active Specialists appear as a removable `[Avatar] Otium ×` pill right in the Composer toolbar)
+  - Use `ArrowUp` / `ArrowDown` / `ArrowRight` / `ArrowLeft` / `Enter` / `Escape` to navigate the `+` menu and its sub-menus entirely from the keyboard.
+- **Inline Mentions & Slash Commands**:
+  - `@` — attach files from the session workspace or project folder
+  - `/` — attach a skill or run a slash command
+  - `#` — reference another chat session (`⟦#:SESSION_ID⟧`)
+- **Sandbox Selector**: Run tools and code in the **Local Sandbox** or on an on-demand **Modal Cloud CPU/GPU** container.

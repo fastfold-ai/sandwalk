@@ -1,9 +1,21 @@
 ---
 title: Skills
-description: Install guided workflows from GitHub or skills.sh.
+description: Install guided workflows from skills.sh or GitHub, or crystallize your own from Memory and Wiki.
 ---
 
-Packaged instructions and scripts the agent loads on demand.
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/skills-sh.png"
+    alt="The public skills.sh catalog ranked by installs"
+    className="w-full"
+  />
+</div>
+
+Skills are packaged `SKILL.md` instructions, reference schemas, and scripts that agents load on demand.
+
+## 1. Install from `skills.sh` or GitHub
+
+In **Dashboard → Skills**, browse the public [skills.sh](https://skills.sh) leaderboard (with install counts and security audits), toggle installed skills, or install from any GitHub repository:
 
 ```bash
 sandwalk skills add fastfold-ai/skills
@@ -11,10 +23,21 @@ sandwalk skills add fastfold-ai/skills@skills/fold
 sandwalk skills find
 ```
 
-In the Web UI: **Skills**. Toggle installs, import from GitHub, or search [skills.sh](https://skills.sh) (install counts and security audits).
+## 2. Crystallize Your Own Skills from Memory, Wiki & Omnigraph
 
-In chat: type `/` to browse skills for the active specialist and **Try** example prompts.
+You can turn what your workspace has learned into a reusable Skill (`~/.sandwalk/skills/<slug>/SKILL.md` + `references/{schema.pg,queries.gq,wiki-digest.md}`):
 
-CLI details: [Command reference → Skills](/cli/skills).
+- **From the UI**: In **Dashboard → Memory & Wiki**, click **Create Skill** in the top header (or **To Skill** inside any Living Wiki page or Knowledge Graph view).
+- **From Chat or Capy**: Ask any agent *"Create a skill from what we know about oral GLP-1R"* (calls `memory.create_skill` or `capy.create_skill_from_memory`).
 
-{/* TODO: skill detail page, audits, specialists */}
+## 3. Using Skills in the Composer
+
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/skills.png"
+    alt="The composer menu with skills open"
+    className="w-full"
+  />
+</div>
+
+Type `/` in the composer (or open `+ → Skills`) to attach any installed or crystallized skill to your message. See also [CLI Skills](/cli/skills).

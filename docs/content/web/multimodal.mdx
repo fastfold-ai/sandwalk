@@ -1,14 +1,13 @@
 ---
 title: Multimodal
-description: Attach images, PDFs, audio, and video with @paths.
+description: Attach images, PDFs, structures, audio, and video with @paths or clipboard paste.
 ---
 
-`@`-attach workspace files in the composer. Gemini models accept image, PDF, audio, and video natively. Dashboard → **Models** → **Multimodal support** lists what each model can take.
+Attach files to any message using `@` in the composer, drag-and-drop, or `Cmd+V` / `Ctrl+V` clipboard paste.
 
-{/* TODO: expand with capability matrix and preview cards */}
+## Supported Inputs
 
-## Coming soon
-
-- Supported file types
-- Per-provider capabilities
-- Chat and Artifacts preview players
+- **Images (`.png`, `.jpg`, `.webp`, `.gif`, `.svg`)**: Sent directly to vision-capable cloud and local models. Pasting an image from your clipboard saves it under the session's `uploads/` folder and inserts an attachment chip.
+- **Documents & Data (`.pdf`, `.csv`, `.tsv`, `.json`, `.md`, `.ipynb`)**: Native PDF support on Gemini, Claude, and OpenAI models, plus direct workspace path access for sandbox Python/bash tools.
+- **Audio & Video**: Supported natively by Gemini models and previewable inline in the Artifacts panel.
+- **Molecular Structures (`.pdb`, `.cif`, `.sdf`, `.fasta`)**: Automatically recognized by scientific tools and rendered in the 3D structure viewer.

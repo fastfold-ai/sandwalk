@@ -1,14 +1,16 @@
 ---
 title: MCPs
-description: Connect catalog and custom MCP servers.
+description: Connect 1-click catalog MCP servers, local Omnigraph stdio MCP, or custom endpoints.
 ---
 
-Dashboard → **MCPs** manages servers in `~/.sandwalk/mcp.json` (standard `mcpServers` shape, Cursor-compatible). Toggle catalog entries (Latch, Paperclip, Tamarind, Neurosnap, …), connect when auth is required, or add a custom URL.
+**Dashboard → MCPs** manages Model Context Protocol servers in `~/.sandwalk/mcp.json` (standard `mcpServers` format, compatible with Cursor and Claude Desktop).
+
+## 1-Click Catalog & Local Omnigraph MCP
+
+- **Built-in Local Omnigraph MCP (`omnigraph`)**: Automatically wired to `~/.sandwalk/bin/sandwalk-omnigraph-mcp` when you install Omnigraph in **Dashboard → Memory & Wiki** (or **Dashboard → MCPs**), exposing 7 graph tools (`omnigraph_status`, `omnigraph_query`, `omnigraph_upsert_node`, `omnigraph_record_claim`, `omnigraph_branch`, `omnigraph_load_cookbook_seed`, `omnigraph_sync_bundle`) over stdio with automatic embedding API key passthrough.
+- **Featured Scientific & Productivity Catalog**: Toggle catalog entries (Hugging Face, ChEMBL, Open Targets, ClinicalTrials, BioRender, PubMed, Benchling, Latch, Tamarind, Neurosnap, Slack, Linear, GitHub, and more) in one click.
+- **Custom MCP Servers**: Add any `stdio`, `SSE`, or `Streamable HTTP` MCP server via the UI or by editing `~/.sandwalk/mcp.json` directly.
 
 ```bash
 sandwalk mcp list
 ```
-
-Credentials stay under Integrations / keys (`sandwalk keys`).
-
-{/* TODO: Edit mcp.json, catalog table, auth flows */}

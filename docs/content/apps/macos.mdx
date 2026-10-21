@@ -1,20 +1,46 @@
 ---
-title: macOS app
-description: Menu-bar entrance to the local agent server and dashboard.
+title: Desktop App (macOS & Ubuntu)
+description: Native Tauri desktop shell and local server supervisor for macOS and Linux.
 ---
 
-**Sandwalk.app** is the simplest way in on Mac. Start and stop the local agent server from the menu bar, open the Web UI, and use Settings for ports, models, tools, and skills.
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/welcome.png"
+    alt="Sandwalk Desktop: connect locally or open a remote server"
+    className="w-full"
+  />
+</div>
 
-For the shortest path, see [Quick Start](/quickstart).
+The Sandwalk desktop app runs on **macOS (Apple Silicon, 12.0+)** and **Ubuntu Linux (24.04 / 26.04, `amd64` & `arm64`)**.
+
+## Local & Remote Servers
+
+On launch, the Welcome screen lets you:
+
+- **Connect Locally (`127.0.0.1:8787`)**: Starts or attaches to the local Sandwalk server on this computer.
+- **Open a Remote Server**: Connect to a Sandwalk server running on a Mac mini, Linux GPU workstation, HPC node, or Tailscale IP (`sandwalk serve --host 0.0.0.0` paired with `sandwalk auth`). Recent remote servers are remembered with their OS icon and hostname.
+
+## Installing & Updating
+
+### macOS
+
+Download [`Sandwalk-macos-arm64.dmg`](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg), open the disk image, and drag **Sandwalk** to `/Applications`.
+
+Or install via the CLI:
 
 ```bash
-cd apps/sandwalk-mac
-./scripts/package-app.sh
-open ~/Applications/Sandwalk.app
+sandwalk desktop
 ```
 
-Or install from [GitHub Releases](https://github.com/fastfold-ai/sandwalk/releases) when published.
+### Ubuntu (24.04 / 26.04)
 
-Server settings also live under Application Support; runtime config remains in `~/.sandwalk/` (see [Configuration](/configuration)).
+Install via the signed APT repository:
 
-From there, most day-to-day work happens in the [Web UI](/web/composer).
+```bash
+curl -fsSL https://apt.sandwalk.sh/sandwalk.gpg | sudo gpg --dearmor -o /usr/share/keyrings/sandwalk.gpg
+echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/sandwalk.gpg] https://apt.sandwalk.sh stable main" | sudo tee /etc/apt/sources.list.d/sandwalk.list
+sudo apt update
+sudo apt install sandwalk
+```
+
+Or run `sandwalk desktop` from the CLI to download and install the matching `.deb` package for `amd64` or `arm64`.

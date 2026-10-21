@@ -1,22 +1,26 @@
 ---
 title: Serve
-description: Start the local agent API and Web UI from the CLI.
+description: Start the local agent API and Web UI from the CLI or expose it to your LAN.
 ---
 
 ```bash
-sandwalk serve
+sandwalk serve                    # bind to http://127.0.0.1:8787
+sandwalk serve --host 0.0.0.0     # expose to LAN / Tailscale (requires sandwalk auth)
 ```
 
-| Service   | Default URL             |
-|-----------|-------------------------|
-| Agent API | http://127.0.0.1:8787   |
-| Dashboard | http://127.0.0.1:8969   |
+| Service | Default URL |
+|---------|-------------|
+| **Agent API & Web UI (`sandwalk serve`)** | `http://127.0.0.1:8787` |
+| **Vite Dev UI (`scripts/dev-ui.sh`)** | `http://127.0.0.1:1420` |
 
-Best for using the [Web UI](/web/composer) while keeping the CLI as the process supervisor. On macOS you can use [Sandwalk.app](/apps/macos) instead.
+## Remote & LAN Access (`sandwalk auth`)
+
+When binding `sandwalk serve` to `0.0.0.0` (for example on a Mac mini, Linux workstation, or HPC node so you can connect from your laptop or phone), enable API key authentication first:
 
 ```bash
-sandwalk auth generate   # optional
+sandwalk auth generate
 sandwalk auth enable
+sandwalk serve --host 0.0.0.0 --port 8787
 ```
 
-{/* TODO: bind flags, remote access notes */}
+Then open the Sandwalk desktop app (or browser) on another device, choose **Open a Remote Server**, and paste the URL and API key.

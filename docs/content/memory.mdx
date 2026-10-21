@@ -3,20 +3,17 @@ title: Memory, Living Wiki & Omnigraph
 description: Compounding local-first memory, Markdown Wiki, Omnigraph knowledge graphs, and 1-click Skill crystallization.
 ---
 
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/memory.png"
+    alt="Memory & Knowledge showing MEMORY.md operating rules, USER.md profile, and Pending Approvals"
+    className="w-full"
+  />
+</div>
+
 Sandwalk turns everyday sessions into a structured, self-improving local knowledge base under `~/.sandwalk/memory/`—without requiring external database infrastructure or bloating your system prompt.
 
 ## The Four Knowledge Assets
-
-```mermaid
-flowchart LR
-    S1["Past Sessions"] --> A1["Chat Memory"]
-    S2["Docs & Notes"] --> A2["Living Wiki"]
-    S3["Domain Data"] --> A3["Omnigraph"]
-    S4["Completed Tasks"] --> A4["Skills"]
-
-    A1 & A2 & A3 & A4 --> Hub[("Memory Hub")]
-    Hub --> Next["Next Agent"]
-```
 
 | Asset | On-Disk Location | Purpose |
 |---|---|---|
@@ -27,18 +24,32 @@ flowchart LR
 
 ---
 
-## Scopes & Specialist Brains
+## Living Markdown Wiki (`Preview` / `Split` / `Edit` + `Full Screen`)
 
-Every memory entry, Wiki page, and Knowledge Graph is scoped to one of four namespaces:
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/wiki.png"
+    alt="Living Markdown Wiki in Split View with live preview, [[wikilinks]], Full Screen, and To Skill"
+    className="w-full"
+  />
+</div>
 
-1. **`global` (Global Brain — Personal & Lab)**: Defaults to **`06 Second brain`** (`Person`, `Organization`, `Note`, `Artifact`, `Goal`, `Project`, `Task`).
-2. **`project:<id>` (Project Brain)**: Scoped to a specific Sandwalk Project.
-3. **`specialist:<id>` (Specialist Brain)**: Each Specialist—whether one of the starter O'Reilly animal personas (**Otium**, **Atlas**, **Nova**, **Milo**, **Soren**), a scientific specialist, or a custom profile you create via **`+ New specialist`**—has its own `PRIORS.md`, `MEMORY.md`, default model, and Cookbook ontology lens.
-4. **`user` (`USER.md` Profile)**: Your personal preferences, stack, and communication style across all sessions.
+- **Real `.md` Files on Disk**: Stored under `~/.sandwalk/memory/wiki/<scope>/` (and `<project>/.sandwalk/wiki/`).
+- **Interactive `[[wikilinks]]` & Backlinks**: Link pages with `[[page-slug]]`; clicking any `[[wikilink]]` in the live Markdown preview or backlink footer opens that page immediately.
+- **Full-Screen Mode**: Click **Full Screen** (or press `Esc` to exit) for a distraction-free, side-by-side Markdown editor and live preview.
+- **One-Click `To Skill`**: Turn any Wiki page and its scope ontology into a reusable `/skill-slug` in one click.
 
 ---
 
-## Six Runnable Omnigraph Cookbook Modes (`01–06`)
+## Versioned Knowledge Graph with Omnigraph (`01–06` Cookbooks)
+
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/omnigraph.png"
+    alt="Omnigraph Knowledge Graph explorer with Cookbook modes, Supports/Contradicts edges, and branches"
+    className="w-full"
+  />
+</div>
 
 Sandwalk ships with six runnable [Omnigraph](https://www.omnigraph.dev/) Cookbooks. Each Cookbook defines a 3-layer `.pg` ontology schema, linted `.gq` stored queries, and a starter graph seed:
 

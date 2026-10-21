@@ -1,0 +1,37 @@
+---
+title: Capy & Multi-Agent Grids
+description: Orchestrate parallel sessions, Specialist cohorts, and workspace actions with Capy.
+---
+
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/capy.png"
+    alt="Capy orchestrating a session in Sandwalk"
+    className="w-full"
+  />
+</div>
+
+**Capy** is Sandwalk's built-in meta-agent (`⌃⌥C` or the Capy button at the bottom-left of the sidebar). Unlike a regular session agent that works inside a single chat, Capy has full awareness of your active sessions, projects, Specialists, Memory/Wiki/Omnigraph, external coding CLIs, and benchmarking harness.
+
+## Parallel Multi-Agent Split Grids
+
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/grid.png"
+    alt="A parallel split grid of sessions working on one research question"
+    className="w-full"
+  />
+</div>
+
+Ask Capy to split a complex question across multiple sessions or Specialist personas at once:
+
+- *"Spawn a 2-session split grid with Nova and Soren to debate oral GLP-1R titration vs. hERG safety."*
+- *"Create 4 parallel chats investigating KRAS G12D resistance mechanisms across different models."*
+- *"Summarize session #abc123 and seed a new chat with Otium from its findings."*
+
+## What Capy Can Do
+
+- **Session & Grid Orchestration**: `capy.spawn_sessions` (with `specialists="Nova,Soren"`), `capy.open_split`, `capy.seed_session`, `capy.read_session`, `capy.summarize_session`.
+- **Memory, Wiki & Skill Stewardship**: `capy.memory_manage`, `capy.memory_search`, `capy.wiki_digest`, `capy.distill_session`, and `capy.create_skill_from_memory`.
+- **External Coding Agents**: Import sessions from or hand off chats to **Claude Code**, **Codex**, **OpenCode**, **fx**, and **Hermes**.
+- **Benchmarking & Diagnostics**: Launch `sandwalk eval` suites (`capy.bench_launch`), inspect results (`capy.bench_inspect`), or run `capy.doctor`.

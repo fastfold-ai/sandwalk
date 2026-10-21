@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: A thinking path for open science.
+description: An agent harness for ambitious work.
 ---
 
 <div className="not-prose mb-6 flex justify-center">
@@ -16,35 +16,77 @@ description: A thinking path for open science.
   />
 </div>
 
-<div className="not-prose mx-auto mb-8 max-w-2xl text-center text-lg text-fd-muted-foreground">
-  A thinking path for open science.
+<div className="not-prose mx-auto mb-6 max-w-2xl text-center text-lg text-fd-muted-foreground">
+  An agent harness for ambitious work.
 </div>
 
-**sandwalk** is a self-hosted science agent. Ask a question, attach files, install skills, and walk multi-step research workflows with tools, sandboxes, and results in one place.
+<div className="not-prose mb-8 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/showcase.png"
+    alt="Sandwalk desktop: a chat, the files it produced, and a terminal, side by side"
+    className="w-full"
+  />
+</div>
 
-## Start in minutes
+## Why Sandwalk exists
 
-Pick how you want to install, then get the dashboard and agent running.
+Sandwalk exists to eliminate repetitive work—freeing human minds and teams to focus on ambitious questions that take days or months, not a single prompt—so individual curiosity compounds into collective discovery.
+
+Serious research and engineering cannot live inside one vendor's model, one set of tools, or behind a subscription wall. Sandwalk is built for **maximum freedom of where and how you work**:
+
+- **Run anywhere**: on your laptop, an always-on Mac mini at home, a Linux workstation, an HPC cluster, a cloud VM, or from your phone on the go.
+- **No subscription walls or lock-in**: the entire harness—multi-agent grids, Capy, Specialists, Memory, Living Wiki, Omnigraph, and Benchmarking—is open, self-hosted, and Apache-2.0. You bring your own keys, your existing ChatGPT plan, or your own hardware.
+- **Switch effortlessly between cloud and local**: move between 17 cloud providers, ChatGPT Plus/Pro, local GGUF models (`llama.cpp`, Ollama, oMLX, LM Studio), or any OpenAI-compatible endpoint—and between local execution and on-demand Modal cloud GPUs—within the same session.
+- **Share what you discover**: the work stays on the machine that ran it, and a crystallized skill (`SKILL.md`) or a published page (`sandwalk.site`) is how a verified method or result is passed on to the next person or agent.
+
+---
+
+## Core Architecture
+
+| Pillar | What you get |
+|--------|--------------|
+| **One Workspace Everywhere** | Shared session list across the macOS/Ubuntu desktop app, Web UI, terminal CLI (`sandwalk`), LAN/phone, and external coding CLIs (**Claude Code**, **Codex**, **OpenCode**, **fx**, **Hermes**). |
+| **Any Model, Cloud or Local** | 17 cloud providers (OpenAI, Anthropic, Gemini, xAI, DeepSeek, OpenRouter, Bedrock, etc.), **Sign in with ChatGPT** (Plus/Pro), local GGUF models via `llama.cpp`, Ollama, oMLX, and LM Studio, or **any OpenAI-compatible endpoint** (vLLM, SGLang, TGI, LiteLLM, custom HPC servers). |
+| **Capy & Multi-Agent Grids** | Built-in meta-agent (**Capy**) that spawns parallel sessions, arranges split grids, seeds briefs across chats, manages memory/wiki/graph, and runs diagnostics or benchmarks by voice or text. |
+| **Customizable Specialists** | Starter O'Reilly-style animal personas (**Otium**, **Atlas**, **Nova**, **Milo**, **Soren**) and scientific specialists—or create your own (`+ New specialist`) with custom priors (`PRIORS.md`), model, skills, MCPs, and brain. |
+| **Memory, Wiki & Omnigraph** | Automatic post-run distillation into bounded `USER.md`/`MEMORY.md` snapshots, a full-screen Markdown Wiki with live preview & `[[wikilinks]]`, and a Lance-backed `.omni` Knowledge Graph with 6 Cookbook Modes (`01–06`). |
+| **Skills & 1-Click MCPs** | Install public skills from [skills.sh](https://skills.sh), attach 1-click MCP servers, or crystallize your own project's Memory, Wiki, and Ontology into a reusable `/skill`. |
+| **Local & Cloud GPU Sandboxes** | Execute code locally or on Modal CPU/GPU containers (`T4`, `L4`, `A10`, `A100`, `H100`). Every plot, 3D molecular structure, report, or `.ipynb` notebook lands beside the session, ready to publish to `sandwalk.site`. |
+| **Scientific & Harness Evals** | 190+ built-in tools (PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, DepMap, MSigDB, STRING) plus end-to-end harness benchmarking (`sandwalk eval`) across MMLU-Pro, LiveCodeBench, BixBench, and Bio-Capybara. |
+
+---
+
+## Explore the Docs
 
 <Cards>
   <Card
     title="Quick Start"
-    description="macOS app or CLI. Short steps to everything running."
+    description="Install on macOS or Ubuntu and start your first session in minutes."
     href="/quickstart"
   />
   <Card
-    title="Web UI"
-    description="Composer, plan mode, artifacts, terminal."
+    title="Composer & Web UI"
+    description="Models, Plan mode, Capy split grids, 3D artifacts, and embedded terminals."
     href="/web/composer"
   />
   <Card
-    title="CLI reference"
-    description="Terminal, one-shot, serve, and commands."
-    href="/cli/terminal"
+    title="Specialists"
+    description="Starter personas (Otium, Soren, Milo, Nova, Atlas), scientific profiles, and + New specialist."
+    href="/specialists"
   />
   <Card
-    title="macOS app"
-    description="Menu-bar control for the local stack."
-    href="/apps/macos"
+    title="Memory, Wiki & Omnigraph"
+    description="Bounded snapshots, Full-Screen Markdown Wiki, 6 Omnigraph Cookbooks, and Skill crystallization."
+    href="/memory"
+  />
+  <Card
+    title="Models (Cloud & Local)"
+    description="17 cloud providers, ChatGPT Plus/Pro sign-in, local GGUF, and OpenAI-compatible endpoints."
+    href="/models"
+  />
+  <Card
+    title="Benchmarking & Evals"
+    description="Evaluate models, Specialists, skills, and sandboxes end-to-end."
+    href="/benchmarking"
   />
 </Cards>

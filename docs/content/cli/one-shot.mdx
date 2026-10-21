@@ -1,6 +1,6 @@
 ---
 title: One-shot
-description: Run a single query and exit (scripts and automation).
+description: Run a single query from scripts, pipelines, or CI and exit.
 ---
 
 ```bash
@@ -8,8 +8,4 @@ sandwalk "What is known about KRAS G12C inhibitors?"
 sandwalk --smiles "CCO" "Profile this compound"
 ```
 
-Best for scripts, CI, and quick asks without opening the interactive REPL.
-
-Uses the same agent, tools, and config as [Terminal](/cli/terminal) mode.
-
-{/* TODO: exit codes, JSON/output flags if any */}
+One-shot mode runs the full Sandwalk agent (including your configured default model, Specialist, Memory snapshot, skills, and sandbox) for a single turn, prints the response and generated artifact paths, and exits with code `0` on success.

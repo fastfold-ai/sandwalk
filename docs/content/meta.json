@@ -5,10 +5,12 @@
     "apps",
     "web",
     "cli",
+    "specialists",
     "memory",
     "skills",
     "mcps",
     "models",
+    "benchmarking",
     "configuration"
   ]
 }

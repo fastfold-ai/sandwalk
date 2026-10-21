@@ -2,6 +2,7 @@
   "title": "Web UI",
   "pages": [
     "composer",
+    "capy-and-grids",
     "plan-mode",
     "multimodal",
     "projects",

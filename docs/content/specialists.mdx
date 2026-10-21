@@ -1,0 +1,42 @@
+---
+title: Specialists
+description: Customizable agent personas and domain specialists with their own priors, models, skills, MCPs, and brains.
+---
+
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/specialists.png"
+    alt="Specialists grid with + New specialist button and Otium's Profile & Priors drawer"
+    className="w-full"
+  />
+</div>
+
+**Specialists** bundle a cognitive style (`PRIORS.md`), a default model, an allowlist of skills, tools, and MCP servers, and a dedicated **Specialist Brain** (`MEMORY.md` + Omnigraph ontology lens) into a reusable profile you can pick in the Composer (`+ → Specialist`), summon via **Capy**, or select in the CLI (`/specialist`).
+
+## Starter Personas & Domain Specialists
+
+Sandwalk seeds a roster of starter Specialists—illustrated with 19th-century natural history woodcut animal portraits—alongside domain-specific scientific specialists. **These are starter defaults**: you can edit any of them or click **`+ New specialist`** in the top-right header to create your own.
+
+| Starter Persona | Role / Archetype | Default Ontology Lens | Cognitive Priors (`PRIORS.md`) |
+|---|---|---|---|
+| **Otium** (Capybara) | `Relaxed` | `06 Second brain` / `05 Biomed research` | Calm, unhurried contemplative thinker. De-escalates complexity, cuts busywork, finds the simplest durable solution, and distills messy sessions into clean Living Wiki notes. |
+| **Soren** (Owl) | `Skeptical Reviewer` | `02 Pharma intel` | Methodological red-teamer. Hunts for confounders, batch effects, off-target liabilities, and contradicted assumptions before approving a conclusion. |
+| **Milo** (Badger) | `Project Manager` | `03 Context graph` | Structured execution lead. Turns ambiguous goals into clear milestones, dependencies, risk registers, and accountable action items. |
+| **Nova** (Fox) | `Dreamer` | `05 Biomed research` | Divergent hypothesis generator. Connects cross-disciplinary mechanisms, proposes unconventional experiments, and explores adjacent possibilities. |
+| **Atlas** (Wolf) | `Ambitious Generalist` | `01 Industry intel` | High-agency polymath. Synthesizes across code, biology, systems architecture, and strategy to ship end-to-end artifacts fast. |
+
+Sandwalk also ships with scientific Specialists (**Target Discovery**, **Protein Designer**, **Medicinal Chemist**, **Single-cell Analyst**, **Genomics Analyst**, **Clinical Trial Strategist**, **Literature Synthesizer**, and **Fast Computational Scientist**).
+
+---
+
+## Creating & Customizing Specialists (`+ New specialist`)
+
+1. Open **Dashboard → Specialists** and click **`+ New specialist`** in the top-right header.
+2. Choose a **Name**, **Role / Archetype**, **Avatar** (any built-in woodcut portrait, icon, or custom image URL), **Default Model**, and **Ontology Cookbook Lens (`01–06`)**.
+3. Select the **Skills**, **Tools**, and **MCP servers** this Specialist should carry.
+4. Click any Specialist card in the grid to open the right-side **Profile Inspector Drawer**:
+   - **Info**: Edit `Cognitive Priors & Biases (PRIORS.md)` and ontology lens inline.
+   - **Runtime**: Configure per-specialist model and provider overrides.
+   - **Skills**: Inspect and toggle attached skills.
+   - **Memories**: View and teach durable rules directly to that Specialist's private brain (`specialist:<id>`).
+5. Click the **Play (`▶`)** button on any card (or in the Profile drawer) to immediately start a chat with that Specialist active in the Composer toolbar (`[Avatar] Otium ×`).
