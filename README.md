@@ -94,12 +94,12 @@ Sandwalk is architected as a **local-first, multi-agent research and engineering
 
 ```mermaid
 flowchart LR
-    Surfaces["Desktop · Web · CLI<br/>& External Agent CLIs"] --> Orch["Capy Meta-Agent<br/>& Parallel Specialist Grids"]
-    Orch --> Server["Local Sandwalk Server (:8787)<br/>Byte-Stable KV Prefix + Tool Tiering"]
-    Server --> Models["17 Cloud Providers · ChatGPT Plan<br/>& Local llama.cpp / Ollama / oMLX"]
-    Server --> Compute["Local Sandbox & Modal Cloud GPUs<br/>+ 190 Scientific & MCP Tools"]
-    Server <--> Memory[("Compounding Memory Hub<br/>Memories · Wiki · Omnigraph · Skills")]
-    Compute --> Outputs["Session Artifacts · 3D Structures<br/>Notebooks (.ipynb) · sandwalk.site"]
+    Surfaces["Client Surfaces"] --> Orch["Capy & Specialists"]
+    Orch --> Server["Agent Runtime"]
+    Server --> Models["Cloud & Local LLMs"]
+    Server --> Compute["Sandboxes & Tools"]
+    Server <--> Memory[("Memory Hub")]
+    Compute --> Outputs["Artifacts & Sites"]
 ```
 
 ### Cold Start: Load the Save File, Then Get to Work
@@ -108,13 +108,13 @@ Instead of forcing every new agent to re-learn your project from scratch, Sandwa
 
 ```mermaid
 flowchart LR
-    S1["Past Sessions"] --> A1["Memories<br/>USER.md · MEMORY.md"]
-    S2["Docs & Notes"] --> A2["Living Wiki<br/>Markdown + Backlinks"]
-    S3["Domain Data"] --> A3["Omnigraph (.omni)<br/>Queryable Graph"]
-    S4["Completed Work"] --> A4["Skills (SKILL.md)<br/>Verified Methods"]
+    S1["Past Sessions"] --> A1["Chat Memory"]
+    S2["Docs & Notes"] --> A2["Living Wiki"]
+    S3["Domain Data"] --> A3["Omnigraph"]
+    S4["Completed Tasks"] --> A4["Skills"]
 
-    A1 & A2 & A3 & A4 --> Hub[("Sandwalk Memory Hub<br/>Review · Branch · Crystallize")]
-    Hub --> Next["Next Agent / Specialist<br/>Starts Where You Left Off"]
+    A1 & A2 & A3 & A4 --> Hub[("Memory Hub")]
+    Hub --> Next["Next Agent"]
 ```
 
 1. **Decoupled & Local-First (`~/.sandwalk/`)**: Swap models (17 cloud providers, ChatGPT Plus/Pro plan, or local `llama.cpp` / Ollama), sandboxes (Local machine or Modal cloud `T4`/`L4`/`A100`/`H100` GPUs), and MCP servers per turn while keeping all data on your machine in open files (`.md`, `.pg`, `.gq`, `.jsonl`, Lance `.omni`, SQLite).
