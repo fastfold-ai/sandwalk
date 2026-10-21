@@ -129,3 +129,13 @@ export const MemoryView = lazy(() =>
     default: m.MemoryView
   }))
 )
+export const AutomationsView = lazy(() =>
+  import('@/components/agents/AutomationsView').then(m => ({
+    default: m.AutomationsView
+  }))
+)
+export const SshView = lazy(() =>
+  import('@/components/agents/SshView').then(m => ({
+    default: m.SshView
+  }))
+)

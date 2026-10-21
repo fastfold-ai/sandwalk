@@ -114,17 +114,52 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
         if end != -1:
             block = stripped[3:end]
 
-    for line in block.splitlines():
-        line = line.strip()
+    lines = block.splitlines()
+    idx = 0
+    while idx < len(lines):
+        raw_line = lines[idx]
+        line = raw_line.strip()
         if line.startswith("name:"):
             value = line.split(":", 1)[1].strip().strip('"').strip("'")
             if value:
                 name = value
         elif line.startswith("description:"):
-            description = line.split(":", 1)[1].strip().strip('"').strip("'")
+            val = line.split(":", 1)[1].strip().strip('"').strip("'")
+            if val in {">", "|", ">-", "|-", ">+", "|+"} or not val:
+                cont: list[str] = []
+                idx += 1
+                while idx < len(lines):
+                    nxt = lines[idx]
+                    if nxt.startswith((" ", "\t")) and nxt.strip():
+                        cont.append(nxt.strip())
+                        idx += 1
+                    elif not nxt.strip():
+                        idx += 1
+                    else:
+                        break
+                description = " ".join(cont).strip()
+                continue
+            description = val
         elif line.startswith("tags:"):
             raw = line.split(":", 1)[1].strip().strip("[]")
-            tags = [t.strip().strip('"').strip("'") for t in raw.split(",") if t.strip()]
+            if raw:
+                tags = [
+                    t.strip().strip('"').strip("'")
+                    for t in raw.split(",")
+                    if t.strip()
+                ]
+            else:
+                idx += 1
+                while idx < len(lines):
+                    nxt_strip = lines[idx].strip()
+                    if nxt_strip.startswith("- "):
+                        t_val = nxt_strip[2:].strip().strip('"').strip("'")
+                        if t_val:
+                            tags.append(t_val)
+                        idx += 1
+                    else:
+                        break
+                continue
         elif line.startswith("icon:"):
             icon = line.split(":", 1)[1].strip().strip('"').strip("'")
         elif line.startswith("author:"):
@@ -139,6 +174,7 @@ def parse_skill_md(skill_md: Path) -> SkillInfo:
             value = line.split(":", 1)[1].strip().strip('"').strip("'")
             if value:
                 updated_at = value
+        idx += 1
 
     if category.lower() in {"custom", "user"}:
         category = USER_CREATED_CATEGORY

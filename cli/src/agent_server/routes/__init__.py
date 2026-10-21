@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from agent_server.app_deps import AppDeps
 from agent_server.routes.account import register_account_routes
 from agent_server.routes.auth import register_auth_routes
+from agent_server.routes.automations import register_automation_and_ssh_routes
 from agent_server.routes.bench import register_bench_routes
 from agent_server.routes.capy import register_capy_routes
 from agent_server.routes.chatgpt_auth import register_chatgpt_auth_routes
@@ -79,6 +80,7 @@ def register_all_routes(app: FastAPI, deps: AppDeps) -> None:
     register_library_routes(app, deps)
     register_llama_runtime_routes(app, deps)
     register_memory_routes(app, deps)
+    register_automation_and_ssh_routes(app, deps)
     register_connector_routes(app, deps)
     register_slack_oauth_return_routes(app, deps)
     register_specialist_routes(app, deps)

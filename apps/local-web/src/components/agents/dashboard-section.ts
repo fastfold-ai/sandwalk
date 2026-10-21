@@ -20,3 +20,5 @@ export type DashboardSection =
   | 'mcp'
   | 'specialists'
   | 'memory'
+  | 'automations'
+  | 'ssh'

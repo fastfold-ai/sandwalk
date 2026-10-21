@@ -136,5 +136,11 @@ export function resolveDashboardSection(pathname: string) {
   if (pathname.startsWith('/dashboard/memory')) {
     return 'memory' as const
   }
+  if (pathname.startsWith('/dashboard/automations')) {
+    return 'automations' as const
+  }
+  if (pathname.startsWith('/dashboard/ssh')) {
+    return 'ssh' as const
+  }
   return 'overview' as const
 }

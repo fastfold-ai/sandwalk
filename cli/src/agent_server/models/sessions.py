@@ -20,7 +20,17 @@ TitleSource = Literal["pending", "auto", "user"]
 
 # Connector/origin that spawned the session; None means it started locally.
 # claude / codex / opencode / fx / hermes mark a chat imported from that CLI's history.
-SessionSource = Literal["slack", "bench", "capy", "claude", "codex", "opencode", "fx", "hermes"]
+SessionSource = Literal[
+    "slack",
+    "bench",
+    "capy",
+    "automation",
+    "claude",
+    "codex",
+    "opencode",
+    "fx",
+    "hermes",
+]
 
 # Product surface for usage attribution (independent of Slack `source`).
 ClientSurface = Literal["cli", "ui", "slack", "unknown"]
@@ -44,6 +54,8 @@ class AgentSession(ApiModel):
     # Human-readable origin, e.g. "#dev-ops · Acme" — shown next to the source icon.
     source_label: str | None = None
     client_surface: ClientSurface = "unknown"
+    snoozed: bool = False
+    automation_id: str | None = None
     last_message_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -82,6 +94,7 @@ class UpdateSessionRequest(ApiModel):
     model: str | None = None
     openai_profile_id: str | None = None
     clear_llm: bool = False
+    snoozed: bool | None = None
 
 
 class AutoTitleSessionRequest(ApiModel):

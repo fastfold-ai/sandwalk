@@ -1,4 +1,5 @@
 import {
+  Bot,
   Box,
   Boxes,
   Brain,
@@ -12,6 +13,7 @@ import {
   Paintbrush,
   Plug,
   ScrollText,
+  Server,
   Settings2,
   ShieldCheck,
   Sparkles,
@@ -94,6 +96,18 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
         label: 'Memory & Wiki',
         path: '/dashboard/memory',
         icon: Brain
+      },
+      {
+        id: 'automations',
+        label: 'Automations',
+        path: '/dashboard/automations',
+        icon: Bot
+      },
+      {
+        id: 'ssh',
+        label: 'SSH',
+        path: '/dashboard/ssh',
+        icon: Server
       },
       {
         id: 'voice',

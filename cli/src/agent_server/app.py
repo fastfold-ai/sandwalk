@@ -298,8 +298,21 @@ def create_app(
 
             logging.getLogger("agent_server").exception("Connector startup failed")
         backup_task = asyncio.create_task(_keep_backup_fresh(store))
+        from agent_server.automations_service import AutomationsService
+        from agent_server.ssh_service import SshService
+
+        automations_scheduler = AutomationsService(
+            store, agent_service=service, ssh_service=SshService(store)
+        )
+        scheduler_task = asyncio.create_task(
+            automations_scheduler.start_scheduler_loop(poll_seconds=15.0)
+        )
         yield
         shutdown_event.set()
+        automations_scheduler.stop_scheduler_loop()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            scheduler_task.cancel()
+            await scheduler_task
         # Cancel offline periodic checks
         with contextlib.suppress(asyncio.CancelledError, Exception):
             offline_task.cancel()

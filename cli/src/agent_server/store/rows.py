@@ -42,7 +42,18 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
         title_source = "pending"
     raw_origin = row["source"] if "source" in keys else None
     origin = str(raw_origin or "").strip().lower() or None
-    if origin not in {"slack", "bench", "capy", "claude", "codex", "opencode", "fx", "hermes", None}:
+    if origin not in {
+        "slack",
+        "bench",
+        "capy",
+        "automation",
+        "claude",
+        "codex",
+        "opencode",
+        "fx",
+        "hermes",
+        None,
+    }:
         origin = None
     raw_surface = row["client_surface"] if "client_surface" in keys else "unknown"
     surface = str(raw_surface or "unknown").strip().lower()
@@ -67,6 +78,8 @@ def session_from_row(row: sqlite3.Row) -> AgentSession:
         source=origin,  # type: ignore[arg-type]
         source_label=(row["source_label"] if "source_label" in keys else None),
         client_surface=surface,  # type: ignore[arg-type]
+        snoozed=bool(row["snoozed"]) if "snoozed" in keys else False,
+        automation_id=(row["automation_id"] if "automation_id" in keys else None),
         last_message_at=(
             datetime.fromisoformat(row["last_message_at"])
             if row["last_message_at"]

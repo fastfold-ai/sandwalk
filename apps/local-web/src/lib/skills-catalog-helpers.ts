@@ -145,6 +145,9 @@ export function suggestionSourceIcon(item: AgentSkillSource): string | null {
   ) {
     return '/suggestions/huggingface.png'
   }
+  if (source.includes('nvidia') || provider.includes('nvidia')) {
+    return '/suggestions/nvidia.png'
+  }
   return null
 }
 
@@ -162,6 +165,9 @@ export function suggestionSourceLabel(item: AgentSkillSource): string {
     provider.toLowerCase().includes('hugging face')
   ) {
     return 'Hugging Face'
+  }
+  if (source.includes('nvidia') || provider.toLowerCase().includes('nvidia')) {
+    return 'NVIDIA'
   }
   return provider || item.source
 }

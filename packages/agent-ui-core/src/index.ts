@@ -392,7 +392,12 @@ export type SessionTitleSource = 'pending' | 'auto' | 'user'
 /** Coding-agent CLIs Sandwalk can read from, launch, and hand off to. */
 export type ExternalAgentKind = 'claude' | 'codex' | 'opencode' | 'fx' | 'hermes'
 
-export type SessionSource = 'slack' | 'bench' | 'capy' | ExternalAgentKind
+export type SessionSource =
+  | 'slack'
+  | 'bench'
+  | 'capy'
+  | 'automation'
+  | ExternalAgentKind
 
 export type ExternalAgentInfo = {
   kind: ExternalAgentKind
@@ -619,6 +624,10 @@ export type AgentSession = {
   sourceLabel?: string | null
   /** Product surface for usage attribution. */
   clientSurface?: ClientSurface
+  /** Snoozed threads stay quiet in the background during automated runs. */
+  snoozed?: boolean
+  /** Bound automation ID when scheduled in-thread. */
+  automationId?: string | null
   lastMessageAt: string | null
   createdAt: string
   updatedAt: string
@@ -2406,5 +2415,194 @@ export type CreatedSkillResponse = {
   graphNodesIncluded: number
   summary: string
 }
+
+export type AutomationScheduleKind = 'once' | 'interval' | 'cron' | 'webhook'
+export type AutomationSessionMode = 'continue' | 'fresh' | 'no_agent'
+export type AutomationStatus =
+  | 'idle'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'paused'
+  | 'completed'
+export type AutomationRunStatus = 'running' | 'succeeded' | 'failed' | 'skipped'
+
+export type Automation = {
+  id: string
+  name: string
+  description?: string | null
+  prompt: string
+  command?: string | null
+  scheduleExpr: string
+  scheduleKind: AutomationScheduleKind
+  scheduleLabel: string
+  sessionMode: AutomationSessionMode
+  originSessionId?: string | null
+  specialistId?: string | null
+  projectId?: string | null
+  workdir?: string | null
+  sshHostId?: string | null
+  remoteWorkdir?: string | null
+  skillNames: string[]
+  toolNames: string[]
+  mcpServerIds: string[]
+  providerPin?: string | null
+  modelPin?: string | null
+  continuity: boolean
+  contextFrom: string[]
+  wakeOnChangeOnly: boolean
+  repeatLimit?: number | null
+  runCount: number
+  enabled: boolean
+  nextRunAt?: string | null
+  lastRunAt?: string | null
+  lastStatus: AutomationStatus
+  lastError?: string | null
+  webhookToken?: string | null
+  templateId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type AutomationRun = {
+  id: string
+  automationId: string
+  automationName?: string | null
+  sessionId?: string | null
+  status: AutomationRunStatus
+  triggerSource: string
+  startedAt: string
+  finishedAt?: string | null
+  durationSeconds?: number | null
+  outputExcerpt?: string | null
+  outputPath?: string | null
+  error?: string | null
+  wasCatchup: boolean
+}
+
+export type AutomationTemplate = {
+  id: string
+  name: string
+  category:
+    | 'popular'
+    | 'hpc_slurm'
+    | 'bio_compchem'
+    | 'memory_wiki'
+    | 'code_ci'
+    | 'environment'
+  description: string
+  scheduleExpr: string
+  scheduleLabel: string
+  sessionMode: AutomationSessionMode
+  prompt: string
+  command?: string | null
+  continuity: boolean
+  wakeOnChangeOnly: boolean
+  recommendedSpecialistSlug?: string | null
+  skillNames: string[]
+  toolNames: string[]
+  badge: string
+}
+
+export type SshHostSource = 'saved' | 'ssh_config'
+export type SshConnectionStatus =
+  | 'unknown'
+  | 'online'
+  | 'offline'
+  | 'bootstrapping'
+  | 'tunnel_active'
+  | 'error'
+
+export type SshHost = {
+  id: string
+  alias: string
+  host: string
+  user?: string | null
+  port: number
+  identityFile?: string | null
+  proxyJump?: string | null
+  remotePort: number
+  defaultWorkdir?: string | null
+  source: SshHostSource
+  status: SshConnectionStatus
+  platform?: string | null
+  arch?: string | null
+  hostname?: string | null
+  gpuSummary?: string | null
+  slurmAvailable: boolean
+  sandwalkInstalled: boolean
+  sandwalkVersion?: string | null
+  daemonRunning: boolean
+  tunnelLocalPort?: number | null
+  tunnelUrl?: string | null
+  lastConnectedAt?: string | null
+  lastError?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type SshBootstrapStep = {
+  step: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  detail?: string | null
+}
+
+export type SshConnectResponse = {
+  host: SshHost
+  steps: SshBootstrapStep[]
+  authRequired?: boolean
+  keyInstalled?: boolean
+  localUrl?: string | null
+  remoteApiKey?: string | null
+  hostname?: string | null
+  platform?: string | null
+  daemonPersistence?: string | null
+  watchdogInstalled: boolean
+}
+
+export type SshProbeResult = {
+  hostId: string
+  reachable: boolean
+  authRequired?: boolean
+  hostname?: string | null
+  platform?: string | null
+  arch?: string | null
+  gpuSummary?: string | null
+  slurmAvailable: boolean
+  sandwalkInstalled: boolean
+  sandwalkVersion?: string | null
+  daemonRunning: boolean
+  defaultWorkdir?: string | null
+  detail?: string | null
+}
+
+export type SshExecResponse = {
+  hostId: string
+  command: string
+  workdir?: string | null
+  exitCode: number
+  stdout: string
+  stderr: string
+  durationSeconds: number
+}
+
+export type SshSlurmQueueEntry = {
+  jobId: string
+  partition: string
+  name: string
+  user: string
+  state: string
+  timeUsed: string
+  nodes: string
+  reasonOrNodelist: string
+}
+
+export type SshSlurmStatusResponse = {
+  hostId: string
+  slurmAvailable: boolean
+  jobs: SshSlurmQueueEntry[]
+  rawOutput: string
+}
+
 
 

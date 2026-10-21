@@ -65,6 +65,10 @@ describe('resolveDashboardSection', () => {
     )
     expect(resolveDashboardSection('/dashboard/mcp')).toBe('mcp')
     expect(resolveDashboardSection('/dashboard/memory')).toBe('memory')
+    expect(resolveDashboardSection('/dashboard/automations')).toBe(
+      'automations'
+    )
+    expect(resolveDashboardSection('/dashboard/ssh')).toBe('ssh')
     expect(resolveDashboardSection('/dashboard')).toBe('overview')
   })
 })
