@@ -17,7 +17,8 @@ const MCP_ICONS: Record<string, { src: string; invertInDark?: boolean }> = {
   exa: { src: '/integrations/exa.png' },
   huggingface: { src: '/integrations/huggingface.png' },
   tavily: { src: '/tavily-color.png' },
-  linear: { src: '/integrations/linear.png' }
+  linear: { src: '/integrations/linear.png' },
+  omnigraph: { src: '/integrations/omnigraph.png' }
 }
 
 export function skillMetaText(skill: AgentSkill): string | null {

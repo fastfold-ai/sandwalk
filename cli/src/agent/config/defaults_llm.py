@@ -95,6 +95,7 @@ DEFAULTS_LLM = {
     "mcp.tavily_tool_count": None,
     "mcp.pymol_tool_count": None,
     "mcp.raymol_tool_count": None,
+    "mcp.omnigraph_tool_count": None,
     # Absolute path to RayMol --mcp-bridge binary (set by mcp install raymol).
     "mcp.raymol_binary": None,
     "mcp.tamarind_status_message": None,
@@ -107,6 +108,7 @@ DEFAULTS_LLM = {
     "mcp.tavily_status_message": None,
     "mcp.pymol_status_message": None,
     "mcp.raymol_status_message": None,
+    "mcp.omnigraph_status_message": None,
     "mcp.tamarind_access_token": None,
     "mcp.tamarind_refresh_token": None,
     "mcp.tamarind_token_expires_at": None,

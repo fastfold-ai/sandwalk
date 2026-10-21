@@ -1,3 +1,4 @@
+import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSkill,
   McpCatalogEntry,
@@ -45,7 +46,12 @@ export function SpecialistsView({
   onOpenMcp,
   onEnableSkill,
   onInstallSkill,
-  onListTools
+  onListTools,
+  client,
+  userName,
+  onStartChat,
+  onExploreBrain,
+  onOpenDefaults
 }: {
   mode: 'list' | 'new' | 'edit'
   specialistId: string | null
@@ -54,6 +60,8 @@ export function SpecialistsView({
   mcpServers: McpServer[]
   mcpCatalog?: McpCatalogEntry[]
   loading?: boolean
+  client?: LocalAgentClient
+  userName?: string | null
   onRefresh: () => Promise<void>
   onCreate: (input: {
     name: string
@@ -62,6 +70,12 @@ export function SpecialistsView({
     instructions?: string | null
     color?: string
     icon?: string
+    roleLabel?: string | null
+    avatarUrl?: string | null
+    provider?: string | null
+    model?: string | null
+    cookbookId?: string | null
+    priors?: string | null
     skillNames?: string[]
     toolNames?: string[]
     mcpServerIds?: string[]
@@ -77,6 +91,13 @@ export function SpecialistsView({
       instructions?: string | null
       color?: string
       icon?: string
+      roleLabel?: string | null
+      avatarUrl?: string | null
+      provider?: string | null
+      model?: string | null
+      clearLlm?: boolean
+      cookbookId?: string | null
+      priors?: string | null
       skillNames?: string[]
       toolNames?: string[]
       mcpServerIds?: string[]
@@ -98,16 +119,25 @@ export function SpecialistsView({
   onEnableSkill?: (name: string) => Promise<void>
   onInstallSkill?: (source: string) => Promise<void>
   onListTools?: (signal?: AbortSignal) => Promise<ToolCatalog>
+  onStartChat?: (specialist: Specialist) => void
+  onExploreBrain?: (specialist: Specialist) => void
+  onOpenDefaults?: () => void
 }) {
   if (mode === 'list') {
     return (
       <SpecialistsListView
         specialists={specialists}
         loading={loading}
+        client={client}
+        userName={userName}
         onOpenNew={onOpenNew}
         onOpenEdit={onOpenEdit}
         onUpdate={onUpdate}
+        onDelete={onDelete}
         onRefresh={onRefresh}
+        onStartChat={onStartChat}
+        onExploreBrain={onExploreBrain}
+        onOpenDefaults={onOpenDefaults}
       />
     )
   }

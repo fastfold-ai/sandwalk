@@ -17,8 +17,8 @@ import {
   writeProjectScopeId
 } from '@/lib/app-storage'
 import { isDraftAgentSessionId } from '@/lib/draft-agent'
-import { sameArrayBy } from '@/lib/stable-equal'
 import { clearSessionAttention } from '@/lib/session-attention'
+import { sameArrayBy } from '@/lib/stable-equal'
 
 type UseAppSessionEffectsArgs = {
   setIntegrationValues: Dispatch<SetStateAction<Record<string, string>>>

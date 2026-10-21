@@ -96,6 +96,25 @@ def build_prompt(
             result.section_children.append(
                 bucket_from_text(id="project", label="Project context", text=block, model=model)
             )
+    try:
+        from agent_server.memory_service import MemoryService
+
+        mem_text = MemoryService().build_prompt_snapshot(
+            specialist_id=getattr(ctx.specialist, "id", None) if ctx.specialist else None,
+            specialist_priors=getattr(ctx.specialist, "priors", None) if ctx.specialist else None,
+            specialist_name=getattr(ctx.specialist, "name", None) if ctx.specialist else None,
+        )
+        if mem_text:
+            result.section_children.append(
+                bucket_from_text(
+                    id="memory_wiki_graph",
+                    label="Memory, Wiki TOC & Ontology",
+                    text=mem_text,
+                    model=model,
+                )
+            )
+    except Exception:
+        pass
 
     result.skills_text, result.skill_count = build_skills_index_text(ctx.allowed_skill_names)
     skills_sources = resolve_skill_source_dirs(ctx.allowed_skill_names)

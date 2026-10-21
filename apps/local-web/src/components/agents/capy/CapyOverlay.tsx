@@ -1,3 +1,5 @@
+import '@/components/agents/capy/CapyOverlay.css'
+
 import type { LocalAgentClient } from '@sandwalk/agent-local-client'
 import type {
   AgentSession,
@@ -12,19 +14,18 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react'
 
 import capyLogo from '@/assets/capy-logo.png'
-import '@/components/agents/capy/CapyOverlay.css'
 import { CapyChat } from '@/components/agents/capy/CapyChat'
-import { useCapyShortcut } from '@/components/agents/capy/CapyShortcutKeys'
 import { CapyComposer } from '@/components/agents/capy/CapyComposer'
+import { useCapyShortcut } from '@/components/agents/capy/CapyShortcutKeys'
 import { VoiceLevelBars } from '@/components/agents/composer/VoiceLevelBars'
 import { useCapyHandsFree } from '@/hooks/useCapyHandsFree'
 import { useCapySession } from '@/hooks/useCapySession'
 import { useCapyVoiceReply } from '@/hooks/useCapyVoiceReply'
 import { useCapyWindow } from '@/hooks/useCapyWindow'
+import { CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, capyShortcutSymbols, formatCapyUnreadBadge } from '@/lib/capy-ui'
 import { readCapySpeakAll } from '@/lib/capy-voice'
-import { capyShortcutSymbols, CAPY_MIN_HEIGHT, CAPY_MIN_WIDTH, formatCapyUnreadBadge } from '@/lib/capy-ui'
-import { usableVoiceTranscript } from '@/lib/desktop-voice'
 import type { ComposerModelOption } from '@/lib/composer-models'
+import { usableVoiceTranscript } from '@/lib/desktop-voice'
 import { isDraftAgentSessionId, isReservedAgentRouteId } from '@/lib/draft-agent'
 import { cn } from '@/lib/utils'
 

@@ -38,7 +38,7 @@ export function IntegrationCard({
   onSelect: (key: string) => void
 }) {
   return (
-    <div className="bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors">
+    <div className="border-border/50 bg-muted/20 hover:border-border hover:bg-muted/35 flex items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all">
       <button
         type="button"
         className="min-w-0 flex-1 text-left"

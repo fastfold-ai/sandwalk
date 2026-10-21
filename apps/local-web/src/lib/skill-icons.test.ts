@@ -125,6 +125,20 @@ describe('skillIcon helpers', () => {
   })
 
   it('infers Hugging Face logos and keeps mapped skill logos by name', () => {
+    expect(skillIcon({ name: 'omnigraph', iconSrc: null })).toBe(
+      '/integrations/omnigraph.png'
+    )
+    expect(skillIcon({ name: 'knowledge-steward', iconSrc: null })).toBe(
+      '/integrations/omnigraph.png'
+    )
+    expect(
+      skillIconInvertInDark({
+        name: 'omnigraph',
+        iconSrc: null,
+        author: 'sandwalk',
+        source: 'bundled'
+      })
+    ).toBe(false)
     expect(skillIcon({ name: 'convert-documents-to-markdown', iconSrc: null })).toBe(
       '/integrations/firecrawl.png'
     )

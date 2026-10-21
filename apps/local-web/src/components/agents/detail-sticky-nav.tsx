@@ -19,7 +19,7 @@ export function DetailStickyNav({
   return (
     <div
       className={cn(
-        'bg-background shrink-0',
+        'bg-transparent shrink-0',
         className
       )}
     >

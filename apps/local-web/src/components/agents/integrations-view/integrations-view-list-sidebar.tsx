@@ -37,7 +37,7 @@ export function IntegrationsListSidebar({
         className
       )}
     >
-      <section className="bg-background/70 shrink-0 rounded-lg p-2">
+      <section className="border-border/50 bg-muted/20 shrink-0 rounded-2xl border p-2.5">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Status
         </div>
@@ -63,7 +63,7 @@ export function IntegrationsListSidebar({
           Not configured ({notConfiguredCount})
         </button>
       </section>
-      <section className="bg-background/70 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg p-2">
+      <section className="border-border/50 bg-muted/20 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border p-2.5">
         <div className="text-muted-foreground/60 mb-1 shrink-0 px-2 py-1 text-xs font-semibold">
           Categories
         </div>

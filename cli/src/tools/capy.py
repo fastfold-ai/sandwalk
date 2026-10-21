@@ -78,6 +78,29 @@ def _resolve_project_id(store, spec: str = "current") -> dict:
     return {"ok": False, "summary": f"Project not found: {raw}."}
 
 
+def _resolve_specialist_ref(deps, spec: str = ""):
+    """Resolve a persona / specialist by id, slug, person name, or role label."""
+    raw = str(spec or "").strip()
+    if not raw or raw.lower() in {"none", "default"}:
+        return None
+    try:
+        items = deps.specialists_service.list()
+    except Exception:
+        items = deps.store.list_specialists()
+    key = raw.lower()
+    for item in items:
+        if item.id == raw or item.slug.lower() == key or item.name.strip().lower() == key:
+            return item
+    for item in items:
+        role = str(getattr(item, "role_label", "") or "").strip().lower()
+        if role and (role == key or key in role):
+            return item
+    for item in items:
+        if key in item.name.strip().lower() or key in item.slug.lower():
+            return item
+    return None
+
+
 @registry.register(
     name="capy.list_sessions",
     description="List worker chats (id, title, status). Excludes Capy and bench.",
@@ -171,14 +194,16 @@ def capy_send_message(session_id: str = "", content: str = "", **kwargs) -> dict
 
 @registry.register(
     name="capy.spawn_sessions",
-    description="Create worker chats, optionally send a first message, and open them as a grid. Defaults to the current UI project (All if none selected).",
+    description="Create worker chats (optionally with an Agent Persona / Specialist like Atlas, Nova, Milo, Soren), send a first message, and open them in the UI.",
     category="capy",
-    usage_guide="For a picture that is 4 panes across and 2 down, pass grid='4x2' (columns x rows) or cols=4 and rows=2. Do not leave layout empty — without it every chat sits in one row.",
+    usage_guide="Pass specialist (or specialists as comma-separated names for multi-persona grids) when the user asks to spawn a chat with a specific persona, profile, or specialist. For a grid that is 4 panes across and 2 down, pass grid='4x2' or cols=4 and rows=2.",
     parameters={
         "count": "How many chats (1-16). Ignored when rows and cols (or grid) are set; then count is rows*cols.",
         "message": "Optional first user message for each chat.",
         "title_prefix": "Optional title prefix.",
         "project_id": "current (default), all, or a project id/name.",
+        "specialist": "Optional persona / specialist name, role, slug, or id (e.g. 'Atlas', 'Nova', 'Dreamer', 'Project Manager', 'Soren', 'protein-designer').",
+        "specialists": "Optional comma-separated persona/specialist names to assign across panes in order (e.g. 'Nova,Soren' for a 2-pane debate).",
         "rows": "Horizontal bands. 2 for a picture that is two panes tall.",
         "cols": "Panes across each band. 4 for a picture that is four panes wide.",
         "grid": "columns x rows, e.g. 4x2 means 4 across and 2 down.",
@@ -189,47 +214,91 @@ def capy_spawn_sessions(
     message: str = "",
     title_prefix: str = "",
     project_id: str = "current",
+    specialist: str = "",
+    specialists: str = "",
     rows: int = 0,
     cols: int = 0,
     grid: str = "",
     **kwargs,
 ) -> dict:
     layout = _parse_grid(rows, cols, grid)
+    deps = _deps()
+    spec_tokens = [
+        part.strip()
+        for part in (str(specialists or "").split(",") if specialists else ([specialist] if specialist else []))
+        if part.strip()
+    ]
+    resolved_specs = []
+    for token in spec_tokens:
+        found = _resolve_specialist_ref(deps, token)
+        if found is None:
+            return {
+                "ok": False,
+                "summary": f"Specialist / persona not found: '{token}'. Call capy.list_specialists to see available personas.",
+            }
+        resolved_specs.append(found)
+
     if layout:
         n = max(1, min(16, layout["rows"] * layout["cols"]))
+    elif len(resolved_specs) > 1 and int(count or 1) == 1:
+        n = min(16, len(resolved_specs))
+        layout = {"rows": 1, "cols": n}
     else:
         n = max(1, min(16, int(count or 1)))
     text = str(message or "").strip()
-    prefix = str(title_prefix or "Chat").strip() or "Chat"
-    deps = _deps()
+    prefix = str(title_prefix or "").strip()
     resolved = _resolve_project_id(deps.store, project_id)
     if not resolved["ok"]:
         return resolved
     pid = resolved["projectId"]
     ids: list[str] = []
+    assigned_names: list[str] = []
     for index in range(n):
+        chosen_spec = (
+            resolved_specs[index % len(resolved_specs)] if resolved_specs else None
+        )
+        if prefix:
+            chat_title = f"{prefix} {index + 1}" if n > 1 else prefix
+        elif chosen_spec is not None:
+            role = getattr(chosen_spec, "role_label", None) or chosen_spec.slug
+            chat_title = f"{chosen_spec.name} · {role}"
+        else:
+            chat_title = f"Chat {index + 1}" if n > 1 else "Chat"
         session = deps.service.create_session(
-            title=f"{prefix} {index + 1}" if n > 1 else prefix,
+            title=chat_title,
             workspace_path=None,
             project_id=pid,
+            specialist_id=chosen_spec.id if chosen_spec else None,
+            provider=getattr(chosen_spec, "provider", None) if chosen_spec else None,
+            model=getattr(chosen_spec, "model", None) if chosen_spec else None,
+            openai_profile_id=getattr(chosen_spec, "openai_profile_id", None) if chosen_spec else None,
             sandbox_backend="builtin",
             client_surface="ui",
         )
         ids.append(session.id)
+        if chosen_spec is not None:
+            assigned_names.append(chosen_spec.name)
         if text:
             try:
                 deps.service.submit_message(session_id=session.id, content=text)
             except Exception:  # noqa: BLE001
                 pass
-    _emit_open_split(ids, layout)
+    if len(ids) >= 2:
+        _emit_open_split(ids, layout)
+    elif len(ids) == 1:
+        from agent_server.session_event_bus import session_event_bus
+
+        session_event_bus.publish("ui.command", {"action": "open_item", "itemId": ids[0]})
     where = resolved.get("projectName") or "All"
     shape = ""
     if layout:
         shape = f" as {layout['cols']} across × {layout['rows']} down"
+    persona_note = f" with {', '.join(assigned_names)}" if assigned_names else ""
     return {
         "ok": True,
-        "summary": f"Created {n} chat(s) in {where}{shape}.",
+        "summary": f"Created {n} chat(s){persona_note} in {where}{shape}.",
         "sessionIds": ids,
+        "specialists": assigned_names,
         "projectId": pid,
         "layout": layout,
     }
@@ -245,6 +314,7 @@ def capy_spawn_sessions(
         "target_id": "Existing target chat id, or empty to create one.",
         "brief": "Short imported brief (you write this from the extract).",
         "also_prompt": "Optional ask after the imported context.",
+        "specialist": "Optional persona / specialist name or slug for a newly created target chat.",
     },
 )
 def capy_seed_session(
@@ -252,6 +322,7 @@ def capy_seed_session(
     target_id: str = "",
     brief: str = "",
     also_prompt: str = "",
+    specialist: str = "",
     **kwargs,
 ) -> dict:
     from agent_server.capy.extract import extract_session
@@ -267,6 +338,7 @@ def capy_seed_session(
     if extra:
         content = f"{content}\n\n{extra}"
     tid = str(target_id or "").strip()
+    chosen_spec = _resolve_specialist_ref(deps, specialist) if specialist else None
     if tid:
         session = deps.store.get_session(tid)
         if session is None:
@@ -278,6 +350,7 @@ def capy_seed_session(
             title=f"From {title}",
             workspace_path=None,
             project_id=_resolve_project_id(deps.store, "current").get("projectId"),
+            specialist_id=chosen_spec.id if chosen_spec else None,
             sandbox_backend="builtin",
             client_surface="ui",
         )
@@ -1300,3 +1373,303 @@ def capy_handoff_session(session_id: str = "", agent: str = "", **kwargs) -> dic
         "terminalId": launched["terminal"]["id"],
         "path": exported["path"],
     }
+
+
+@registry.register(
+    name="capy.list_specialists",
+    description="List available Agent Personas and Specialists (id, name, role, slug, priors, memory count, cookbook lens).",
+    category="capy",
+    usage_guide="Use before spawning a chat with a persona/specialist or when the user asks what personas/specialists exist.",
+    parameters={},
+)
+def capy_list_specialists(**kwargs) -> dict:
+    deps = _deps()
+    items = deps.specialists_service.list()
+    rows = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "slug": s.slug,
+            "role": getattr(s, "role_label", None) or s.description or s.slug,
+            "cookbook": getattr(s, "cookbook_id", None) or "biomed-research",
+            "priors": getattr(s, "priors", None) or "",
+            "memoryCount": getattr(s, "memory_count", 0),
+            "enabled": s.enabled,
+        }
+        for s in items
+    ]
+    return {
+        "ok": True,
+        "count": len(rows),
+        "specialists": rows,
+        "summary": f"{len(rows)} agent personas/specialists available.",
+    }
+
+
+@registry.register(
+    name="capy.memory_search",
+    description="Search Sandwalk's curated memories, past session transcripts, and knowledge graph claims.",
+    category="capy",
+    usage_guide="Use when the user asks what we know, decided, or learned across sessions or projects.",
+    parameters={
+        "query": "Search query (optional; leave empty to list current scope memories and graph overview).",
+        "scope": "Scope: 'global', 'project:<id>', or 'specialist:<id>' (defaults to current UI project or 'global').",
+    },
+)
+def capy_memory_search(query: str = "", scope: str = "", **kwargs) -> dict:
+    from agent_server.capy.scope import get_capy_scope
+    from agent_server.memory_service import MemoryService, search_past_sessions
+
+    deps = _deps()
+    resolved_scope = str(scope or "").strip()
+    if not resolved_scope:
+        pid = get_capy_scope().get("project_id")
+        resolved_scope = f"project:{pid}" if pid else "global"
+    svc = MemoryService(agent_store=deps.store)
+    entries = svc.list_entries(resolved_scope).data
+    snap = svc.get_graph(resolved_scope)
+    q = str(query or "").strip()
+    session_hits = search_past_sessions(deps.store, q, limit=5) if q else []
+    if q:
+        low = q.lower()
+        entries = [e for e in entries if low in e.content.lower() or any(low in t.lower() for t in e.tags)]
+    return {
+        "ok": True,
+        "scope": resolved_scope,
+        "cookbook": snap.active_cookbook.name,
+        "memories": [e.model_dump(mode="json", by_alias=True) for e in entries[:15]],
+        "graphNodes": len(snap.nodes),
+        "graphEdges": len(snap.edges),
+        "contradictions": snap.contradiction_count,
+        "sessionMatches": session_hits,
+        "summary": (
+            f"Scope {resolved_scope} ({snap.active_cookbook.name}): "
+            f"{len(entries)} matching memory note(s), {len(snap.nodes)} graph node(s), "
+            f"{snap.contradiction_count} contradiction(s), and {len(session_hits)} session match(es)."
+        ),
+    }
+
+
+@registry.register(
+    name="capy.wiki_digest",
+    description="List or read Living Markdown Wiki pages for the current project or global brain.",
+    category="capy",
+    usage_guide="Use to inspect synthesized Wiki pages and [[wikilinks]].",
+    parameters={
+        "slug": "Optional page slug to read in full (omit to list all pages in scope).",
+        "scope": "Optional scope ('global' or 'project:<id>').",
+    },
+)
+def capy_wiki_digest(slug: str = "", scope: str = "", **kwargs) -> dict:
+    from agent_server.capy.scope import get_capy_scope
+    from agent_server.memory_service import MemoryService
+
+    deps = _deps()
+    resolved_scope = str(scope or "").strip()
+    if not resolved_scope:
+        pid = get_capy_scope().get("project_id")
+        resolved_scope = f"project:{pid}" if pid else "global"
+    svc = MemoryService(agent_store=deps.store)
+    if str(slug or "").strip():
+        page = svc.get_wiki_page(slug.strip(), scope=resolved_scope)
+        if page is None:
+            return {"ok": False, "summary": f"Wiki page '{slug}' not found in {resolved_scope}."}
+        return {
+            "ok": True,
+            "summary": f"Wiki page [[{page.slug}]]: {page.title}",
+            "page": page.model_dump(mode="json", by_alias=True),
+        }
+    listed = svc.list_wiki(resolved_scope)
+    return {
+        "ok": True,
+        "scope": listed.scope,
+        "pages": [p.model_dump(mode="json", by_alias=True) for p in listed.data],
+        "summary": f"Found {len(listed.data)} wiki page(s) in {listed.scope}.",
+    }
+
+
+@registry.register(
+    name="capy.distill_session",
+    description="Distill a Sandwalk chat session into durable Memory notes, a Living Wiki page, and Knowledge Graph claims.",
+    category="capy",
+    usage_guide="Use when the user asks to save, distill, or extract learnings from a session into Memory/Wiki/Graph.",
+    parameters={
+        "session_id": "Chat session id to distill.",
+        "scope": "Optional target scope ('global', 'project:<id>', or 'specialist:<id>').",
+    },
+)
+def capy_distill_session(session_id: str = "", scope: str = "", **kwargs) -> dict:
+    from agent_server.memory_service import MemoryService
+
+    deps = _deps()
+    sid = str(session_id or "").strip()
+    if not sid:
+        return {"ok": False, "summary": "session_id is required."}
+    svc = MemoryService(agent_store=deps.store)
+    try:
+        res = svc.distill_session(sid, scope=str(scope or "").strip() or None)
+        return res.model_dump(mode="json", by_alias=True)
+    except KeyError:
+        return {"ok": False, "summary": f"Session not found: {sid}"}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "summary": f"Distillation failed: {exc}"}
+
+
+@registry.register(
+    name="capy.create_skill_from_memory",
+    description=(
+        "Crystallize curated Memories, Living Wiki pages, and Omnigraph Cookbook ontologies "
+        "from a scope into a reusable Sandwalk Skill (~/.sandwalk/skills/<slug>/SKILL.md)."
+    ),
+    category="capy",
+    usage_guide=(
+        "Use when the user asks to convert what we know about a topic, a Living Wiki page, "
+        "or an Omnigraph Cookbook ontology into an installed Skill (/skill-slug)."
+    ),
+    parameters={
+        "name": "Skill title or slug (e.g. 'Oral GLP-1R Discovery').",
+        "scope": "Source scope ('global', 'project:<id>', or 'specialist:<id>').",
+        "topic": "Optional topic filter.",
+        "wiki_slug": "Optional specific Wiki page slug.",
+        "description": "Optional 1-sentence skill description.",
+    },
+)
+def capy_create_skill_from_memory(
+    name: str = "",
+    scope: str = "global",
+    topic: str = "",
+    wiki_slug: str = "",
+    description: str = "",
+    **kwargs,
+) -> dict:
+    from agent_server.memory_service import MemoryService
+    from agent_server.models.memory import CreateSkillFromMemoryRequest
+
+    clean_name = str(name or "").strip()
+    if not clean_name:
+        return {"ok": False, "summary": "name is required to create a skill."}
+    deps = _deps()
+    svc = MemoryService(agent_store=deps.store)
+    res = svc.create_skill(
+        CreateSkillFromMemoryRequest(
+            scope=str(scope or "global").strip() or "global",
+            name=clean_name,
+            description=str(description or "").strip() or None,
+            topic=str(topic or "").strip() or None,
+            wiki_slug=str(wiki_slug or "").strip() or None,
+        )
+    )
+    return res.model_dump(mode="json", by_alias=True)
+
+
+@registry.register(
+    name="capy.memory_manage",
+    description=(
+        "Manage Sandwalk's Memory (USER.md / MEMORY.md), Living Wiki pages, "
+        "Knowledge Graph nodes/claims, or active Cookbook Mode (01-06)."
+    ),
+    category="capy",
+    usage_guide=(
+        "Use when the user asks Capy to remember a preference or rule, write/update a Wiki page, "
+        "record a Knowledge Graph claim, or switch Cookbook mode (industry-intel, pharma-intel, "
+        "context-graph, vc-os, biomed-research, second-brain)."
+    ),
+    parameters={
+        "operation": (
+            "'add_memory', 'add_user_memory', 'remove_memory', 'write_wiki', "
+            "'record_claim', or 'select_cookbook'"
+        ),
+        "scope": "Target scope ('global', 'project:<id>', or 'specialist:<id>').",
+        "content": "Memory text, Wiki Markdown content, or claim summary.",
+        "title": "Wiki page title or Graph subject name.",
+        "slug": "Wiki page slug or Cookbook ID (for select_cookbook).",
+        "predicate": "Graph claim predicate (e.g. 'Supports', 'Contradicts') when operation='record_claim'.",
+        "target": "Graph claim object (e.g. 'Goal:local-first') when operation='record_claim'.",
+        "polarity": "'support', 'contradict', or 'neutral' when operation='record_claim'.",
+    },
+)
+def capy_memory_manage(
+    operation: str = "add_memory",
+    scope: str = "global",
+    content: str = "",
+    title: str = "",
+    slug: str = "",
+    predicate: str = "Supports",
+    target: str = "",
+    polarity: str = "support",
+    **kwargs,
+) -> dict:
+    from agent_server.memory_service import MemoryService
+    from agent_server.models.memory import (
+        CreateGraphClaimRequest,
+        UpsertWikiPageRequest,
+    )
+
+    deps = _deps()
+    svc = MemoryService(agent_store=deps.store)
+    op = str(operation or "add_memory").strip().lower()
+    resolved_scope = str(scope or "global").strip() or "global"
+
+    if op in {"add_memory", "add_user_memory"}:
+        tgt = "user" if op == "add_user_memory" else "memory"
+        res = svc.store.mutate_by_substring(
+            scope="user" if tgt == "user" else resolved_scope,
+            target=tgt,
+            action="add",
+            content=content,
+            bypass_approval=True,
+        )
+        return {"summary": f"Saved entry to {tgt.upper()}.md ({resolved_scope}).", **res}
+    if op == "remove_memory":
+        res = svc.store.mutate_by_substring(
+            scope=resolved_scope,
+            target="memory",
+            action="remove",
+            old_text=content or title,
+            bypass_approval=True,
+        )
+        return {"summary": f"Removed memory matching '{content or title}'.", **res}
+    if op == "write_wiki":
+        page_slug = str(slug or title or "note").strip()
+        page_title = str(title or slug or "Wiki Note").strip()
+        page = svc.write_wiki_page(
+            page_slug,
+            UpsertWikiPageRequest(
+                scope=resolved_scope,
+                title=page_title,
+                content=content,
+            ),
+        )
+        return {
+            "ok": True,
+            "summary": f"Saved Living Wiki page [[{page.slug}]] ({page.title}).",
+            "page": page.model_dump(mode="json", by_alias=True),
+        }
+    if op == "record_claim":
+        edge = svc.record_graph_claim(
+            CreateGraphClaimRequest(
+                scope=resolved_scope,
+                subject_id=title or slug or "Entity:subject",
+                predicate=predicate or "Supports",
+                object_id=target or "Claim:object",
+                polarity=polarity if polarity in {"support", "contradict", "neutral"} else "support",  # type: ignore[arg-type]
+                summary=content,
+            )
+        )
+        return {
+            "ok": True,
+            "summary": f"Recorded graph claim {edge.source_id} -[{edge.predicate}]-> {edge.target_id}.",
+            "edge": edge.model_dump(mode="json", by_alias=True),
+        }
+    if op == "select_cookbook":
+        cb_id = str(slug or content or "second-brain").strip()
+        snap = svc.select_cookbook(scope=resolved_scope, cookbook_id=cb_id, load_demo_seed=True)
+        return {
+            "ok": True,
+            "summary": f"Switched {resolved_scope} to Cookbook {snap.active_cookbook.number} {snap.active_cookbook.name}.",
+            "cookbookId": snap.active_cookbook.id,
+        }
+    return {"ok": False, "summary": f"Unsupported memory_manage operation: {operation}"}
+
+
+

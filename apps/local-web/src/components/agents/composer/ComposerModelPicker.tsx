@@ -262,11 +262,14 @@ export function ComposerModelPicker({
         onCloseAutoFocus={event => event.preventDefault()}
       >
         <div className="relative">
-          <div className="bg-popover w-60 rounded-2xl border p-1 text-[13px] shadow-lg">
+          <div className="sandwalk-glass-menu border-border/60 bg-popover/90 w-60 rounded-2xl border p-1.5 text-[13px] shadow-lg backdrop-blur-xl">
             {supportsReasoningEffort &&
             selectedModel.supportsReasoningFast !== false &&
             onReasoningSettingsChange ? (
-              <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5">
+              <div
+                className="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+                onMouseEnter={() => setFlyout(null)}
+              >
                 <span>Fast</span>
                 <button
                   type="button"
@@ -298,6 +301,7 @@ export function ComposerModelPicker({
               <button
                 type="button"
                 className="hover:bg-muted flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left"
+                onMouseEnter={() => setFlyout(null)}
                 onClick={() => {
                   if (llamaState === 'loaded' || llamaState === 'ready') {
                     setLlamaState('unloaded')
@@ -333,11 +337,13 @@ export function ComposerModelPicker({
                 </span>
               </button>
             ) : contextLabel ? (
-              <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5">
+              <div
+                className="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+                onMouseEnter={() => setFlyout(null)}
+              >
                 <span>Context</span>
                 <span className="text-muted-foreground flex items-center gap-1">
                   {contextLabel}
-                  <ChevronRight className="size-3.5 opacity-70" />
                 </span>
               </div>
             ) : null}
@@ -359,7 +365,10 @@ export function ComposerModelPicker({
               </button>
             ) : null}
             {selectedModel.speed ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5">
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5"
+                onMouseEnter={() => setFlyout(null)}
+              >
                 <span>Provider</span>
                 <span className="text-muted-foreground truncate">
                   {selectedModel.speed}
@@ -385,7 +394,7 @@ export function ComposerModelPicker({
             </button>
           </div>
           {flyout === 'context' && selectedModel.backend === 'llama' && client ? (
-            <div className="bg-popover absolute top-14 left-full z-10 ml-1.5 w-44 rounded-2xl border p-1 shadow-lg">
+            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-14 left-full z-10 ml-2 w-44 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl">
               {[4096, 8192, 16384, 32768, 65536, 131072].map(tier => (
                 <button
                   key={tier}
@@ -411,7 +420,7 @@ export function ComposerModelPicker({
             </div>
           ) : null}
           {flyout === 'effort' && supportsReasoningEffort ? (
-            <div className="bg-popover absolute top-14 left-full z-10 ml-1.5 w-40 rounded-2xl border p-1 shadow-lg">
+            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-14 left-full z-10 ml-2 w-40 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl">
               {effortOptions.map(level => {
                 const active = selectedEffort === level
                 return (
@@ -435,7 +444,7 @@ export function ComposerModelPicker({
             </div>
           ) : null}
           {flyout === 'model' ? (
-            <div className="bg-popover absolute top-0 left-full z-10 ml-1.5 flex w-72 flex-col overflow-hidden rounded-2xl border shadow-lg">
+            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-0 left-full z-10 ml-2 flex w-72 flex-col overflow-hidden rounded-2xl border shadow-lg backdrop-blur-xl">
               <div className="border-b px-3 py-1.5">
                 <Input
                   value={modelSearch}

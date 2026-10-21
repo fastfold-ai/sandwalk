@@ -318,7 +318,7 @@ export function Composer({
              */
             embedded
               ? 'bg-transparent border-0 rounded-none shadow-none px-4 pt-3 pb-4'
-              : 'bg-card hover:border-muted-foreground/25 focus-within:border-muted-foreground/40 border-border rounded-3xl border pt-1.5 pr-2 pb-3 pl-3',
+              : 'border-border/60 bg-muted/25 hover:border-muted-foreground/30 focus-within:border-muted-foreground/45 rounded-3xl border pt-1.5 pr-2 pb-3 pl-3 backdrop-blur-md',
             !embedded &&
               (voice.active
                 ? 'shadow-none'

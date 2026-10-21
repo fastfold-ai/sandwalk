@@ -1,8 +1,8 @@
+import { OfflineBanner } from '@/components/app/OfflineBanner'
 import type { AppShellProps } from '@/components/app-shell-props'
 import { AppDialogs } from '@/components/AppDialogs'
 import { AppShellMain } from '@/components/AppShellMain'
 import { AppShellSidebar } from '@/components/AppShellSidebar'
-import { OfflineBanner } from '@/components/app/OfflineBanner'
 import {
   ResizableHandle,
   ResizablePanelGroup

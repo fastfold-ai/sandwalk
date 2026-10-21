@@ -64,6 +64,7 @@ describe('resolveDashboardSection', () => {
       'integrations'
     )
     expect(resolveDashboardSection('/dashboard/mcp')).toBe('mcp')
+    expect(resolveDashboardSection('/dashboard/memory')).toBe('memory')
     expect(resolveDashboardSection('/dashboard')).toBe('overview')
   })
 })

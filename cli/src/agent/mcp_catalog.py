@@ -46,6 +46,14 @@ def _raymol_command() -> str:
     return str(launcher_path())
 
 
+def _omnigraph_command() -> str:
+    from agent_server.memory_service.omnigraph_engine import (
+        ensure_omnigraph_mcp_launcher,
+    )
+
+    return str(ensure_omnigraph_mcp_launcher())
+
+
 MCP_CATALOG: list[McpCatalogEntry] = [
     McpCatalogEntry(
         id="pymol",
@@ -212,6 +220,23 @@ MCP_CATALOG: list[McpCatalogEntry] = [
         integration_key="linear",
         featured=False,
     ),
+    McpCatalogEntry(
+        id="omnigraph",
+        name="Omnigraph",
+        description=(
+            "Local Lance-backed knowledge graph with typed .pg ontologies, "
+            "hybrid BM25/vector RRF search, and Git-style branching."
+        ),
+        url=None,
+        transport="stdio",
+        auth_mode="none",
+        preferred_auth="api_key",
+        docs_url="https://www.omnigraph.dev/docs",
+        setup_url="https://github.com/ModernRelay/omnigraph",
+        featured=True,
+        command=None,
+        args=[],
+    ),
 ]
 
 _BY_ID = {entry.id: entry for entry in MCP_CATALOG}
@@ -229,6 +254,8 @@ def resolve_catalog_command(entry: McpCatalogEntry) -> str | None:
         return _pymol_command()
     if entry.id == "raymol":
         return _raymol_command()
+    if entry.id == "omnigraph":
+        return _omnigraph_command()
     return entry.command
 
 

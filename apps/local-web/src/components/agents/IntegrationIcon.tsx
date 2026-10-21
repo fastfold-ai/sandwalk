@@ -45,6 +45,7 @@ export const INTEGRATION_ICONS: Record<
   exa: { src: '/integrations/exa.png' },
   huggingface: { src: '/integrations/huggingface.png' },
   linear: { src: '/integrations/linear.png' },
+  omnigraph: { src: '/integrations/omnigraph.png' },
 }
 
 export function IntegrationIcon({

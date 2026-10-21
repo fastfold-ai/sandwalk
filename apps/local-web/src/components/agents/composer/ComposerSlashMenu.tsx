@@ -241,7 +241,7 @@ export const ComposerSlashMenu = forwardRef<
   if (!open) return null
 
   return (
-    <div className="bg-popover border-border/70 absolute bottom-full left-0 right-0 z-40 mb-2 overflow-hidden rounded-lg border shadow-lg">
+    <div className="sandwalk-glass-menu bg-popover/90 border-border/60 absolute bottom-full left-0 right-0 z-40 mb-2 overflow-hidden rounded-2xl border shadow-lg backdrop-blur-xl">
       {selectedSpecialist ? (
         <div className="border-border/60 text-muted-foreground border-b px-3 py-1.5 text-[11px]">
           Showing skills & MCPs for{' '}

@@ -252,7 +252,7 @@ export function McpCustomServerList({
   }
 
   return (
-    <div className="bg-card mt-3 divide-y overflow-hidden rounded-xl border">
+    <div className="border-border/50 bg-muted/20 divide-border/50 mt-3 divide-y overflow-hidden rounded-2xl border">
       {installedServers.map(server => {
         const catalogEntry = server.catalogId
           ? catalogById.get(server.catalogId)
@@ -322,7 +322,7 @@ export function McpCustomServerList({
                 </span>
                 <span
                   className={cn(
-                    'border-card absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2',
+                    'border-background absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2',
                     shownEnabled
                       ? 'bg-emerald-500'
                       : needsConnect || waiting

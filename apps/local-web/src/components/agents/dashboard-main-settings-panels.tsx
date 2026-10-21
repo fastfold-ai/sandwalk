@@ -9,9 +9,10 @@ import {
   BenchView,
   DataView,
   DoctorView,
-  LogsView,
   EnvironmentView,
   GeneralView,
+  LogsView,
+  MemoryView,
   ModelsView,
   SandboxListView,
   StorageView,
@@ -25,8 +26,13 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
   const {
     client,
     navigate,
+    dashboardSection,
     backendUrl,
     health,
+    projects,
+    specialists,
+    sessions,
+    activeProjectId,
     integrations,
     runtimeSettings,
     sandboxSettings,
@@ -131,6 +137,18 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
 
   if (isDashboardVoice) {
     return <VoiceView />
+  }
+
+  if (dashboardSection === 'memory') {
+    return (
+      <MemoryView
+        client={client}
+        projects={projects}
+        specialists={specialists}
+        sessions={sessions}
+        activeProjectId={activeProjectId}
+      />
+    )
   }
 
   if (isDashboardAgentSandbox) {

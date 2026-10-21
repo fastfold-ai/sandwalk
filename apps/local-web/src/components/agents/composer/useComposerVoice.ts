@@ -10,12 +10,12 @@ import {
   getDictationStatus,
   getVoiceInputOwner,
   isCapyOwnedVoiceInput,
+  publishVoiceInputChanged,
   startDictation,
   stopDictation,
-  publishVoiceInputChanged,
   usableVoiceTranscript,
-  type VoiceInputChangedDetail,
   VOICE_INPUT_CHANGED,
+  type VoiceInputChangedDetail,
   voiceReady
 } from '@/lib/desktop-voice'
 

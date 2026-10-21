@@ -8,9 +8,7 @@
   "scripts": {
     "dev": "pnpm --filter @sandwalk/agent-local-web dev",
     "dev:web": "pnpm --filter @sandwalk/agent-local-web dev",
-    "dev:docs": "pnpm --filter @sandwalk/docs dev",
     "build": "pnpm -r build",
-    "build:docs": "pnpm --filter @sandwalk/docs build",
     "lint": "pnpm -r lint",
     "format": "pnpm --filter @sandwalk/agent-local-web format",
     "format:check": "pnpm --filter @sandwalk/agent-local-web format:check",

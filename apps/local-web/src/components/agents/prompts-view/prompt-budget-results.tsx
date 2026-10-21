@@ -116,7 +116,9 @@ export function PromptBudgetResults({
                   <SpecialistAvatar
                     color={selectedSpecialist.color}
                     icon={selectedSpecialist.icon}
-                    className="size-6 rounded-md"
+                    avatarUrl={selectedSpecialist.avatarUrl}
+                    slug={selectedSpecialist.slug}
+                    className="size-6"
                   />
                   <span className="truncate">{selectedSpecialist.name}</span>
                 </div>

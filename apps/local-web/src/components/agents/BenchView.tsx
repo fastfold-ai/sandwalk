@@ -17,7 +17,6 @@ import { ComposerModelPicker } from '@/components/agents/composer/ComposerModelP
 import { ComposerSpecialistPicker } from '@/components/agents/composer/ComposerSpecialistPicker'
 import { composerModelOptionKey } from '@/components/agents/composer/useComposerModelPickerNav'
 import { Button } from '@/components/ui/button'
-import { isTauri, openDesktopServerSettings } from '@/lib/desktop'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +29,7 @@ import {
   patchComposerModelEffort,
   toComposerModelOptions
 } from '@/lib/composer-models'
+import { isTauri, openDesktopServerSettings } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
 type Tab = 'new' | 'results'

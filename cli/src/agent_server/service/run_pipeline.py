@@ -168,6 +168,30 @@ class _RunPipelineMixin:
                 name=f"retitle-{session_id[:8]}",
                 daemon=True,
             ).start()
+        if (
+            current_session is not None
+            and getattr(current_session, "source", None) not in {"bench", "capy"}
+            and len(str(summary or "").strip()) >= 80
+        ):
+            threading.Thread(
+                target=self._auto_distill_after_run,
+                args=(session_id,),
+                name=f"distill-{session_id[:8]}",
+                daemon=True,
+            ).start()
+
+    def _auto_distill_after_run(self, session_id: str) -> None:
+        """Best-effort background knowledge distillation after a substantive chat turn."""
+        try:
+            from agent_server.memory_service import MemoryService, load_memory_settings
+
+            settings = load_memory_settings()
+            if not settings.enabled or settings.distiller_mode == "manual":
+                return
+            svc = MemoryService(agent_store=self.store)
+            svc.distill_session(session_id, is_background=True)
+        except Exception:  # noqa: BLE001 — background distillation must never fail a run
+            logger.debug("Background session distillation skipped", exc_info=True)
 
     def _retitle_after_run(self, session_id: str, run_id: str, content: str) -> None:
         try:

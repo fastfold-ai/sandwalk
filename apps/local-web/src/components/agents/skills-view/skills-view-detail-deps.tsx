@@ -3,7 +3,7 @@ import type {
   AgentSkillDepsStatus
 } from '@sandwalk/agent-ui-core'
 import { CheckCircle2, Download, Loader, RotateCcw, Stethoscope } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -50,12 +50,14 @@ export function SkillsDetailDepsPanel({
     null
   )
   const [unavailable, setUnavailable] = useState(false)
+  const handlersRef = useRef(handlers)
+  handlersRef.current = handlers
 
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       setLoading(true)
       try {
-        const next = await handlers.getDeps(skillName, signal)
+        const next = await handlersRef.current.getDeps(skillName, signal)
         if (signal?.aborted) return
         setStatus(next)
         setUnavailable(false)
@@ -67,7 +69,7 @@ export function SkillsDetailDepsPanel({
         if (!signal?.aborted) setLoading(false)
       }
     },
-    [handlers, skillName]
+    [skillName]
   )
 
   useEffect(() => {

@@ -26,7 +26,7 @@ import {
 import { CapyShortcutSetting } from './capy/CapyShortcutSetting'
 import { GeneralViewAccountSection } from './general-view-account'
 import { GeneralViewNotificationsSection } from './general-view-notifications'
-import { GeneralViewResetSection, clearLocalAppPreferences } from './general-view-reset'
+import { clearLocalAppPreferences,GeneralViewResetSection } from './general-view-reset'
 import { GeneralViewServerSection } from './general-view-server'
 import { GeneralViewVersionSection } from './general-view-version'
 

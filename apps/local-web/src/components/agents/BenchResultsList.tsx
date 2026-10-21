@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { formatTokenCount } from '@/components/agents/usage-overview-utils'
 import { Button } from '@/components/ui/button'
@@ -58,11 +59,10 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { benchExportFilename } from '@/lib/bench-export-name'
 import { formatModelEffortBadge } from '@/lib/composer-models'
 import { cn } from '@/lib/utils'
-import { benchExportFilename } from '@/lib/bench-export-name'
 import { buildZipStore } from '@/lib/zip-store'
-import { toast } from 'sonner'
 
 const ROW_GRID =
   'grid grid-cols-[24px_minmax(0,1fr)_10.75rem_6.25rem_4.75rem_10.5rem_2rem] items-center gap-x-3'

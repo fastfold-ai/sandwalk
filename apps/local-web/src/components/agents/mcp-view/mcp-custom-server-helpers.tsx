@@ -83,7 +83,7 @@ export function authStatusLabel(
  * Everything else (custom remotes) uses favicon in the fixed layout box.
  */
 export function CustomServerIcon({ server }: { server: McpServer }) {
-  const catalogKey = server.catalogId?.trim().toLowerCase() || ''
+  const catalogKey = (server.catalogId || server.name || '').trim().toLowerCase()
   const bundled = catalogKey ? MCP_ICONS[catalogKey] : undefined
   const candidates = bundled ? [] : faviconCandidatesForUrl(server.url)
   const [index, setIndex] = useState(0)

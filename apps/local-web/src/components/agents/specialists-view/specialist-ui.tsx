@@ -44,11 +44,106 @@ export const SPECIALIST_COLORS: Array<{
   { id: 'pink', label: 'Magenta', swatch: 'bg-pink-500' }
 ]
 
+export const PERSONA_CHARACTERS: Array<{
+  id: string
+  label: string
+  archetype: string
+  imageUrl: string
+  accentColor: string
+}> = [
+  {
+    id: 'capybara',
+    label: 'Capybara (O’Reilly Engraving)',
+    archetype: 'Calm Polymath',
+    imageUrl: '/avatars/capybara.jpg',
+    accentColor: '#c9402c'
+  },
+  {
+    id: 'owl',
+    label: 'Barn Owl (O’Reilly Engraving)',
+    archetype: 'Skeptical Reviewer',
+    imageUrl: '/avatars/owl.jpg',
+    accentColor: '#0d9488'
+  },
+  {
+    id: 'fox',
+    label: 'Red Fox (O’Reilly Engraving)',
+    archetype: 'Dreamer & Explorer',
+    imageUrl: '/avatars/fox.jpg',
+    accentColor: '#d97706'
+  },
+  {
+    id: 'wolf',
+    label: 'Timber Wolf (O’Reilly Engraving)',
+    archetype: 'Ambitious Generalist',
+    imageUrl: '/avatars/wolf.jpg',
+    accentColor: '#1d74d8'
+  },
+  {
+    id: 'badger',
+    label: 'Badger Builder (O’Reilly Engraving)',
+    archetype: 'Project Manager',
+    imageUrl: '/avatars/badger.jpg',
+    accentColor: '#ea580c'
+  },
+  {
+    id: 'octopus',
+    label: 'Pacific Octopus (O’Reilly Engraving)',
+    archetype: 'Protein & Systems Architect',
+    imageUrl: '/avatars/octopus.jpg',
+    accentColor: '#7c3aed'
+  },
+  {
+    id: 'falcon',
+    label: 'Peregrine Falcon (O’Reilly Engraving)',
+    archetype: 'Fast Computational Scientist',
+    imageUrl: '/avatars/falcon.jpg',
+    accentColor: '#16a34a'
+  },
+  {
+    id: 'chameleon',
+    label: 'Chameleon (O’Reilly Engraving)',
+    archetype: 'Omics & Adaptation Analyst',
+    imageUrl: '/avatars/chameleon.jpg',
+    accentColor: '#4f46e5'
+  },
+  {
+    id: 'capy-field',
+    label: 'Meadow Capy (Classic)',
+    archetype: 'Field Capybara',
+    imageUrl: '/avatars/capy-field.jpg',
+    accentColor: '#16a34a'
+  }
+]
+
+const LEGACY_ANIMAL_ALIASES: Record<string, string> = {
+  otium: 'capybara',
+  bumble: 'wolf',
+  atlas: 'wolf',
+  fizz: 'fox',
+  nova: 'fox',
+  honey: 'badger',
+  milo: 'badger',
+  soren: 'owl',
+  helix: 'octopus',
+  orbit: 'falcon',
+  spark: 'chameleon'
+}
+
 export const SPECIALIST_ICONS: Array<{
   id: SpecialistIcon
   label: string
   Icon: ComponentType<{ className?: string }>
 }> = [
+  { id: 'capybara' as SpecialistIcon, label: 'Capybara (O’Reilly)', Icon: Bot },
+  { id: 'owl' as SpecialistIcon, label: 'Barn Owl (O’Reilly)', Icon: Shield },
+  { id: 'fox' as SpecialistIcon, label: 'Red Fox (O’Reilly)', Icon: Sparkles },
+  { id: 'wolf' as SpecialistIcon, label: 'Timber Wolf (O’Reilly)', Icon: Bot },
+  { id: 'badger' as SpecialistIcon, label: 'Badger (O’Reilly)', Icon: Briefcase },
+  { id: 'octopus' as SpecialistIcon, label: 'Octopus (O’Reilly)', Icon: Dna },
+  { id: 'falcon' as SpecialistIcon, label: 'Falcon (O’Reilly)', Icon: Zap },
+  { id: 'chameleon' as SpecialistIcon, label: 'Chameleon (O’Reilly)', Icon: Microscope },
+  { id: 'capy-field' as SpecialistIcon, label: 'Meadow Capy', Icon: Heart },
   { id: 'agent', label: 'Agent', Icon: Bot },
   { id: 'organization', label: 'Organization', Icon: BarChart3 },
   { id: 'chat', label: 'Chat', Icon: MessageSquare },
@@ -78,8 +173,62 @@ export function specialistColorClass(color: string | undefined) {
   )
 }
 
-function specialistInkOnLight(color: string | undefined) {
-  return Boolean(SPECIALIST_COLORS.find(item => item.id === color)?.ink)
+export function resolvePersonaCharacter(
+  icon?: string | null,
+  _color?: string | null,
+  slug?: string | null
+) {
+  const rawKey = (icon || '').trim().toLowerCase()
+  const mappedKey = LEGACY_ANIMAL_ALIASES[rawKey] || rawKey
+  const direct = PERSONA_CHARACTERS.find(c => c.id === mappedKey)
+  if (direct) return direct
+
+  const slugNorm = (slug || '').toLowerCase()
+  if (slugNorm.includes('single-cell')) {
+    return PERSONA_CHARACTERS.find(c => c.id === 'octopus')!
+  }
+  if (slugNorm.includes('genom')) {
+    return PERSONA_CHARACTERS.find(c => c.id === 'chameleon')!
+  }
+  if (slugNorm.includes('target') || slugNorm.includes('molecule')) {
+    return PERSONA_CHARACTERS.find(c => c.id === 'falcon')!
+  }
+  if (slugNorm.includes('protein') || slugNorm.includes('structure')) {
+    return PERSONA_CHARACTERS.find(c => c.id === 'octopus')!
+  }
+  if (slugNorm.includes('dream') || rawKey === 'sparkles') {
+    return PERSONA_CHARACTERS.find(c => c.id === 'fox')!
+  }
+  if (slugNorm.includes('manager') || rawKey === 'briefcase') {
+    return PERSONA_CHARACTERS.find(c => c.id === 'badger')!
+  }
+  if (slugNorm.includes('skeptic') || rawKey === 'shield') {
+    return PERSONA_CHARACTERS.find(c => c.id === 'owl')!
+  }
+  if (slugNorm.includes('generalist')) {
+    return PERSONA_CHARACTERS.find(c => c.id === 'wolf')!
+  }
+  if (rawKey === 'dna' || rawKey === 'atom') {
+    return PERSONA_CHARACTERS.find(c => c.id === 'octopus')!
+  }
+  if (rawKey === 'microscope') {
+    return PERSONA_CHARACTERS.find(c => c.id === 'chameleon')!
+  }
+  if (rawKey === 'flask' || rawKey === 'lightning' || rawKey === 'target') {
+    return PERSONA_CHARACTERS.find(c => c.id === 'falcon')!
+  }
+  if (slugNorm.includes('otium') || slugNorm.includes('relaxed')) {
+    return PERSONA_CHARACTERS.find(c => c.id === 'capybara')!
+  }
+  if (slugNorm) {
+    let hash = 0
+    for (let i = 0; i < slugNorm.length; i += 1) {
+      hash = (hash * 31 + slugNorm.charCodeAt(i)) >>> 0
+    }
+    const pool = PERSONA_CHARACTERS.slice(1, PERSONA_CHARACTERS.length - 1)
+    return pool[hash % pool.length]
+  }
+  return PERSONA_CHARACTERS[0]
 }
 
 export function SpecialistGlyph({
@@ -98,23 +247,43 @@ export function SpecialistGlyph({
 export function SpecialistAvatar({
   color,
   icon,
+  avatarUrl,
+  slug,
+  size = 'sm',
   className
 }: {
   color: string | undefined
   icon: string | undefined
+  avatarUrl?: string | null
+  slug?: string | null
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }) {
-  const ink = specialistInkOnLight(color)
+  const sizeClass =
+    size === 'xl'
+      ? 'size-28'
+      : size === 'lg'
+        ? 'size-20'
+        : size === 'md'
+          ? 'size-12'
+          : 'size-9'
+
+  const animal = resolvePersonaCharacter(icon, color, slug)
+  const src = avatarUrl && avatarUrl.trim() ? avatarUrl.trim() : animal.imageUrl
+
   return (
     <span
       className={cn(
-        'flex size-9 shrink-0 items-center justify-center rounded-xl',
-        specialistColorClass(color),
-        ink ? 'text-white dark:text-zinc-900' : 'text-white',
+        'border-border/60 bg-amber-50/60 dark:bg-zinc-900 relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border shadow-sm',
+        sizeClass,
         className
       )}
     >
-      <SpecialistGlyph icon={icon} className="size-4" />
+      <img
+        src={src}
+        alt={animal.label}
+        className="size-full object-cover"
+      />
     </span>
   )
 }

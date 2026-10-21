@@ -14,6 +14,20 @@ import type {
   LibraryItemList,
   LibraryKind,
   Specialist,
+  CookbookSummary,
+  DistillSessionResponse,
+  GraphBranch,
+  GraphEdge,
+  GraphNode,
+  GraphSnapshot,
+  MemoryEntry,
+  MemoryEntryList,
+  MemoryOverview,
+  MemorySettings,
+  OmnigraphEngineStatus,
+  PendingMemoryWrite,
+  WikiPageDetail,
+  WikiPageSummary,
   UseLibraryInChatResult,
   AgentCatalogLeaderboard,
   AgentCatalogLeaderboardView,
@@ -1990,6 +2004,13 @@ export class LocalAgentClient
       instructions?: string | null
       color?: string
       icon?: string
+      roleLabel?: string | null
+      avatarUrl?: string | null
+      provider?: string | null
+      model?: string | null
+      openaiProfileId?: string | null
+      cookbookId?: string | null
+      priors?: string | null
       skillNames?: string[]
       toolNames?: string[]
       mcpServerIds?: string[]
@@ -2007,6 +2028,13 @@ export class LocalAgentClient
         instructions: input.instructions,
         color: input.color,
         icon: input.icon,
+        role_label: input.roleLabel,
+        avatar_url: input.avatarUrl,
+        provider: input.provider,
+        model: input.model,
+        openai_profile_id: input.openaiProfileId,
+        cookbook_id: input.cookbookId,
+        priors: input.priors,
         skill_names: input.skillNames ?? [],
         tool_names: input.toolNames ?? [],
         mcp_server_ids: input.mcpServerIds ?? [],
@@ -2027,6 +2055,15 @@ export class LocalAgentClient
       instructions?: string | null
       color?: string
       icon?: string
+      roleLabel?: string | null
+      avatarUrl?: string | null
+      provider?: string | null
+      model?: string | null
+      openaiProfileId?: string | null
+      clearLlm?: boolean
+      cookbookId?: string | null
+      priors?: string | null
+      clearPriors?: boolean
       skillNames?: string[]
       toolNames?: string[]
       mcpServerIds?: string[]
@@ -2048,6 +2085,15 @@ export class LocalAgentClient
           clear_instructions: input.instructions === null,
           color: input.color,
           icon: input.icon,
+          role_label: input.roleLabel,
+          avatar_url: input.avatarUrl,
+          provider: input.provider,
+          model: input.model,
+          openai_profile_id: input.openaiProfileId,
+          clear_llm: input.clearLlm,
+          cookbook_id: input.cookbookId,
+          priors: input.priors,
+          clear_priors: input.clearPriors || input.priors === null,
           skill_names: input.skillNames,
           tool_names: input.toolNames,
           mcp_server_ids: input.mcpServerIds,
@@ -3996,5 +4042,407 @@ export class LocalAgentClient
       `/sessions/${encodeURIComponent(sessionId)}/snapshot/flush`,
       { method: 'POST', signal }
     )
+  }
+
+  getMemoryOverview(
+    scope = 'global',
+    signal?: AbortSignal
+  ): Promise<MemoryOverview> {
+    const params = new URLSearchParams({ scope })
+    return this.request<MemoryOverview>(`/memory/overview?${params.toString()}`, {
+      method: 'GET',
+      signal
+    })
+  }
+
+  getMemorySettings(signal?: AbortSignal): Promise<MemorySettings> {
+    return this.request<MemorySettings>('/memory/settings', {
+      method: 'GET',
+      signal
+    })
+  }
+
+  updateMemorySettings(
+    changes: Partial<MemorySettings>,
+    signal?: AbortSignal
+  ): Promise<MemorySettings> {
+    return this.request<MemorySettings>('/memory/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  listMemoryEntries(
+    scope = 'global',
+    includeUser = true,
+    signal?: AbortSignal
+  ): Promise<MemoryEntryList> {
+    const params = new URLSearchParams({
+      scope,
+      includeUser: String(includeUser)
+    })
+    return this.request<MemoryEntryList>(`/memory/entries?${params.toString()}`, {
+      method: 'GET',
+      signal
+    })
+  }
+
+  createMemoryEntry(
+    input: {
+      scope?: string
+      target?: 'user' | 'memory' | 'project' | 'specialist'
+      layer?: 'L1' | 'L2' | 'L3'
+      content: string
+      tags?: string[]
+      pinned?: boolean
+    },
+    signal?: AbortSignal
+  ): Promise<MemoryEntry> {
+    return this.request<MemoryEntry>('/memory/entries', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  updateMemoryEntry(
+    entryId: string,
+    input: {
+      content?: string
+      tags?: string[]
+      pinned?: boolean
+    },
+    signal?: AbortSignal
+  ): Promise<MemoryEntry> {
+    return this.request<MemoryEntry>(
+      `/memory/entries/${encodeURIComponent(entryId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
+  async deleteMemoryEntry(entryId: string, signal?: AbortSignal): Promise<void> {
+    await this.request(`/memory/entries/${encodeURIComponent(entryId)}`, {
+      method: 'DELETE',
+      signal
+    })
+  }
+
+  async listPendingMemoryWrites(
+    scope?: string,
+    signal?: AbortSignal
+  ): Promise<PendingMemoryWrite[]> {
+    const params = new URLSearchParams()
+    if (scope) params.set('scope', scope)
+    const suffix = params.toString() ? `?${params.toString()}` : ''
+    const res = await this.request<{ data: PendingMemoryWrite[] }>(
+      `/memory/pending${suffix}`,
+      { method: 'GET', signal }
+    )
+    return res.data
+  }
+
+  approvePendingMemoryWrite(
+    pendingId: string,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(
+      `/memory/pending/${encodeURIComponent(pendingId)}/approve`,
+      { method: 'POST', signal }
+    )
+  }
+
+  rejectPendingMemoryWrite(
+    pendingId: string,
+    signal?: AbortSignal
+  ): Promise<{ rejected: boolean }> {
+    return this.request<{ rejected: boolean }>(
+      `/memory/pending/${encodeURIComponent(pendingId)}/reject`,
+      { method: 'POST', signal }
+    )
+  }
+
+  async listWikiPages(
+    scope = 'global',
+    signal?: AbortSignal
+  ): Promise<WikiPageSummary[]> {
+    const params = new URLSearchParams({ scope })
+    const res = await this.request<{ data: WikiPageSummary[] }>(
+      `/memory/wiki?${params.toString()}`,
+      { method: 'GET', signal }
+    )
+    return res.data
+  }
+
+  getWikiPage(
+    slug: string,
+    scope = 'global',
+    signal?: AbortSignal
+  ): Promise<WikiPageDetail> {
+    const params = new URLSearchParams({ scope })
+    return this.request<WikiPageDetail>(
+      `/memory/wiki/${encodeURIComponent(slug)}?${params.toString()}`,
+      { method: 'GET', signal }
+    )
+  }
+
+  writeWikiPage(
+    slug: string,
+    input: {
+      scope?: string
+      title: string
+      content: string
+      summary?: string | null
+      tags?: string[]
+    },
+    signal?: AbortSignal
+  ): Promise<WikiPageDetail> {
+    return this.request<WikiPageDetail>(
+      `/memory/wiki/${encodeURIComponent(slug)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(input),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
+  async deleteWikiPage(
+    slug: string,
+    scope = 'global',
+    signal?: AbortSignal
+  ): Promise<void> {
+    const params = new URLSearchParams({ scope })
+    await this.request(
+      `/memory/wiki/${encodeURIComponent(slug)}?${params.toString()}`,
+      { method: 'DELETE', signal }
+    )
+  }
+
+  listCookbooks(
+    scope = 'global',
+    signal?: AbortSignal
+  ): Promise<{ data: CookbookSummary[]; activeCookbookId: string }> {
+    const params = new URLSearchParams({ scope })
+    return this.request<{ data: CookbookSummary[]; activeCookbookId: string }>(
+      `/memory/cookbooks?${params.toString()}`,
+      { method: 'GET', signal }
+    )
+  }
+
+  selectCookbook(
+    input: {
+      scope?: string
+      cookbookId: string
+      loadDemoSeed?: boolean
+    },
+    signal?: AbortSignal
+  ): Promise<GraphSnapshot> {
+    return this.request<GraphSnapshot>('/memory/cookbooks/select', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  getMemoryGraph(
+    options?: {
+      scope?: string
+      branch?: string
+      queryName?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<GraphSnapshot> {
+    const params = new URLSearchParams()
+    if (options?.scope) params.set('scope', options.scope)
+    if (options?.branch) params.set('branch', options.branch)
+    if (options?.queryName) params.set('queryName', options.queryName)
+    const suffix = params.toString() ? `?${params.toString()}` : ''
+    return this.request<GraphSnapshot>(`/memory/graph${suffix}`, {
+      method: 'GET',
+      signal
+    })
+  }
+
+  upsertGraphNode(
+    input: {
+      scope?: string
+      branch?: string
+      nodeType: string
+      slug?: string | null
+      name: string
+      summary?: string
+      tags?: string[]
+      sourceRef?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<GraphNode> {
+    return this.request<GraphNode>('/memory/graph/nodes', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  async deleteGraphNode(
+    nodeId: string,
+    scope = 'global',
+    branch = 'main',
+    signal?: AbortSignal
+  ): Promise<void> {
+    const params = new URLSearchParams({ scope, branch })
+    await this.request(
+      `/memory/graph/nodes/${encodeURIComponent(nodeId)}?${params.toString()}`,
+      { method: 'DELETE', signal }
+    )
+  }
+
+  createGraphClaim(
+    input: {
+      scope?: string
+      branch?: string
+      subjectId: string
+      subjectType?: string
+      subjectName?: string
+      predicate: string
+      objectId: string
+      objectType?: string
+      objectName?: string
+      polarity: 'support' | 'contradict' | 'neutral'
+      summary?: string
+      sourceRef?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<GraphEdge> {
+    return this.request<GraphEdge>('/memory/graph/claims', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  manageGraphBranch(
+    input: {
+      scope?: string
+      action: 'create' | 'merge' | 'delete'
+      name: string
+      targetBranch?: string
+    },
+    signal?: AbortSignal
+  ): Promise<GraphBranch[]> {
+    return this.request<GraphBranch[]>('/memory/graph/branches', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  distillSession(
+    sessionId: string,
+    input?: {
+      scope?: string | null
+      includeWiki?: boolean
+      includeGraph?: boolean
+    },
+    signal?: AbortSignal
+  ): Promise<DistillSessionResponse> {
+    return this.request<DistillSessionResponse>(
+      `/memory/distill/${encodeURIComponent(sessionId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input ?? {}),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
+  getOmnigraphStatus(
+    scope = 'global',
+    signal?: AbortSignal
+  ): Promise<OmnigraphEngineStatus> {
+    const params = new URLSearchParams({ scope })
+    return this.request<OmnigraphEngineStatus>(
+      `/memory/omnigraph/status?${params.toString()}`,
+      { method: 'GET', signal }
+    )
+  }
+
+  installOmnigraph(signal?: AbortSignal): Promise<OmnigraphEngineStatus> {
+    return this.request<OmnigraphEngineStatus>('/memory/omnigraph/install', {
+      method: 'POST',
+      signal
+    })
+  }
+
+  seedMemoryDemo(
+    force = true,
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean; seededSessions?: string[] }> {
+    const params = new URLSearchParams({ force: force ? 'true' : 'false' })
+    return this.request<{ ok: boolean; seededSessions?: string[] }>(
+      `/memory/demo/seed?${params.toString()}`,
+      {
+        method: 'POST',
+        signal
+      }
+    )
+  }
+
+  syncOmnigraph(
+    scope = 'global',
+    branch = 'main',
+    signal?: AbortSignal
+  ): Promise<{ ok: boolean }> {
+    const params = new URLSearchParams({ scope, branch })
+    return this.request<{ ok: boolean }>(
+      `/memory/omnigraph/sync?${params.toString()}`,
+      { method: 'POST', signal }
+    )
+  }
+
+  createSkillFromMemory(
+    payload: {
+      scope?: string
+      name: string
+      slug?: string | null
+      description?: string | null
+      topic?: string | null
+      wikiSlug?: string | null
+      includeMemories?: boolean
+      includeWiki?: boolean
+      includeGraph?: boolean
+      customInstructions?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<{
+    ok: boolean
+    skillName: string
+    skillDir: string
+    skillMdPath: string
+    scope: string
+    cookbookId: string
+    memoriesIncluded: number
+    wikiPagesIncluded: number
+    graphNodesIncluded: number
+    summary: string
+  }> {
+    return this.request('/memory/skills/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal
+    })
   }
 }

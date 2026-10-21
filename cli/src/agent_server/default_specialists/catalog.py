@@ -13,6 +13,14 @@ from agent_server.default_specialists.profiles_omics import (
     SINGLE_CELL_ANALYST,
     TARGET_DISCOVERY,
 )
+from agent_server.default_specialists.profiles_personas import (
+    AMBITIOUS_GENERALIST,
+    DREAMER,
+    OTIUM_RELAXED,
+    PERSONA_SPECIALISTS,
+    PROJECT_MANAGER,
+    SKEPTICAL_REVIEWER,
+)
 from agent_server.default_specialists.profiles_structure import (
     MOLECULAR_DYNAMICS,
     STRUCTURE_PREDICTION,
@@ -27,3 +35,5 @@ DEFAULT_SPECIALISTS: list[dict[str, Any]] = [
     SINGLE_CELL_ANALYST,
     GENOMICS_ANALYST,
 ]
+
+__all__ = ["DEFAULT_SPECIALISTS", "PERSONA_SPECIALISTS"]

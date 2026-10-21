@@ -35,7 +35,7 @@ CORE_TOOLS_DEFAULTS_CONFIG_KEY = "agent.core_tools_defaults_applied"
 def tool_tier(tool_id: str) -> str:
     """Return ``core`` or ``extra`` for a registry tool id."""
     name = str(tool_id or "").strip()
-    return "core" if name in CORE_TOOL_NAMES else "extra"
+    return "core" if (name in CORE_TOOL_NAMES or name.startswith("memory.")) else "extra"
 
 
 def is_core_tool(tool_id: str) -> bool:
@@ -48,7 +48,7 @@ def default_hidden_tool_ids(all_tool_ids: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     for raw in all_tool_ids:
         name = str(raw or "").strip()
-        if not name or name in seen or name in CORE_TOOL_NAMES:
+        if not name or name in seen or name in CORE_TOOL_NAMES or name.startswith("memory."):
             continue
         seen.add(name)
         out.append(name)

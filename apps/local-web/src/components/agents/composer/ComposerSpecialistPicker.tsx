@@ -3,8 +3,7 @@ import { Check, GitBranch, Plus } from 'lucide-react'
 import { useState } from 'react'
 
 import {
-  specialistColorClass,
-  SpecialistGlyph
+  SpecialistAvatar
 } from '@/components/agents/SpecialistsView'
 import {
   Popover,
@@ -12,7 +11,6 @@ import {
   PopoverTrigger
 } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { cn } from '@/lib/utils'
 
 export function ComposerSpecialistPicker({
   specialists,
@@ -53,17 +51,13 @@ export function ComposerSpecialistPicker({
           }
         >
           {selectedSpecialist ? (
-            <span
-              className={cn(
-                'flex size-4 items-center justify-center rounded-full text-white [&_svg]:text-white',
-                specialistColorClass(selectedSpecialist.color)
-              )}
-            >
-              <SpecialistGlyph
-                icon={selectedSpecialist.icon}
-                className="size-2.5 text-white"
-              />
-            </span>
+            <SpecialistAvatar
+              color={selectedSpecialist.color}
+              icon={selectedSpecialist.icon}
+              avatarUrl={selectedSpecialist.avatarUrl}
+              slug={selectedSpecialist.slug}
+              className="size-5"
+            />
           ) : (
             <GitBranch className="size-4" />
           )}
@@ -122,17 +116,13 @@ export function ComposerSpecialistPicker({
                       setSpecialistPickerOpen(false)
                     }}
                   >
-                    <span
-                      className={cn(
-                        'flex size-4 shrink-0 items-center justify-center rounded-full text-white [&_svg]:text-white',
-                        specialistColorClass(item.color)
-                      )}
-                    >
-                      <SpecialistGlyph
-                        icon={item.icon}
-                        className="size-2.5 text-white"
-                      />
-                    </span>
+                    <SpecialistAvatar
+                      color={item.color}
+                      icon={item.icon}
+                      avatarUrl={item.avatarUrl}
+                      slug={item.slug}
+                      className="size-5"
+                    />
                     <span className="min-w-0 flex-1 truncate">{item.name}</span>
                     {isSelected ? (
                       <Check className="text-foreground ml-auto size-4 shrink-0" />

@@ -18,9 +18,9 @@ import { openInSystemBrowser } from '@/lib/desktop'
 import { cn } from '@/lib/utils'
 
 import {
+  bedrockFieldValue,
   LLM_API_KEY_COPY,
   LLM_API_KEY_ORDER,
-  bedrockFieldValue,
   primaryMaskedPreview,
   qwenEndpointValue
 } from './models-view-utils'

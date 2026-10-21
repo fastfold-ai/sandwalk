@@ -9,8 +9,6 @@ import type {
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { type Dispatch, memo, type SetStateAction } from 'react'
 
-import { perfCount } from '@/lib/perf-probe'
-
 import { ChatTranscriptMessageEntry } from '@/components/agents/chat-transcript-message-entry'
 import { type ChatTimelineItem } from '@/components/agents/chat-transcript-timeline'
 import { CreatedPlanCard } from '@/components/agents/CreatedPlanCard'
@@ -21,6 +19,7 @@ import {
   thoughtDurationForTools,
   TOOL_RUN_VISIBLE_COUNT
 } from '@/components/agents/transcript'
+import { perfCount } from '@/lib/perf-probe'
 
 type TimelineItemProps = {
   timelineItem: ChatTimelineItem

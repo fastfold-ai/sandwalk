@@ -124,7 +124,7 @@ export function McpCatalogCard({
         }
       }}
       className={cn(
-        'bg-background/60 hover:bg-muted/40 flex h-full flex-col rounded-lg p-3 transition-colors',
+        'border-border/50 bg-muted/20 hover:border-border hover:bg-muted/35 flex h-full flex-col rounded-2xl border p-3.5 transition-all',
         onOpenCatalog && 'cursor-pointer',
         focusedMcpKey === `catalog-${view.id}` &&
           'ring-ring ring-2 ring-offset-2 ring-offset-background',

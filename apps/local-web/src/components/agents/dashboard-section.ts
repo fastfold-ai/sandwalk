@@ -19,3 +19,4 @@ export type DashboardSection =
   | 'integrations'
   | 'mcp'
   | 'specialists'
+  | 'memory'

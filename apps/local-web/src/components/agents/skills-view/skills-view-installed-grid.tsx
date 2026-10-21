@@ -102,7 +102,7 @@ export function SkillsInstalledGridSection({
                 <div
                   key={skill.name}
                   className={cn(
-                    'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
+                    'border-border/50 bg-muted/20 hover:border-border hover:bg-muted/35 flex items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all',
                     !skill.enabled && 'opacity-60'
                   )}
                 >
@@ -157,7 +157,7 @@ export function SkillsInstalledGridSection({
               return (
                 <div
                   key={`pending:${item.name}`}
-                  className="bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg border border-dashed border-border/70 p-3 transition-colors"
+                  className="border-border/60 bg-muted/20 hover:bg-muted/35 flex items-start justify-between gap-3 rounded-2xl border border-dashed p-3.5 transition-all"
                 >
                   <div className="min-w-0 flex-1 text-left">
                     <div className="flex items-center gap-2">
@@ -249,7 +249,7 @@ export function SkillsInstalledGridSection({
                 <div
                   key={skill.name}
                   className={cn(
-                    'bg-background/60 hover:bg-muted/40 flex items-start justify-between gap-3 rounded-lg p-3 transition-colors',
+                    'border-border/50 bg-muted/20 hover:border-border hover:bg-muted/35 flex items-start justify-between gap-3 rounded-2xl border p-3.5 transition-all',
                     !skill.enabled && 'opacity-60'
                   )}
                 >

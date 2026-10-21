@@ -43,7 +43,7 @@ export function SkillsListSidebar({
         className
       )}
     >
-      <section className="bg-background/70 shrink-0 rounded-lg p-2">
+      <section className="border-border/50 bg-muted/20 shrink-0 rounded-2xl border p-2.5">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Status
         </div>
@@ -84,7 +84,7 @@ export function SkillsListSidebar({
           Disabled ({disabledCount})
         </button>
       </section>
-      <section className="bg-background/70 shrink-0 rounded-lg p-2">
+      <section className="border-border/50 bg-muted/20 shrink-0 rounded-2xl border p-2.5">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Categories
         </div>
@@ -128,7 +128,7 @@ export function SkillsListSidebar({
           </button>
         ))}
       </section>
-      <section className="bg-background/70 min-h-0 flex-1 rounded-lg p-2">
+      <section className="border-border/50 bg-muted/20 min-h-0 flex-1 rounded-2xl border p-2.5">
         <div className="text-muted-foreground/60 mb-1 px-2 py-1 text-xs font-semibold">
           Authors
         </div>

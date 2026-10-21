@@ -1,24 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
-  cancelTts,
-  getTtsStatus,
-  listenTtsSpeakProgress,
-  playTtsAudio,
-  speakTts,
-  stopTtsPlayback,
-  VOICE_INPUT_CHANGED,
-  type DictationStatus,
-  voiceTtsReady
-} from '@/lib/desktop-voice'
-import { cleanSpeechText } from '@/lib/speakable-text'
-import {
   detectSpeechLanguage,
   pickCapyVoice,
   readCapyVoiceAuto,
   readCapyVoiceSpeed,
   voiceForDetectedText
 } from '@/lib/capy-voice'
+import {
+  cancelTts,
+  type DictationStatus,
+  getTtsStatus,
+  listenTtsSpeakProgress,
+  playTtsAudio,
+  speakTts,
+  stopTtsPlayback,
+  VOICE_INPUT_CHANGED,
+  voiceTtsReady
+} from '@/lib/desktop-voice'
+import { cleanSpeechText } from '@/lib/speakable-text'
 
 export function useCapyVoiceReply({
   enabled,

@@ -26,8 +26,10 @@ from agent_server.default_specialists.mcp_filter import filter_mcp_servers_for_s
 from agent_server.default_specialists.seeding import (
     DEFAULT_SPECIALIST_TOOL_NAMES_META_KEY,
     DEFAULT_SPECIALISTS_SEEDED_META_KEY,
+    PERSONA_SPECIALISTS_SEEDED_META_KEY,
     ensure_default_specialist_tool_names,
     ensure_default_specialists,
+    ensure_persona_specialists,
 )
 
 __all__ = [
@@ -36,8 +38,10 @@ __all__ = [
     "DEFAULT_SPECIALISTS_SEEDED_META_KEY",
     "FAST_COMPUTATIONAL_SCIENTIST_META_KEY",
     "FAST_COMPUTATIONAL_SCIENTIST_SLUG",
+    "PERSONA_SPECIALISTS_SEEDED_META_KEY",
     "ensure_default_specialist_tool_names",
     "ensure_default_specialists",
     "ensure_fast_computational_scientist",
+    "ensure_persona_specialists",
     "filter_mcp_servers_for_specialist",
 ]

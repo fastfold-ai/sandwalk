@@ -15,13 +15,17 @@ const FEATURED_SKILL_NAMES = new Set([
   'modal-basic-skills',
   'modal-gpu-dev',
   'modal-gpu-experiment',
-  'sub-agents'
+  'sub-agents',
+  'omnigraph',
+  'knowledge-steward'
 ])
 
 const SKILL_ICON_BY_NAME: Record<
   string,
   { src: string; invertInDark?: boolean }
 > = {
+  omnigraph: { src: '/integrations/omnigraph.png', invertInDark: false },
+  'knowledge-steward': { src: '/integrations/omnigraph.png', invertInDark: false },
   boltz: { src: '/pipelines/boltzgen.svg', invertInDark: true },
   diagrams_mermaid: { src: '/mermaid-logo.png' },
   slack_report: { src: '/integrations/slack.png' },
@@ -99,7 +103,9 @@ export function skillIconInvertInDark(
     Partial<Pick<AgentSkill, 'author' | 'source'>>
 ): boolean {
   if (String(skill.iconSrc || '').trim()) return false
-  if (SKILL_ICON_BY_NAME[skill.name]?.invertInDark) return true
+  if (skill.name in SKILL_ICON_BY_NAME) {
+    return Boolean(SKILL_ICON_BY_NAME[skill.name]?.invertInDark)
+  }
   return isBundledSkill(skill)
 }
 

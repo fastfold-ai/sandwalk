@@ -54,6 +54,9 @@ def _profile(
     skill_names: list[str],
     tools: list[str],
     mcp_catalog_ids: list[str] | None = None,
+    role_label: str | None = None,
+    cookbook_id: str | None = None,
+    priors: str | None = None,
 ) -> dict[str, Any]:
     from agent.tool_tiers import CORE_TOOL_NAMES
 
@@ -65,6 +68,10 @@ def _profile(
         "description": description,
         "color": color,
         "icon": icon,
+        "role_label": role_label or name,
+        "cookbook_id": cookbook_id or "biomed-research",
+        "priors": priors
+        or f"Domain specialist for {role_label or name}. Prioritize reproducible evidence and clear provenance.",
         "instructions": _with_tools(instructions, tools),
         "skill_names": skill_names,
         "preferred_tools": list(tools),

@@ -12,8 +12,8 @@ import type { useChatScroll } from '@/hooks/useChatScroll'
 import type { useSessionActions } from '@/hooks/useSessionActions'
 import type { useSessionChatState } from '@/hooks/useSessionChatState'
 import type { useSessionSandbox } from '@/hooks/useSessionSandbox'
-import type { TabItem, TabItemSection } from '@/lib/sessions'
 import type { SessionActivityMap } from '@/lib/session-activity'
+import type { TabItem, TabItemSection } from '@/lib/sessions'
 
 type AppShellBridgeInput = {
   offlineStatus: AppShellProps['offlineStatus']

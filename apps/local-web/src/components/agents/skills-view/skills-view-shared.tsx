@@ -114,21 +114,21 @@ export function SkillsShMetrics({
       : null
 
   return (
-    <aside className="space-y-4 lg:sticky lg:top-4">
-      <div className="rounded-lg p-3">
+    <aside className="space-y-3 lg:sticky lg:top-4">
+      <div className="border-border/50 bg-muted/20 rounded-xl border p-3">
         <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           Installs
         </p>
         <p className="mt-1 text-3xl font-semibold">{installLabel}</p>
       </div>
-      <div className="rounded-lg p-3">
+      <div className="border-border/50 bg-muted/20 rounded-xl border p-3">
         <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           Repository
         </p>
         <p className="mt-1 break-all text-sm">{source || 'Unknown'}</p>
       </div>
       {starsLabel ? (
-        <div className="rounded-lg p-3">
+        <div className="border-border/50 bg-muted/20 rounded-xl border p-3">
           <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             GitHub Stars
           </p>
@@ -136,14 +136,14 @@ export function SkillsShMetrics({
         </div>
       ) : null}
       {firstSeen ? (
-        <div className="rounded-lg p-3">
+        <div className="border-border/50 bg-muted/20 rounded-xl border p-3">
           <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             First Seen
           </p>
           <p className="mt-1 text-sm">{firstSeen}</p>
         </div>
       ) : null}
-      <div className="rounded-lg p-3">
+      <div className="border-border/50 bg-muted/20 rounded-xl border p-3">
         <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           Security Audits
         </p>
@@ -278,8 +278,8 @@ export function InstallCommandBlock({
   onCopy: () => void
 }) {
   return (
-    <div className="bg-muted/50 overflow-hidden rounded-lg">
-      <div className="bg-muted/80 flex items-center justify-between px-3 py-1.5">
+    <div className="border-border/50 bg-muted/20 overflow-hidden rounded-xl border">
+      <div className="border-border/50 bg-muted/25 flex items-center justify-between border-b px-3 py-1.5">
         <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           bash
         </span>
