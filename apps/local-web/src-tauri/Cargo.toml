@@ -1,6 +1,6 @@
 [package]
 name = "sandwalk-desktop"
-version = "0.1.12"
+version = "0.1.13"
 description = "Sandwalk macOS client (Tauri; Sandwalk Server helper owns the agent)"
 authors = ["Fastfold AI Labs"]
 edition = "2021"

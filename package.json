@@ -1,7 +1,7 @@
 {
   "name": "sandwalk",
   "private": true,
-  "version": "0.1.12",
+  "version": "0.1.13",
   "license": "Apache-2.0",
   "author": "Fastfold AI Labs <julio@fastfold.ai>",
   "packageManager": "pnpm@10.14.0",

@@ -38,8 +38,8 @@
 | Platform | Link |
 |----------|------|
 | macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
-| Ubuntu amd64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.12_amd64.deb) |
-| Ubuntu arm64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.12_arm64.deb) |
+| Ubuntu amd64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.13_amd64.deb) |
+| Ubuntu arm64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.13_arm64.deb) |
 
 macOS needs 12.0 or newer and Apple Silicon. Open the disk image and drag Sandwalk to Applications.
 
