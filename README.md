@@ -78,11 +78,14 @@ See [Development](#development) for the test and packaging loop.
 
 ## Why Sandwalk exists
 
-Sandwalk exists to turn individual curiosity into collective discovery.
+Sandwalk exists to eliminate repetitive work—freeing human minds and teams to focus on ambitious questions that take days or months, not a single prompt—so individual curiosity compounds into collective discovery.
 
-It is built for scientists, engineers, and anyone chasing a question that takes days, not one prompt.
+Serious research and engineering cannot live inside one vendor's model, one set of tools, or behind a subscription wall. Sandwalk is built for **maximum freedom of where and how you work**:
 
-Serious research cannot live inside one vendor's model, one set of tools, or one cloud. The model, the skills, the MCP servers, the personas, the memory, and the compute are separate pieces in Sandwalk, so a session can pair any of them and swap any of them as the field moves. The harness is open, self-hosted, and Apache-2.0. The work stays on the machine that ran it, and a crystallized skill or a published page is how a result is shared.
+- **Run anywhere**: on your laptop, an always-on Mac mini at home, a Linux workstation, an HPC cluster, a cloud VM, or from your phone on the go.
+- **No subscription walls or lock-in**: the entire harness—multi-agent grids, Capy, Memory, Living Wiki, Omnigraph, and Benchmarking—is open, self-hosted, and Apache-2.0. You bring your own keys, your existing ChatGPT plan, or your own hardware.
+- **Switch effortlessly between cloud and local**: move between frontier cloud models and local models (`llama.cpp`, Ollama, oMLX, LM Studio), or between local execution and on-demand cloud GPUs, within the same session.
+- **Share what you discover**: the work stays on the machine that ran it, and a crystallized skill (`SKILL.md`) or a published page (`sandwalk.site`) is how a verified method or result is passed on to the next person or agent.
 
 Sandwalk is in developer preview.
 
