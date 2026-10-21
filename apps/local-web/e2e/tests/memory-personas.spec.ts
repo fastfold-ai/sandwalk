@@ -28,11 +28,16 @@ test.describe('Memory, Omnigraph Cookbooks, and Persona Specialists UI', () => {
       { apiUrl: env.apiUrl, apiKey: env.apiKey }
     )
 
-    // 1. Navigate to Specialists (Agents Persona Grid)
+    // 1. Navigate to Specialists (/dashboard/specialists)
     await page.goto('/dashboard/specialists')
-    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: 'Specialists' })
+    ).toBeVisible({
       timeout: 15_000
     })
+    await expect(
+      page.getByRole('button', { name: /New specialist/i })
+    ).toBeVisible()
     await expect(page.getByText('Otium').first()).toBeVisible()
     await expect(page.getByText('Nova').first()).toBeVisible()
     await expect(page.getByText('Atlas').first()).toBeVisible()

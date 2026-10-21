@@ -696,7 +696,7 @@ export function MemoryView({
                 className="h-9 rounded-xl text-xs"
                 onClick={() => navigate('/dashboard/specialists')}
               >
-                Back to Agents
+                Back to Specialists
               </Button>
             ) : null}
           </div>

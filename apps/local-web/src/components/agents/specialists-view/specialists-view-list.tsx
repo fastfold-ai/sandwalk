@@ -233,10 +233,13 @@ export function SpecialistsListView({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 pt-6 pb-10 md:px-8 md:pt-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Agents</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Specialists
+              </h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Set up and manage your agent personas, cognitive biases, and
-                specialist brains.
+                Starter personas and domain specialists—create your own or
+                customize any specialist’s priors, model, skills, MCPs, and
+                brain.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -249,9 +252,18 @@ export function SpecialistsListView({
                   onClick={onOpenDefaults}
                 >
                   <SlidersHorizontal className="size-3.5" />
-                  Agent defaults
+                  Specialist defaults
                 </Button>
               ) : null}
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 gap-1.5 rounded-xl px-3.5 text-xs font-medium"
+                onClick={onOpenNew}
+              >
+                <Plus className="size-3.5" />
+                New specialist
+              </Button>
             </div>
           </div>
 

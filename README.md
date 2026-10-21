@@ -90,76 +90,39 @@ Sandwalk is in developer preview.
 
 Most AI chat tools treat every conversation as disposable: when a thread ends, the context, caveats, negative results, and domain workflows vanish with it. Dumping raw transcripts into a vector store or an ever-growing system prompt only trades amnesia for context rot and broken KV caches.
 
+Sandwalk turns the learning cost you have already paid into a **local save file**:
+
+```mermaid
+flowchart LR
+    S1["Past Sessions"] --> A1["Memories\n(USER.md · MEMORY.md)"]
+    S2["Docs & Notes"] --> A2["Living Wiki\n([[wikilinks]])"]
+    S3["Domain Data"] --> A3["Omnigraph (.omni)\n(Queryable Graph)"]
+    S4["Completed Work"] --> A4["Skills\n(Verified Methods)"]
+
+    A1 & A2 & A3 & A4 --> Hub[("Sandwalk Memory Hub\nReview · Branch · Crystallize")]
+    Hub --> Next["Next Agent / Specialist\nStarts Where You Left Off"]
+```
+
 Sandwalk is built around four core principles:
 
 1. **Decoupled & Local-First (`~/.sandwalk/`)**: Your models (17 cloud providers + local `llama.cpp`, Ollama, oMLX, LM Studio), your execution sandboxes (Local machine or Modal cloud CPU/GPU), your MCP servers, and your knowledge live on your machine in open formats (`.md`, `.pg`, `.gq`, `.jsonl`, Lance `.omni`, SQLite).
-2. **Cognitive Diversity via Persona Specialists**: Complex questions benefit from distinct thinking styles. Sandwalk ships with O'Reilly-style natural history animal personas—**Otium** (*Relaxed* Capybara), **Atlas** (*Ambitious Generalist* Wolf), **Nova** (*Dreamer* Fox), **Milo** (*Project Manager* Badger), and **Soren** (*Skeptical Reviewer* Owl)—alongside domain specialists. Each persona carries its own cognitive priors (`PRIORS.md`), learned memory (`MEMORY.md`), default model, and ontology lens.
+2. **Customizable Specialists**: Complex questions benefit from distinct thinking styles and toolkits. Sandwalk ships with starter Specialists—including O'Reilly-style natural history animal personas (**Otium**, **Atlas**, **Nova**, **Milo**, **Soren**) and scientific specialists—and you can create as many custom Specialists as you want (`+ New specialist`), each with its own cognitive priors (`PRIORS.md`), learned memory (`MEMORY.md`), default model, skills, MCPs, and ontology lens.
 3. **Byte-Stable Prompt Prefix + Progressive Disclosure**: At session start, Sandwalk injects a compact, bounded snapshot (`USER.md` ~1,375 chars + `MEMORY.md` ~2,200 chars + `PRIORS.md` + Living Wiki TOC + Active Ontology summary) and freezes it for the session so LLM KV prefix caches stay warm. Deeper knowledge is retrieved on demand via tools.
 4. **Compounding Knowledge into Reusable Skills**: As you work with your agents or **Capy**, conversations automatically distill into **4 governed knowledge assets**—**Bounded Memories**, **Living Markdown Wiki**, **Versioned Omnigraph Knowledge Graph**, and **Reusable Skills (`SKILL.md`)**—so what you learn today becomes an executable capability tomorrow.
 
 ```mermaid
-flowchart TB
-    subgraph Surfaces["Unified Client Surfaces"]
-        Desktop["macOS & Ubuntu Desktop App\n(Tauri + React)"]
-        Web["Local & LAN Web UI\n(:1420 / :8787)"]
-        CLI["Interactive Terminal CLI\n(sandwalk)"]
-        ExtCLI["External Agent CLIs\n(Claude Code · Codex · OpenCode · fx · Hermes)"]
-    end
-
-    subgraph Orchestration["Orchestration & Cognitive Personas"]
-        Capy["Capy Meta-Agent\n(Session Grids · Handoffs · Bench · Memory Steward)"]
-        Personas["Persona & Domain Specialists\n(Otium · Atlas · Nova · Milo · Soren · Bio/Chem)"]
-    end
-
-    subgraph Core["Local Sandwalk Agent Server (:8787)"]
-        Router["Unified Model Router\n(17 Cloud Providers · ChatGPT Plan · Local llama.cpp / Ollama)"]
-        PromptBudget["Frozen Session-Start Context\n(Byte-Stable KV Cache + Tool Tiering)"]
-        Distiller["Background Session Distiller\n(GPU-Aware Hybrid Extraction)"]
-    end
-
-    subgraph Execution["Sandboxes, Tools & MCP"]
-        LocalSB["Local Sandbox\n(Workspaces · PTY · Artifacts)"]
-        ModalSB["Modal Cloud CPU / GPU\n(T4 · L4 · A100 · H100)"]
-        Toolkit["190+ Scientific & Core Tools\n+ 1-Click MCP Servers"]
-    end
-
-    subgraph Knowledge["Compounding Knowledge Layer (~/.sandwalk/)"]
-        Mem["1. Bounded Snapshots\n(USER.md · MEMORY.md · PRIORS.md)"]
-        Wiki["2. Living Markdown Wiki\n([[wikilinks]] · Backlinks · Split/Full-Screen)"]
-        Omni["3. Local Omnigraph Engine (.omni)\n(6 Cookbooks 01–06 · Supports/Contradicts · Branches)"]
-        Skills["4. Crystallized Skills\n(~/.sandwalk/skills/<slug>/SKILL.md)"]
-    end
-
-    Surfaces --> Orchestration
-    Orchestration --> Core
-    Core --> Execution
-    Core --> Knowledge
-    Distiller -->|Auto-extracts after runs| Mem
-    Distiller -->|Synthesizes briefs| Wiki
-    Distiller -->|Records typed claims| Omni
-    Mem & Wiki & Omni -->|memory.create_skill / To Skill| Skills
-    Skills -->|Equipped on next run| Personas
+flowchart LR
+    UI["Desktop · Web · CLI\n& External CLIs"] --> Orch["Capy & Specialists\n(Starter or Custom)"]
+    Orch --> Runtime["Sandwalk Local Server\n(Any Cloud or Local LLM)"]
+    Runtime --> Exec["Sandboxes & Tools\n(Local or Modal GPU)"]
+    Runtime <--> Hub[("Memory · Wiki\nOmnigraph · Skills")]
 ```
 
 ## Compounding Memory, Wiki & Omnigraph
 
-Sandwalk turns everyday agent sessions into a structured, self-improving knowledge base—without requiring external database infrastructure:
+Sandwalk turns everyday sessions into a structured, self-improving knowledge base—without requiring external database infrastructure:
 
-```mermaid
-flowchart LR
-    Chat["Agent / Persona Session\n(or Capy Command)"] -->|1. During turn| Tools["Core Memory Tools\n(memory.mutate · wiki.write · graph.record_claim)"]
-    Chat -->|2. On run.completed| AutoDistill["Background Distiller\n(_auto_distill_after_run)"]
-
-    Tools & AutoDistill --> M["Memories\nUSER.md & MEMORY.md"]
-    Tools & AutoDistill --> W["Living Wiki\n~/.sandwalk/memory/wiki/*.md"]
-    Tools & AutoDistill --> G["Omnigraph (.omni)\nschema.pg · queries.gq · data.jsonl"]
-
-    G -->|Git-style review/* branch| Review["Supports vs. Contradicts\n& Contested Claim Alerts"]
-    M & W & G -->|3. Crystallize\n(memory.create_skill / UI)| Skill["Installed Sandwalk Skill\n~/.sandwalk/skills/<slug>/SKILL.md"]
-    Skill -->|4. /skill-slug| Chat
-```
-
-- **Four Scopes**: `global` (Personal & Lab Second Brain), `project:<id>` (per-project rules and wiki), `specialist:<id>` (each persona's private brain), and `user` (`USER.md` profile).
+- **Four Scopes**: `global` (Personal & Lab Second Brain), `project:<id>` (per-project rules and wiki), `specialist:<id>` (each Specialist's private brain), and `user` (`USER.md` profile).
 - **Six Runnable Omnigraph Cookbook Modes (`01–06`)**: Powered by the local [Omnigraph](https://www.omnigraph.dev/) Rust + Lance engine (`~/.sandwalk/bin/omnigraph` + auto-enabled stdio MCP bridge):
   - `01 Industry intel` — Track market signals through the SPIKE frame (`Signal`, `Pattern`, `Insight`, `KnowHow`).
   - `02 Pharma intel` — Monitor compounds, mechanisms, clinical trials, and competitive assumptions.
@@ -215,8 +178,8 @@ flowchart LR
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="images/specialists.png" alt="O'Reilly animal Persona Specialists grid with Otium's Profile & Priors drawer" width="100%"><br>
-<sub><strong>Persona Specialists think differently.</strong> Otium, Soren, Milo, Nova, and Atlas—each with its own priors, model, and brain.</sub>
+<img src="images/specialists.png" alt="Specialists grid with + New specialist button and Otium's Profile & Priors drawer" width="100%"><br>
+<sub><strong>Specialists are customizable.</strong> Start from built-in personas (Otium, Soren, Milo, Nova, Atlas) or create your own—each with its own priors, model, skills, MCPs, and brain.</sub>
 </td>
 <td width="50%" valign="top">
 <img src="images/memory.png" alt="Memory & Knowledge showing MEMORY.md operating rules, USER.md profile, and Pending Approvals" width="100%"><br>
@@ -400,6 +363,17 @@ pnpm e2e:bench            # perf report → apps/local-web/e2e/results/grid-late
 ```
 
 Working with an AI agent? [AGENTS.md](AGENTS.md) and the project skills in `.cursor/skills/` encode the dev and test loop. See [CONTRIBUTING.md](CONTRIBUTING.md), [.github/TESTING.md](.github/TESTING.md), and [apps/packaging/APPLE-SIGNING.md](apps/packaging/APPLE-SIGNING.md).
+
+## References & Acknowledgments
+
+Sandwalk builds on and draws direct inspiration from several open-source projects and research harnesses:
+
+- **[Omnigraph (`ModernRelay/omnigraph`)](https://github.com/ModernRelay/omnigraph)** & **[omnigraph.dev](https://www.omnigraph.dev/)** — Versioned Rust + Lance graph engine, declarative `.pg` schemas, `.gq` stored queries, Git-style branching, and runnable Cookbook ontologies.
+- **[LangChain](https://github.com/langchain-ai/langchain)**, **[LangGraph](https://github.com/langchain-ai/langgraph)** & **[Deep Agents (`langchain-ai/deepagents`)](https://github.com/langchain-ai/deepagents)** — Core agent execution graph, streaming tool orchestration, and multi-provider model adapters.
+- **[Hermes Agent (`NousResearch/hermes-agent`)](https://github.com/NousResearch/hermes-agent)** — Bounded session-start `USER.md` / `MEMORY.md` snapshot architecture (preserving KV prefix caches) and SQLite FTS5 `session_search`.
+- **[TencentDB Agent Memory (`TencentCloud/TencentDB-Agent-Memory`)](https://github.com/TencentCloud/TencentDB-Agent-Memory)** — Four-asset memory hub (`Chat Memory`, `Skill`, `Wiki`, `Graph`) and the "Cold Start: Load the Save File" skill crystallization model.
+- **[skills.sh (`vercel-labs/skills`)](https://skills.sh)** — Open `SKILL.md` package specification and public agent skills catalog.
+- **[llama.cpp (`ggml-org/llama.cpp`)](https://github.com/ggml-org/llama.cpp)** & **[Modal](https://modal.com)** — Local GGUF model/embedding inference and on-demand cloud CPU/GPU sandboxes.
 
 ## License
 
