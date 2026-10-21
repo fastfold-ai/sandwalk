@@ -44,6 +44,37 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _render_cookbook_bundle_skill_md(
+    cb: Any,
+    scope: str,
+    node_count: int,
+    edge_count: int,
+) -> str:
+    nt_lines = "\n".join(
+        f"- **{nt.name}** (`{nt.layer}`): {nt.description}" for nt in cb.node_types
+    )
+    q_lines = "\n".join(
+        f"- `{q.name}` — {q.label}: {q.description}" for q in cb.stored_queries
+    )
+    return (
+        f"---\n"
+        f"name: omnigraph-{cb.id}\n"
+        f'description: "{cb.tagline}"\n'
+        f"version: 0.1.0\n"
+        f"---\n\n"
+        f"# {cb.number} {cb.name} — Omnigraph Bundle (`{scope}`)\n\n"
+        f"{cb.description}\n\n"
+        f"## Files in this Bundle\n"
+        f"- `schema.pg` — Declarative Omnigraph node & edge ontology\n"
+        f"- `queries.gq` — Linted stored queries\n"
+        f"- `data.jsonl` — Seed & instance rows ({node_count} nodes, {edge_count} edges)\n"
+        f"- `graph.omni` — Local Lance-backed Omnigraph store\n\n"
+        f"## Ontology Node Types\n{nt_lines}\n\n"
+        f"## Stored Queries (`graph.cookbook_query`)\n{q_lines}\n"
+    )
+
+
+
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower()).strip("-")
     return slug or "node"
@@ -936,36 +967,94 @@ class GraphEngine:
         return [n.id for n in nodes]
 
     def sync_omnigraph_bundle(self, scope: str = "global", *, branch: str = "main") -> dict[str, Any]:
-        """Write schema.pg, queries.gq, and seed.jsonl and sync into graph.omni if binary is installed."""
+        """Write schema.pg, queries.gq, SKILL.md, and data.jsonl and sync into graph.omni."""
         norm = normalize_scope(scope)
         snap = self.get_snapshot(norm, branch=branch)
+        cb = snap.active_cookbook
         bundle_dir = memory_root() / "omni" / norm.replace(":", "_")
         bundle_dir.mkdir(parents=True, exist_ok=True)
         schema_path = bundle_dir / "schema.pg"
         queries_path = bundle_dir / "queries.gq"
+        skill_path = bundle_dir / "SKILL.md"
         data_path = bundle_dir / "data.jsonl"
+        cookbook_marker = bundle_dir / ".cookbook_id"
         omni_path = bundle_dir / "graph.omni"
 
-        schema_path.write_text(snap.active_cookbook.pg_schema, encoding="utf-8")
-        queries_text = "\n\n".join(q.gq_source for q in snap.active_cookbook.stored_queries)
+        schema_path.write_text(cb.pg_schema, encoding="utf-8")
+        queries_text = "\n\n".join(q.gq_source for q in cb.stored_queries)
         queries_path.write_text(queries_text + "\n", encoding="utf-8")
+        skill_path.write_text(
+            _render_cookbook_bundle_skill_md(cb, norm, len(snap.nodes), len(snap.edges)),
+            encoding="utf-8",
+        )
+
+        nt_map = {nt.name: nt for nt in cb.node_types}
+        node_by_id = {n.id: n for n in snap.nodes}
+        node_by_slug = {n.slug: n for n in snap.nodes}
 
         jsonl_lines: list[str] = []
+        valid_nodes_by_slug: dict[str, GraphNode] = {}
         for n in snap.nodes:
-            jsonl_lines.append(
-                json.dumps(
-                    {
-                        "type": n.node_type,
-                        "data": {"slug": n.slug, "name": n.name, **n.properties},
-                    }
-                )
-            )
+            nt = nt_map.get(n.node_type)
+            if nt is None:
+                continue
+            node_data: dict[str, Any] = {}
+            for p in nt.properties:
+                if p.is_key:
+                    node_data[p.name] = n.slug
+                elif p.name in n.properties and n.properties[p.name] is not None:
+                    node_data[p.name] = n.properties[p.name]
+                elif p.name in {"name", "title", "headline", "statement", "question", "nct_id"}:
+                    node_data[p.name] = n.name
+                elif p.name in {"summary", "implication", "playbook"} and n.summary:
+                    node_data[p.name] = n.summary
+                elif not p.optional:
+                    node_data[p.name] = n.summary or n.name or n.node_type
+            valid_nodes_by_slug[n.slug] = n
+            jsonl_lines.append(json.dumps({"type": n.node_type, "data": node_data}))
+
+        edge_defs = cb.edge_types
         for e in snap.edges:
             src_slug = e.source_id.split(":", 1)[-1]
             dst_slug = e.target_id.split(":", 1)[-1]
-            jsonl_lines.append(
-                json.dumps({"edge": e.predicate, "from": src_slug, "to": dst_slug})
+            src_node = node_by_id.get(e.source_id) or node_by_slug.get(src_slug)
+            dst_node = node_by_id.get(e.target_id) or node_by_slug.get(dst_slug)
+            if not src_node or not dst_node:
+                continue
+            if src_node.slug not in valid_nodes_by_slug or dst_node.slug not in valid_nodes_by_slug:
+                continue
+            matched_edge = next(
+                (
+                    ed
+                    for ed in edge_defs
+                    if ed.predicate == e.predicate
+                    and ed.source_type == src_node.node_type
+                    and ed.target_type == dst_node.node_type
+                ),
+                None,
             )
+            if matched_edge is None:
+                matched_edge = next(
+                    (
+                        ed
+                        for ed in edge_defs
+                        if ed.source_type == src_node.node_type
+                        and ed.target_type == dst_node.node_type
+                        and (ed.polarity == e.polarity or ed.polarity == "neutral")
+                    ),
+                    None,
+                )
+            if matched_edge is not None:
+                jsonl_lines.append(
+                    json.dumps(
+                        {
+                            "edge": matched_edge.predicate,
+                            "from": src_node.slug,
+                            "to": dst_node.slug,
+                        }
+                    )
+                )
+
         data_path.write_text("\n".join(jsonl_lines) + ("\n" if jsonl_lines else ""), encoding="utf-8")
 
         cli_bin = find_omnigraph_binary("omnigraph")
@@ -973,8 +1062,15 @@ class GraphEngine:
         if cli_bin is not None:
             env = resolve_omnigraph_env()
             try:
+                prev_cb = (
+                    cookbook_marker.read_text(encoding="utf-8").strip()
+                    if cookbook_marker.is_file()
+                    else ""
+                )
+                if prev_cb != cb.id and omni_path.exists():
+                    shutil.rmtree(omni_path, ignore_errors=True)
                 if not omni_path.exists():
-                    subprocess.run(
+                    init_res = subprocess.run(
                         [str(cli_bin), "init", "--schema", str(schema_path), str(omni_path)],
                         env=env,
                         capture_output=True,
@@ -982,8 +1078,10 @@ class GraphEngine:
                         timeout=15.0,
                         check=False,
                     )
-                if jsonl_lines:
-                    subprocess.run(
+                    if init_res.returncode == 0:
+                        cookbook_marker.write_text(cb.id, encoding="utf-8")
+                if jsonl_lines and omni_path.exists():
+                    load_res = subprocess.run(
                         [
                             str(cli_bin),
                             "load",
@@ -991,7 +1089,6 @@ class GraphEngine:
                             str(data_path),
                             "--mode",
                             "merge",
-                            "--target",
                             str(omni_path),
                         ],
                         env=env,
@@ -1000,7 +1097,36 @@ class GraphEngine:
                         timeout=20.0,
                         check=False,
                     )
-                ran_cli = True
+                    if load_res.returncode != 0:
+                        shutil.rmtree(omni_path, ignore_errors=True)
+                        subprocess.run(
+                            [str(cli_bin), "init", "--schema", str(schema_path), str(omni_path)],
+                            env=env,
+                            capture_output=True,
+                            text=True,
+                            timeout=15.0,
+                            check=False,
+                        )
+                        cookbook_marker.write_text(cb.id, encoding="utf-8")
+                        load_res = subprocess.run(
+                            [
+                                str(cli_bin),
+                                "load",
+                                "--data",
+                                str(data_path),
+                                "--mode",
+                                "merge",
+                                str(omni_path),
+                            ],
+                            env=env,
+                            capture_output=True,
+                            text=True,
+                            timeout=20.0,
+                            check=False,
+                        )
+                    ran_cli = load_res.returncode == 0
+                else:
+                    ran_cli = omni_path.exists()
             except Exception:
                 ran_cli = False
 
@@ -1009,6 +1135,7 @@ class GraphEngine:
             "scope": norm,
             "bundle_dir": str(bundle_dir),
             "store_path": str(omni_path),
+            "skill_path": str(skill_path),
             "nodes_exported": len(snap.nodes),
             "edges_exported": len(snap.edges),
             "omnigraph_cli_synced": ran_cli,

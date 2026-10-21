@@ -15,8 +15,8 @@ import {
   Settings2,
   Sparkles,
   Stethoscope,
-  Terminal,
   Target,
+  Terminal,
   Wrench
 } from 'lucide-react'
 

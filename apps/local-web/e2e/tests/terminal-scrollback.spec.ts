@@ -5,8 +5,8 @@ import {
   focusTerminal,
   readTerminalBuffer,
   readTerminalText,
-  seedGrid,
   type SeededGrid,
+  seedGrid,
   waitForTerminals
 } from '../fixtures/seed'
 

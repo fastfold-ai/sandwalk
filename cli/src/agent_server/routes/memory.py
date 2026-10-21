@@ -11,8 +11,10 @@ from agent_server.app_deps import AppDeps
 from agent_server.memory_service import MemoryService
 from agent_server.models.memory import (
     CookbookList,
+    CreatedSkillResponse,
     CreateGraphClaimRequest,
     CreateMemoryEntryRequest,
+    CreateSkillFromMemoryRequest,
     DistillSessionRequest,
     DistillSessionResponse,
     GraphBranch,
@@ -270,3 +272,14 @@ def register_memory_routes(app: FastAPI, deps: AppDeps) -> None:
         force: bool = Query(default=True),
     ) -> dict[str, Any]:
         return await asyncio.to_thread(_svc().seed_showcase, force=force)
+
+    @app.post(
+        "/v1/memory/skills/create",
+        response_model=CreatedSkillResponse,
+        status_code=201,
+    )
+    async def create_skill_from_memory_route(
+        payload: CreateSkillFromMemoryRequest,
+    ) -> CreatedSkillResponse:
+        return await asyncio.to_thread(_svc().create_skill, payload)
+

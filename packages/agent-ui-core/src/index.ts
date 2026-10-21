@@ -2381,3 +2381,30 @@ export type DistillSessionResponse = {
   summary: string
 }
 
+export type CreateSkillFromMemoryRequest = {
+  scope?: string
+  name: string
+  slug?: string | null
+  description?: string | null
+  topic?: string | null
+  wikiSlug?: string | null
+  includeMemories?: boolean
+  includeWiki?: boolean
+  includeGraph?: boolean
+  customInstructions?: string | null
+}
+
+export type CreatedSkillResponse = {
+  ok: boolean
+  skillName: string
+  skillDir: string
+  skillMdPath: string
+  scope: string
+  cookbookId: string
+  memoriesIncluded: number
+  wikiPagesIncluded: number
+  graphNodesIncluded: number
+  summary: string
+}
+
+

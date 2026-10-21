@@ -1514,3 +1514,51 @@ def capy_distill_session(session_id: str = "", scope: str = "", **kwargs) -> dic
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "summary": f"Distillation failed: {exc}"}
 
+
+@registry.register(
+    name="capy.create_skill_from_memory",
+    description=(
+        "Crystallize curated Memories, Living Wiki pages, and Omnigraph Cookbook ontologies "
+        "from a scope into a reusable Sandwalk Skill (~/.sandwalk/skills/<slug>/SKILL.md)."
+    ),
+    category="capy",
+    usage_guide=(
+        "Use when the user asks to convert what we know about a topic, a Living Wiki page, "
+        "or an Omnigraph Cookbook ontology into an installed Skill (/skill-slug)."
+    ),
+    parameters={
+        "name": "Skill title or slug (e.g. 'Oral GLP-1R Discovery').",
+        "scope": "Source scope ('global', 'project:<id>', or 'specialist:<id>').",
+        "topic": "Optional topic filter.",
+        "wiki_slug": "Optional specific Wiki page slug.",
+        "description": "Optional 1-sentence skill description.",
+    },
+)
+def capy_create_skill_from_memory(
+    name: str = "",
+    scope: str = "global",
+    topic: str = "",
+    wiki_slug: str = "",
+    description: str = "",
+    **kwargs,
+) -> dict:
+    from agent_server.memory_service import MemoryService
+    from agent_server.models.memory import CreateSkillFromMemoryRequest
+
+    clean_name = str(name or "").strip()
+    if not clean_name:
+        return {"ok": False, "summary": "name is required to create a skill."}
+    deps = _deps()
+    svc = MemoryService(agent_store=deps.store)
+    res = svc.create_skill(
+        CreateSkillFromMemoryRequest(
+            scope=str(scope or "global").strip() or "global",
+            name=clean_name,
+            description=str(description or "").strip() or None,
+            topic=str(topic or "").strip() or None,
+            wiki_slug=str(wiki_slug or "").strip() or None,
+        )
+    )
+    return res.model_dump(mode="json", by_alias=True)
+
+

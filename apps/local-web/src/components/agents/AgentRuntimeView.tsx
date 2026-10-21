@@ -7,11 +7,11 @@ import { BusyConfirmOverlay } from '@/components/BusyConfirmOverlay'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
+import { RuntimeCapacitySection } from './runtime-view/runtime-view-capacity'
 import {
   clampInt,
   type RuntimeDraft,
   settingsToDraft} from './runtime-view/runtime-view-fields'
-import { RuntimeCapacitySection } from './runtime-view/runtime-view-capacity'
 import {
   RuntimeTimeoutsSection,
   RuntimeToolCallingSection,

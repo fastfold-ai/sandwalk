@@ -4412,4 +4412,37 @@ export class LocalAgentClient
       { method: 'POST', signal }
     )
   }
+
+  createSkillFromMemory(
+    payload: {
+      scope?: string
+      name: string
+      slug?: string | null
+      description?: string | null
+      topic?: string | null
+      wikiSlug?: string | null
+      includeMemories?: boolean
+      includeWiki?: boolean
+      includeGraph?: boolean
+      customInstructions?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<{
+    ok: boolean
+    skillName: string
+    skillDir: string
+    skillMdPath: string
+    scope: string
+    cookbookId: string
+    memoriesIncluded: number
+    wikiPagesIncluded: number
+    graphNodesIncluded: number
+    summary: string
+  }> {
+    return this.request('/memory/skills/create', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal
+    })
+  }
 }

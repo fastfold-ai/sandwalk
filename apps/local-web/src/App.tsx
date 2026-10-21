@@ -41,6 +41,10 @@ import { applyCapyOpenSplit, parseGridLayout } from '@/lib/capy-ui'
 import { setChatDateBoosts } from '@/lib/chat-date-boost'
 import { isAboutDesktopWindow } from '@/lib/desktop'
 import { isDraftAgentSessionId, sessionRoutePath } from '@/lib/draft-agent'
+import {
+  refreshInstalledAgents,
+  useExternalAgentActions
+} from '@/lib/external-agent-actions'
 import { setFocusedItemId } from '@/lib/focused-item'
 import { setItemOpener } from '@/lib/item-opener'
 import { getMonitorFingerprint } from '@/lib/monitor-fingerprint'
@@ -59,10 +63,6 @@ import {
 import { visibleSessionIds } from '@/lib/sessions'
 import { resolveStripActiveId } from '@/lib/strip-active'
 import { clearTerminalActivity } from '@/lib/terminal-attention'
-import {
-  refreshInstalledAgents,
-  useExternalAgentActions
-} from '@/lib/external-agent-actions'
 import { queueTerminalStartup } from '@/lib/terminal-startup'
 import { useTerminalsStore } from '@/lib/terminals-store'
 

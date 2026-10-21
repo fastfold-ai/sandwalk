@@ -70,6 +70,23 @@ test.describe('Memory, Omnigraph Cookbooks, and Persona Specialists UI', () => {
       page.getByRole('heading', { name: /About You \(USER\.md Profile\)/i })
     ).toBeVisible()
 
+    // Switch to Living Wiki tab — verify Split/Preview/Edit + Full Screen + To Skill
+    await page.getByRole('button', { name: /Living Wiki/i }).click()
+    await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Split' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Full Screen' })).toBeVisible()
+    await page.getByRole('button', { name: 'Full Screen' }).click()
+    await expect(
+      page.getByRole('button', { name: 'Exit Full Screen' })
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Exit Full Screen' }).click()
+
+    // Test Create Skill builder bar
+    await page.getByRole('button', { name: 'Create Skill' }).first().click()
+    await expect(
+      page.getByRole('button', { name: 'Create Skill Now' })
+    ).toBeVisible()
+
     // Switch to Knowledge Graph tab (defaults to Level 2 Instance Graph)
     await page.getByRole('button', { name: /Knowledge Graph/i }).click()
     await expect(

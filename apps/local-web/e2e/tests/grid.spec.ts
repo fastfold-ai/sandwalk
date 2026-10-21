@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { resolveE2EEnv } from '../fixtures/env'
-import { focusTerminal, readTerminalText, seedGrid, type SeededGrid, waitForTerminals } from '../fixtures/seed'
+import { focusTerminal, readTerminalText, type SeededGrid, seedGrid, waitForTerminals } from '../fixtures/seed'
 
 const env = resolveE2EEnv()
 

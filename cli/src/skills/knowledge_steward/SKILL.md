@@ -39,3 +39,5 @@ Sandwalk separates knowledge into three distinct tiers so the system prompt stay
 - **Never fabricate provenance**: Every scientific or operational claim recorded via `graph.record_claim` must cite its `source_ref` (PMID, DOI, NCT ID, file path, or session ID).
 - **Preserve contradictions**: When a new experiment or paper disagrees with an existing claim, record it with `polarity="contradict"` rather than deleting the prior claim. Contested claims are high-value signals for the user.
 - **Isolate speculative exploration on branches**: When testing a speculative hypothesis or bulk-loading unverified extractions, create a graph branch first (`graph.branch(action="create", name="review/...")`).
+- **Crystallize Knowledge into Reusable Skills (`memory.create_skill`)**: When the user asks to turn what we know about a topic, a Living Wiki page, or an Omnigraph Cookbook ontology into a reusable Skill, call `memory.create_skill(name=..., scope=..., topic=..., wiki_slug=..., custom_instructions=...)`. It writes `~/.sandwalk/skills/<slug>/SKILL.md` plus `references/{schema.pg,queries.gq,wiki-digest.md}` so any agent or Specialist can invoke `/<slug>`.
+

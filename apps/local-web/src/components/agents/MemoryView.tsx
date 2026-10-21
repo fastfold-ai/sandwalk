@@ -19,23 +19,30 @@ import {
   BookOpen,
   Brain,
   Check,
+  Columns2,
   Database,
   Download,
+  Eye,
   GitBranch,
   GitMerge,
   Layers,
+  Maximize2,
+  Minimize2,
   Network,
+  Pencil,
   Plus,
   RefreshCw,
   Settings2,
   Sparkles,
   Trash2,
+  Wand2,
   X
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
+import { MarkdownContent } from '@/components/agents/MarkdownContent'
 import { SpecialistAvatar } from '@/components/agents/specialists-view/specialist-ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,6 +50,7 @@ import { cn } from '@/lib/utils'
 
 type MemoryTab = 'graph' | 'cookbooks' | 'wiki' | 'memories' | 'settings'
 type GraphVisualMode = 'blueprint' | 'instances'
+type WikiViewMode = 'preview' | 'split' | 'edit'
 
 const NODE_COLOR_MAP: Record<string, string> = {
   blue: '#2563eb',
@@ -118,11 +126,26 @@ export function MemoryView({
   const [wikiTitle, setWikiTitle] = useState('')
   const [wikiSlug, setWikiSlug] = useState('')
   const [wikiContent, setWikiContent] = useState('')
+  const [wikiViewMode, setWikiViewMode] = useState<WikiViewMode>('split')
+  const [isFullScreen, setIsFullScreen] = useState(false)
+  const [showSkillBuilder, setShowSkillBuilder] = useState(false)
+  const [skillBuilderName, setSkillBuilderName] = useState('')
+  const [skillBuilderTopic, setSkillBuilderTopic] = useState('')
+  const [skillBuilderWikiSlug, setSkillBuilderWikiSlug] = useState<string | null>(null)
   const [newBranchName, setNewBranchName] = useState('')
   const [newNodeType, setNewNodeType] = useState('Entity')
   const [newNodeName, setNewNodeName] = useState('')
   const [newNodeSummary, setNewNodeSummary] = useState('')
   const [distillSessionId, setDistillSessionId] = useState('')
+
+  useEffect(() => {
+    if (!isFullScreen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsFullScreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isFullScreen])
 
   useEffect(() => {
     const qScope = searchParams.get('scope')
@@ -467,6 +490,94 @@ export function MemoryView({
     [memories]
   )
 
+  const wikiPreviewMarkdown = useMemo(() => {
+    if (!wikiContent.trim()) {
+      return '_No content yet. Write Markdown on the left and link pages with `[[page-slug]]`._'
+    }
+    return wikiContent.replace(/\[\[([a-zA-Z0-9_-]+)\]\]/g, (_match, slug: string) => {
+      return `[\`[[${slug}]]\`](#wikilink:${slug})`
+    })
+  }, [wikiContent])
+
+  const openSkillBuilder = (opts?: {
+    defaultName?: string
+    wikiSlug?: string | null
+    topic?: string
+  }) => {
+    const fallbackName =
+      opts?.defaultName ||
+      (activeTab === 'wiki' && wikiTitle
+        ? `${wikiTitle} Skill`
+        : cb
+          ? `${cb.name} Playbook`
+          : 'Custom Knowledge Skill')
+    setSkillBuilderName(fallbackName)
+    setSkillBuilderWikiSlug(opts?.wikiSlug ?? null)
+    setSkillBuilderTopic(opts?.topic ?? '')
+    setShowSkillBuilder(true)
+  }
+
+  const handleCreateSkill = async () => {
+    if (!skillBuilderName.trim()) return
+    setBusy(true)
+    try {
+      const res = await client.createSkillFromMemory({
+        scope,
+        name: skillBuilderName.trim(),
+        topic: skillBuilderTopic.trim() || null,
+        wikiSlug: skillBuilderWikiSlug,
+        includeMemories: true,
+        includeWiki: true,
+        includeGraph: true
+      })
+      setShowSkillBuilder(false)
+      toast.success(`Created skill /${res.skillName}`, {
+        description: res.summary,
+        action: {
+          label: 'Open Skill',
+          onClick: () => navigate(`/dashboard/skills/${res.skillName}`)
+        }
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create skill')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAskAgentToBuildSkill = async () => {
+    const targetName = skillBuilderName.trim() || cb?.name || 'Domain Playbook'
+    setBusy(true)
+    try {
+      const sess = await client.createSession({
+        title: `Build Skill · ${targetName}`,
+        projectId: activeProjectId,
+        specialistId: activeSpecialist?.id ?? null
+      })
+      const promptParts = [
+        `Please create a reusable Sandwalk Skill named "${targetName}" from our ${scope} knowledge base using \`memory.create_skill\`.`,
+        skillBuilderWikiSlug
+          ? `Focus on the Living Wiki page [[${skillBuilderWikiSlug}]].`
+          : '',
+        skillBuilderTopic.trim()
+          ? `Filter for topic: "${skillBuilderTopic.trim()}".`
+          : '',
+        `Include our curated MEMORY.md rules, Living Wiki notes, and the ${cb?.number || ''} ${cb?.name || ''} Omnigraph ontology & stored queries.`
+      ]
+        .filter(Boolean)
+        .join(' ')
+      await client.sendMessage(sess.id, promptParts)
+      setShowSkillBuilder(false)
+      navigate(`/chat/${sess.id}`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not start skill builder chat'
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="chat-scrollbar flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 pt-6 pb-10 md:px-8 md:pt-8">
@@ -544,6 +655,19 @@ export function MemoryView({
 
             <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => openSkillBuilder()}
+              className="h-9 gap-1.5 rounded-xl text-xs"
+              title="Convert your Memories, Living Wiki, and Omnigraph Ontology into a reusable Sandwalk Skill (/skill-slug)"
+            >
+              <Wand2 className="size-3.5" />
+              Create Skill
+            </Button>
+
+            <Button
+              type="button"
               variant="outline"
               size="sm"
               disabled={busy}
@@ -577,6 +701,81 @@ export function MemoryView({
             ) : null}
           </div>
         </div>
+
+        {/* Inline Skill Crystallizer Modal / Bar (Convert Ontology / Wiki / Memory -> Skill) */}
+        {showSkillBuilder && (
+          <div className="border-primary/40 bg-muted/25 space-y-3 rounded-2xl border p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Wand2 className="text-primary size-4" />
+                <div>
+                  <h4 className="text-sm font-semibold">
+                    Create Reusable Skill from Knowledge ({scope})
+                  </h4>
+                  <p className="text-muted-foreground text-xs">
+                    Crystallizes your curated{' '}
+                    <code className="font-mono">MEMORY.md</code> rules,{' '}
+                    {skillBuilderWikiSlug ? (
+                      <>
+                        Wiki page <code className="font-mono">[[{skillBuilderWikiSlug}]]</code>
+                      </>
+                    ) : (
+                      'Living Wiki pages'
+                    )}
+                    , and the{' '}
+                    <code className="font-mono">
+                      {cb?.number} {cb?.name}
+                    </code>{' '}
+                    Omnigraph ontology + stored queries into{' '}
+                    <code className="font-mono">~/.sandwalk/skills/&lt;slug&gt;/SKILL.md</code>.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSkillBuilder(false)}
+                className="text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={skillBuilderName}
+                onChange={e => setSkillBuilderName(e.target.value)}
+                placeholder="Skill name (e.g. Oral GLP-1R Discovery Playbook)"
+                className="h-9 min-w-[240px] flex-1 text-xs"
+              />
+              <Input
+                value={skillBuilderTopic}
+                onChange={e => setSkillBuilderTopic(e.target.value)}
+                placeholder="Optional topic filter (e.g. GLP-1R, hERG, routing)..."
+                className="h-9 w-64 text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={!skillBuilderName.trim() || busy}
+                onClick={() => void handleCreateSkill()}
+                className="h-9 gap-1.5 rounded-xl px-4 text-xs"
+              >
+                <Sparkles className="size-3.5" />
+                Create Skill Now
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => void handleAskAgentToBuildSkill()}
+                className="h-9 gap-1.5 rounded-xl text-xs"
+              >
+                <Wand2 className="size-3.5" />
+                Ask Agent in Chat
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Clean 3-Tab Navigation Bar + Compact Status & Secondary Tools */}
         <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
@@ -692,7 +891,13 @@ export function MemoryView({
 
         {/* TAB: KNOWLEDGE GRAPH EXPLORER */}
         {activeTab === 'graph' && cb && (
-          <div className="space-y-4">
+          <div
+            className={cn(
+              'space-y-4',
+              isFullScreen &&
+                'border-border/60 bg-background/95 fixed inset-3 z-50 flex flex-col overflow-y-auto rounded-2xl border p-5 shadow-2xl backdrop-blur-xl'
+            )}
+          >
             {/* Toolbar: Instance Graph (Default) vs Schema Blueprint + Inline Mode Picker + Stored Queries + Branch */}
             <div className="border-border/50 bg-muted/20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -811,6 +1016,36 @@ export function MemoryView({
                     Load {cb.name} Demo Seed
                   </Button>
                 )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 rounded-lg text-xs"
+                  onClick={() =>
+                    openSkillBuilder({
+                      defaultName: `${cb.name} Graph Skill`
+                    })
+                  }
+                  title="Convert this Ontology & Knowledge Graph into a reusable Sandwalk Skill"
+                >
+                  <Wand2 className="size-3.5" />
+                  To Skill
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 rounded-lg text-xs"
+                  onClick={() => setIsFullScreen(v => !v)}
+                  title={isFullScreen ? 'Exit full screen (Esc)' : 'Expand Graph to full screen'}
+                >
+                  {isFullScreen ? (
+                    <Minimize2 className="size-3.5" />
+                  ) : (
+                    <Maximize2 className="size-3.5" />
+                  )}
+                  {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+                </Button>
               </div>
             </div>
 
@@ -942,10 +1177,8 @@ export function MemoryView({
                     </div>
                   ) : (
                     <svg
-                      width={positionedGraph.width}
-                      height={positionedGraph.height}
                       viewBox={`0 0 ${positionedGraph.width} ${positionedGraph.height}`}
-                      className="mx-auto block select-none"
+                      className="mx-auto block h-auto w-full max-w-[920px] select-none"
                     >
                       {positionedGraph.edges.map(({ edge, source, target }) => {
                         const isContradict = edge.polarity === 'contradict'
@@ -1235,6 +1468,20 @@ export function MemoryView({
                       >
                         Schema (.pg)
                       </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 gap-1 rounded-lg text-xs"
+                        onClick={() =>
+                          openSkillBuilder({
+                            defaultName: `${item.name} Skill`
+                          })
+                        }
+                      >
+                        <Wand2 className="size-3" />
+                        Create Skill
+                      </Button>
                     </div>
                   </div>
                 )
@@ -1271,10 +1518,17 @@ export function MemoryView({
           </div>
         )}
 
-        {/* TAB 3: LIVING MARKDOWN WIKI */}
+        {/* TAB 2: LIVING MARKDOWN WIKI (Preview / Split / Edit + Full Screen + Create Skill) */}
         {activeTab === 'wiki' && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="border-border/60 bg-muted/15 space-y-2 rounded-2xl border p-3.5">
+          <div
+            className={cn(
+              'grid grid-cols-1 gap-4 md:grid-cols-12',
+              isFullScreen &&
+                'border-border/60 bg-background/95 fixed inset-3 z-50 flex flex-col overflow-hidden rounded-2xl border p-5 shadow-2xl backdrop-blur-xl md:grid md:grid-cols-12'
+            )}
+          >
+            {/* Left Sidebar: Wiki Pages List */}
+            <div className="border-border/50 bg-muted/15 flex flex-col space-y-2 overflow-y-auto rounded-2xl border p-3.5 md:col-span-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-semibold">
                   Wiki Pages ({wikiPages.length})
@@ -1289,6 +1543,7 @@ export function MemoryView({
                     setWikiSlug('')
                     setWikiTitle('')
                     setWikiContent('')
+                    setWikiViewMode('split')
                   }}
                 >
                   <Plus className="mr-1 size-3" />
@@ -1307,10 +1562,10 @@ export function MemoryView({
                       type="button"
                       onClick={() => void handleOpenWikiPage(page.slug)}
                       className={cn(
-                        'w-full rounded-xl p-2.5 text-left transition-colors',
+                        'w-full rounded-xl border p-2.5 text-left transition-colors',
                         activeWikiPage?.slug === page.slug
-                          ? 'bg-background shadow-sm'
-                          : 'hover:bg-background/60'
+                          ? 'border-border/70 bg-muted/40 shadow-sm'
+                          : ' hover:bg-muted/25 border-transparent'
                       )}
                     >
                       <div className="text-xs font-semibold">{page.title}</div>
@@ -1326,45 +1581,159 @@ export function MemoryView({
               )}
             </div>
 
-            <div className="border-border/60 bg-muted/15 space-y-3 rounded-2xl border p-4 md:col-span-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  value={wikiTitle}
-                  onChange={e => setWikiTitle(e.target.value)}
-                  placeholder="Page Title (e.g. KRAS G12D Target Dossier)"
-                  className="h-9 flex-1 text-sm"
-                />
-                <Input
-                  value={wikiSlug}
-                  onChange={e => setWikiSlug(e.target.value)}
-                  placeholder="slug-optional"
-                  className="h-9 w-44 font-mono text-xs"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-9 rounded-xl px-4 text-xs"
-                  onClick={() => void handleSaveWikiPage()}
-                >
-                  Save Page
-                </Button>
+            {/* Right Main Panel: Toolbar + Editor / Live Markdown Preview */}
+            <div className="border-border/50 bg-muted/15 flex flex-col space-y-3 overflow-hidden rounded-2xl border p-4 md:col-span-9">
+              {/* Top Wiki Toolbar: Title, Slug, Preview/Split/Edit Toggle, Create Skill, Full Screen, Save */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-[260px] flex-1 items-center gap-2">
+                  <Input
+                    value={wikiTitle}
+                    onChange={e => setWikiTitle(e.target.value)}
+                    placeholder="Page Title (e.g. KRAS G12D Target Dossier)"
+                    className="h-9 flex-1 text-sm font-medium"
+                  />
+                  <Input
+                    value={wikiSlug}
+                    onChange={e => setWikiSlug(e.target.value)}
+                    placeholder="slug-optional"
+                    className="h-9 w-40 font-mono text-xs"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/* View Mode Pill Group: Preview | Split | Edit */}
+                  <div className="border-border/60 bg-muted/25 inline-flex items-center rounded-xl border p-0.5">
+                    {(
+                      [
+                        { id: 'preview', label: 'Preview', icon: Eye },
+                        { id: 'split', label: 'Split', icon: Columns2 },
+                        { id: 'edit', label: 'Edit', icon: Pencil }
+                      ] as const
+                    ).map(m => {
+                      const ModeIcon = m.icon
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setWikiViewMode(m.id)}
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
+                            wikiViewMode === m.id
+                              ? 'bg-foreground text-background shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          <ModeIcon className="size-3" />
+                          {m.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1 rounded-xl text-xs"
+                    onClick={() =>
+                      openSkillBuilder({
+                        defaultName: wikiTitle
+                          ? `${wikiTitle}`
+                          : 'Wiki Playbook Skill',
+                        wikiSlug: activeWikiPage?.slug ?? (wikiSlug || null)
+                      })
+                    }
+                    title="Convert this Wiki page + Ontology into an installed Sandwalk Skill"
+                  >
+                    <Wand2 className="size-3.5" />
+                    To Skill
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1 rounded-xl text-xs"
+                    onClick={() => setIsFullScreen(v => !v)}
+                    title={
+                      isFullScreen
+                        ? 'Exit full screen (Esc)'
+                        : 'Expand Wiki editor & preview to full screen'
+                    }
+                  >
+                    {isFullScreen ? (
+                      <Minimize2 className="size-3.5" />
+                    ) : (
+                      <Maximize2 className="size-3.5" />
+                    )}
+                    {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-9 rounded-xl px-4 text-xs"
+                    onClick={() => void handleSaveWikiPage()}
+                  >
+                    Save Page
+                  </Button>
+                </div>
               </div>
-              <textarea
-                value={wikiContent}
-                onChange={e => setWikiContent(e.target.value)}
-                rows={14}
-                placeholder="Write Markdown notes here. Link to other pages with [[page-slug]]..."
-                className="border-border/60 bg-background w-full rounded-xl border p-3 font-mono text-xs leading-relaxed outline-none"
-              />
+
+              {/* Editor & Markdown Preview Body */}
+              <div
+                className={cn(
+                  'grid flex-1 gap-4 overflow-hidden',
+                  wikiViewMode === 'split'
+                    ? 'grid-cols-1 lg:grid-cols-2'
+                    : 'grid-cols-1'
+                )}
+              >
+                {(wikiViewMode === 'edit' || wikiViewMode === 'split') && (
+                  <textarea
+                    value={wikiContent}
+                    onChange={e => setWikiContent(e.target.value)}
+                    rows={isFullScreen ? 28 : 18}
+                    placeholder="Write Markdown notes here. Link to other pages with [[page-slug]]..."
+                    className={cn(
+                      'border-border/50 bg-muted/20 w-full resize-y rounded-xl border p-3.5 font-mono text-xs leading-relaxed outline-none',
+                      isFullScreen && 'h-full min-h-[480px]'
+                    )}
+                  />
+                )}
+
+                {(wikiViewMode === 'preview' || wikiViewMode === 'split') && (
+                  <div
+                    onClick={e => {
+                      const anchor = (e.target as HTMLElement).closest('a')
+                      const href = anchor?.getAttribute('href') || ''
+                      if (href.startsWith('#wikilink:')) {
+                        e.preventDefault()
+                        const targetSlug = href.slice('#wikilink:'.length)
+                        if (targetSlug) {
+                          void handleOpenWikiPage(targetSlug)
+                        }
+                      }
+                    }}
+                    className={cn(
+                      'border-border/50 bg-muted/20 chat-scrollbar overflow-y-auto rounded-xl border p-4 text-sm leading-relaxed',
+                      isFullScreen ? 'h-full min-h-[480px]' : 'max-h-[460px] min-h-[340px]'
+                    )}
+                  >
+                    <MarkdownContent content={wikiPreviewMarkdown} />
+                  </div>
+                )}
+              </div>
+
               {activeWikiPage && activeWikiPage.backlinks.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
                   <span className="text-muted-foreground">Backlinks:</span>
                   {activeWikiPage.backlinks.map(bl => (
                     <button
                       key={bl}
                       type="button"
                       onClick={() => void handleOpenWikiPage(bl)}
-                      className="bg-muted rounded px-2 py-0.5 font-mono text-[11px]"
+                      className="border-border/50 bg-muted/30 hover:bg-muted/50 rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors"
                     >
                       [[{bl}]]
                     </button>

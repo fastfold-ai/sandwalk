@@ -354,3 +354,30 @@ class DistillSessionResponse(ApiModel):
     claims_added: int = 0
     staged_for_approval: bool = False
     summary: str
+
+
+class CreateSkillFromMemoryRequest(ApiModel):
+    scope: str = "global"
+    name: str = Field(min_length=1)
+    slug: str | None = None
+    description: str | None = None
+    topic: str | None = None
+    wiki_slug: str | None = None
+    include_memories: bool = True
+    include_wiki: bool = True
+    include_graph: bool = True
+    custom_instructions: str | None = None
+
+
+class CreatedSkillResponse(ApiModel):
+    ok: bool = True
+    skill_name: str
+    skill_dir: str
+    skill_md_path: str
+    scope: str
+    cookbook_id: str
+    memories_included: int = 0
+    wiki_pages_included: int = 0
+    graph_nodes_included: int = 0
+    summary: str
+

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from agent_server.models.memory import (
@@ -29,6 +30,17 @@ def _prop(
         is_indexed=is_indexed,
         optional=optional,
     )
+
+
+def _normalize_gq_source(gq: str, edge_types: list[OntologyEdgeTypeDef]) -> str:
+    out = gq.replace("; ", "\n    ").replace(";\n", "\n")
+    for et in edge_types:
+        out = re.sub(
+            rf"(\$[A-Za-z0-9_]+)\s+{re.escape(et.predicate)}\s+(\$[A-Za-z0-9_]+)",
+            r"\1 * \2",
+            out,
+        )
+    return out
 
 
 def _render_pg_schema(
@@ -1473,6 +1485,12 @@ def get_cookbook_summary(
         for et in raw["edge_types"]
     ]
     pg_schema = _render_pg_schema(raw["name"], node_types, edge_types)
+    stored_queries = [
+        sq.model_copy(
+            update={"gq_source": _normalize_gq_source(sq.gq_source, edge_types)}
+        )
+        for sq in raw["stored_queries"]
+    ]
     return CookbookSummary(
         id=raw["id"],
         number=raw["number"],
@@ -1483,7 +1501,7 @@ def get_cookbook_summary(
         layers=list(raw["layers"]),
         node_types=node_types,
         edge_types=edge_types,
-        stored_queries=list(raw["stored_queries"]),
+        stored_queries=stored_queries,
         pg_schema=pg_schema,
     )
 

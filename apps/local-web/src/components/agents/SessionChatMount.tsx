@@ -6,12 +6,11 @@ import type {
 import { type Dispatch, memo, type RefObject, type SetStateAction } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
-import { perfCount } from '@/lib/perf-probe'
-
 import { SessionChatBody } from '@/components/agents/session-main/session-chat-body'
 import {
   type PerSessionChatStateArgs,
   usePerSessionChatState} from '@/hooks/usePerSessionChatState'
+import { perfCount } from '@/lib/perf-probe'
 
 /**
  * Instantiates a full per-session chat surface (mensajes SSE stream, composer,

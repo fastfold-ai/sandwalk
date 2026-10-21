@@ -32,8 +32,10 @@ from agent_server.memory_service.wiki import WikiManager
 from agent_server.models.memory import (
     CookbookList,
     CookbookSummary,
+    CreatedSkillResponse,
     CreateGraphClaimRequest,
     CreateMemoryEntryRequest,
+    CreateSkillFromMemoryRequest,
     DistillSessionResponse,
     GraphBranch,
     GraphBranchActionRequest,
@@ -298,6 +300,161 @@ class MemoryService:
         from agent_server.memory_service.showcase import seed_end_to_end_showcase
 
         return seed_end_to_end_showcase(self, self.agent_store, force=force)
+
+    def create_skill(self, payload: CreateSkillFromMemoryRequest) -> CreatedSkillResponse:
+        """Crystallize Memories, Living Wiki pages, and Omnigraph Ontology into an installed Sandwalk Skill."""
+        import re as _re
+
+        from agent import config as _cfg_mod
+
+        norm_scope = normalize_scope(payload.scope)
+        raw_slug = payload.slug or payload.name
+        skill_slug = _re.sub(r"[^a-z0-9-]+", "-", raw_slug.strip().lower()).strip("-") or "custom-knowledge-skill"
+
+        skills_root = Path(_cfg_mod.CONFIG_DIR) / "skills" / skill_slug
+        refs_dir = skills_root / "references"
+        refs_dir.mkdir(parents=True, exist_ok=True)
+
+        snap = self.get_graph(norm_scope)
+        cb = snap.active_cookbook
+        topic_filter = (payload.topic or "").strip().lower()
+
+        mem_entries = self.store.list_entries(scope=norm_scope, include_user=True).data if payload.include_memories else []
+        if topic_filter:
+            filtered_mems = [
+                m
+                for m in mem_entries
+                if topic_filter in m.content.lower() or any(topic_filter in t.lower() for t in m.tags)
+            ]
+            if filtered_mems:
+                mem_entries = filtered_mems
+
+        wiki_pages: list[WikiPageDetail] = []
+        if payload.include_wiki:
+            if payload.wiki_slug:
+                single = self.get_wiki_page(payload.wiki_slug, scope=norm_scope)
+                if single is not None:
+                    wiki_pages.append(single)
+            else:
+                for summary in self.list_wiki(norm_scope).data:
+                    if topic_filter and (
+                        topic_filter not in summary.title.lower()
+                        and topic_filter not in summary.summary.lower()
+                        and topic_filter not in summary.slug.lower()
+                    ):
+                        continue
+                    detail = self.get_wiki_page(summary.slug, scope=norm_scope)
+                    if detail is not None:
+                        wiki_pages.append(detail)
+
+        graph_nodes = snap.nodes if payload.include_graph else []
+        if topic_filter and graph_nodes:
+            filtered_nodes = [
+                n
+                for n in graph_nodes
+                if topic_filter in n.name.lower()
+                or topic_filter in n.summary.lower()
+                or topic_filter in n.node_type.lower()
+            ]
+            if filtered_nodes:
+                graph_nodes = filtered_nodes
+
+        # Write reference artifacts into references/
+        if payload.include_graph:
+            (refs_dir / "schema.pg").write_text(cb.pg_schema, encoding="utf-8")
+            queries_txt = "\n\n".join(q.gq_source for q in cb.stored_queries)
+            (refs_dir / "queries.gq").write_text(queries_txt + "\n", encoding="utf-8")
+
+        if wiki_pages:
+            digest_parts = [f"## [[{p.slug}]] — {p.title}\n\n{p.content.strip()}" for p in wiki_pages]
+            (refs_dir / "wiki-digest.md").write_text("\n\n---\n\n".join(digest_parts) + "\n", encoding="utf-8")
+
+        desc = (
+            (payload.description or "").strip()
+            or f"Domain skill crystallized from {norm_scope} ({cb.number} {cb.name} ontology, {len(wiki_pages)} Wiki pages, {len(mem_entries)} memories)."
+        )
+        safe_desc = desc.replace('"', "'")
+
+        md_lines: list[str] = [
+            "---",
+            f"name: {skill_slug}",
+            f'description: "{safe_desc}"',
+            "category: Created by you",
+            "version: 0.1.0",
+            "---",
+            "",
+            f"# {payload.name.strip()}",
+            "",
+            f"{desc}",
+            "",
+        ]
+
+        if payload.custom_instructions and payload.custom_instructions.strip():
+            md_lines.extend(
+                [
+                    "## Operating Instructions",
+                    "",
+                    payload.custom_instructions.strip(),
+                    "",
+                ]
+            )
+
+        if mem_entries:
+            md_lines.extend(["## Curated Rules & Priors (`MEMORY.md`)", ""])
+            for m in mem_entries[:20]:
+                md_lines.append(f"- {m.content}")
+            md_lines.append("")
+
+        if wiki_pages:
+            md_lines.extend(["## Synthesized Living Wiki Knowledge", ""])
+            for wp in wiki_pages[:10]:
+                md_lines.append(f"### [[{wp.slug}]] — {wp.title}")
+                md_lines.append(wp.content.strip())
+                md_lines.append("")
+
+        if payload.include_graph:
+            nt_summary = ", ".join(f"`{nt.name}`" for nt in cb.node_types)
+            q_summary = "\n".join(
+                f"- `{q.name}` ({q.label}): {q.description}" for q in cb.stored_queries
+            )
+            md_lines.extend(
+                [
+                    f"## Knowledge Graph Ontology ({cb.number} {cb.name})",
+                    "",
+                    f"- **Scope**: `{norm_scope}`",
+                    f"- **Node Types**: {nt_summary}",
+                    "- **References**: `references/schema.pg`, `references/queries.gq`",
+                    "",
+                    "### Stored Queries (`memory.graph_cookbook_query`)",
+                    q_summary,
+                    "",
+                ]
+            )
+            if graph_nodes:
+                md_lines.extend(["### Key Domain Entities & Claims", ""])
+                for gn in graph_nodes[:25]:
+                    summary_suffix = f" — {gn.summary}" if gn.summary else ""
+                    md_lines.append(f"- **[{gn.node_type}] {gn.name}** (`{gn.slug}`){summary_suffix}")
+                md_lines.append("")
+
+        skill_md_path = skills_root / "SKILL.md"
+        skill_md_path.write_text("\n".join(md_lines).strip() + "\n", encoding="utf-8")
+
+        return CreatedSkillResponse(
+            ok=True,
+            skill_name=skill_slug,
+            skill_dir=str(skills_root),
+            skill_md_path=str(skill_md_path),
+            scope=norm_scope,
+            cookbook_id=cb.id,
+            memories_included=len(mem_entries),
+            wiki_pages_included=len(wiki_pages),
+            graph_nodes_included=len(graph_nodes),
+            summary=(
+                f"Created skill '/{skill_slug}' at {skill_md_path} "
+                f"({len(mem_entries)} memories, {len(wiki_pages)} wiki pages, {len(graph_nodes)} graph nodes)."
+            ),
+        )
 
     def build_prompt_snapshot(
         self,

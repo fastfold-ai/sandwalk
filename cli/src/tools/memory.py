@@ -354,3 +354,52 @@ def graph_branch(
         "summary": f"Branch action '{act}' on '{name}' completed.",
         "branches": [b.model_dump(mode="json", by_alias=True) for b in branches],
     }
+
+
+@registry.register(
+    name="memory.create_skill",
+    description=(
+        "Crystallize curated Memories, Living Wiki pages, and Omnigraph Cookbook ontologies "
+        "into an installed Sandwalk Skill (~/.sandwalk/skills/<slug>/SKILL.md)."
+    ),
+    category="memory",
+    parameters={
+        "name": "Human-readable title or slug for the new skill (e.g. 'Oral GLP-1R Discovery')",
+        "slug": "Optional kebab-case skill identifier (e.g. 'oral-glp1r-discovery')",
+        "description": "Short 1-sentence description of when agents should use this skill",
+        "scope": "Source brain scope ('global', 'project:<id>', or 'specialist:<id>')",
+        "topic": "Optional keyword filter to include only matching memories, wiki pages, and graph nodes",
+        "wiki_slug": "Optional specific Living Wiki page slug to turn into a skill",
+        "custom_instructions": "Optional extra step-by-step instructions to include in SKILL.md",
+    },
+    usage_guide=(
+        "Use when the user asks to turn what we know about a topic, a Living Wiki page, "
+        "or an Omnigraph Cookbook ontology into a reusable Skill (/skill-slug)."
+    ),
+)
+def create_skill_from_memory(
+    name: str,
+    slug: str = "",
+    description: str = "",
+    scope: str = "global",
+    topic: str = "",
+    wiki_slug: str = "",
+    custom_instructions: str = "",
+    **kwargs: Any,
+) -> dict[str, Any]:
+    from agent_server.models.memory import CreateSkillFromMemoryRequest
+
+    svc = _service()
+    res = svc.create_skill(
+        CreateSkillFromMemoryRequest(
+            scope=scope,
+            name=name,
+            slug=slug.strip() or None,
+            description=description.strip() or None,
+            topic=topic.strip() or None,
+            wiki_slug=wiki_slug.strip() or None,
+            custom_instructions=custom_instructions.strip() or None,
+        )
+    )
+    return res.model_dump(mode="json", by_alias=True)
+

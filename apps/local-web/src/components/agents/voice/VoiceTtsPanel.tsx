@@ -23,27 +23,27 @@ import {
   writeCapyVoiceAuto,
   writeCapyVoiceSpeed
 } from '@/lib/capy-voice'
+import { isTauri } from '@/lib/desktop'
 import {
   browserTtsStatus,
   cancelTts,
   cancelTtsModelDownload,
   deleteTtsModel,
+  type DictationDownloadProgress,
   downloadTtsModel,
-  setActiveTtsModel,
   getTtsStatus,
   listenTtsDownloadProgress,
   listenTtsSpeakProgress,
   playTtsAudio,
   publishTtsChanged,
+  setActiveTtsModel,
   speakTts,
   stopTtsPlayback,
-  type DictationDownloadProgress,
   type TtsModelStatus,
   type TtsStatus,
   verifyTtsModel,
   voiceTtsReady
 } from '@/lib/desktop-voice'
-import { isTauri } from '@/lib/desktop'
 import { pronounceForSpeech } from '@/lib/speakable-text'
 
 function voiceError(error: unknown) {

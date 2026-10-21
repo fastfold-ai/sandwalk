@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 
 import {
   CAPY_SHORTCUT_CHANGE_EVENT,
+  type CapyShortcut,
   capyShortcutSymbols,
-  readCapyShortcut,
-  type CapyShortcut
-} from '@/lib/capy-ui'
+  readCapyShortcut} from '@/lib/capy-ui'
 
 export function useCapyShortcut() {
   const [shortcut, setShortcut] = useState<CapyShortcut>(() => readCapyShortcut())

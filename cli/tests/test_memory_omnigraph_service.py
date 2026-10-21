@@ -768,3 +768,38 @@ def test_comprehensive_memory_omnigraph_capy_and_specialist_coverage(
         assert capy_distill_session(session_id="missing-id")["ok"] is False
         assert capy_distill_session(session_id=rich_sess.id, scope="global")["ok"] is True
 
+        # 7. Skill Crystallization (POST /v1/memory/skills/create, memory.create_skill, capy.create_skill_from_memory)
+        from tools.capy import capy_create_skill_from_memory
+        from tools.memory import create_skill_from_memory
+
+        route_skill = client.post(
+            "/v1/memory/skills/create",
+            json={
+                "scope": "global",
+                "name": "Oral GLP-1R Discovery Playbook",
+                "topic": "compound",
+                "customInstructions": "Always verify unbound Kp,uu and hERG IC50.",
+            },
+        )
+        assert route_skill.status_code == 201
+        assert route_skill.json()["skillName"] == "oral-glp-1r-discovery-playbook"
+        assert Path(route_skill.json()["skillMdPath"]).is_file()
+
+        tool_skill = create_skill_from_memory(
+            name="Vera PKPD Skill",
+            scope=f"specialist:{vera_id}",
+            description="Translational PK/PD rules and ontology.",
+        )
+        assert tool_skill["ok"] is True
+        assert Path(tool_skill["skillMdPath"]).is_file()
+
+        assert capy_create_skill_from_memory(name="")["ok"] is False
+        capy_skill = capy_create_skill_from_memory(
+            name="Global Brain Skill",
+            scope="global",
+            wiki_slug=wiki_list_res["pages"][0]["slug"] if wiki_list_res["pages"] else "",
+        )
+        assert capy_skill["ok"] is True
+        assert Path(capy_skill["skillMdPath"]).is_file()
+
+
