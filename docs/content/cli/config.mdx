@@ -1,6 +1,6 @@
 ---
 title: Config
-description: Read and set sandwalk config from the CLI.
+description: Read and set Sandwalk configuration from the CLI.
 ---
 
 ```bash
@@ -8,18 +8,19 @@ sandwalk config show
 sandwalk config set <key> <value>
 ```
 
-Config lives under `~/.sandwalk/` (see [Configuration](/configuration)).
+All configuration is stored in `~/.sandwalk/config.json` (see [Configuration](/configuration)).
 
-### Common keys
+## Common Configuration Keys
 
-| Key | Notes |
-|-----|--------|
-| `llm.provider` / `llm.model` | Active cloud / default model |
-| `agent.cli_sandbox` | CLI Local vs Modal (`builtin` / `modal`) — see [Sandbox](/cli/sandbox) |
-| `agent.plan_preview` | Plan mode flag (CLI sessions force off at start; `/plan` toggles) |
-| `sandbox.compute_type` | `cpu` / `gpu` |
-| `sandbox.gpu_class` | e.g. `T4` |
-| `sandbox.cpu_image` / `sandbox.gpu_image` | Modal base images |
-| `compute.modal_token_id` / `compute.modal_token_secret` | Modal auth |
-
-Prefer `/sandbox` and `/plan` in the interactive terminal when possible.
+| Key | Description |
+|-----|-------------|
+| `llm.provider` / `llm.model` | Default model provider and model ID |
+| `agent.cli_sandbox` | CLI sandbox backend (`builtin` for Local, `modal` for Modal Cloud) |
+| `sandbox.backend` | Web/Desktop default sandbox backend (`builtin` or `modal`) |
+| `sandbox.compute_type` | `cpu` or `gpu` |
+| `sandbox.gpu_class` | Modal GPU class (`T4`, `L4`, `A10`, `A100`, `H100`) |
+| `sandbox.cpu_image` / `sandbox.gpu_image` | Container base images for Modal sandboxes |
+| `memory.enabled` | Enable session-start Memory/Wiki/Omnigraph snapshots (`true` by default) |
+| `memory.global_cookbook` | Default Cookbook mode for Global Brain (`second-brain`) |
+| `memory.distiller.mode` | Post-run distillation mode (`hybrid`, `auto`, or `manual`) |
+| `memory.embeddings.provider` | Omnigraph vector embedding provider (`none`, `openrouter`, `openai`, `gemini`, `local_llama`) |

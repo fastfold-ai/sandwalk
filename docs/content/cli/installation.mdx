@@ -1,61 +1,53 @@
 ---
 title: Installation
-description: Install or upgrade the sandwalk CLI.
+description: Install or upgrade the Sandwalk CLI and desktop app.
 ---
 
-For the shortest path to a running stack, use the root [Quick Start](/quickstart).
+Requires Python 3.11+ on macOS or Linux.
 
-Requires Python 3.11+.
-
-## One-liner
+## 1. One-Liner Install (`sandwalk.sh/install.sh`)
 
 ```bash
-curl -fsSL https://sandwalk.sh/install | bash
-sandwalk --version
+curl -fsSL https://sandwalk.sh/install.sh | bash
+sandwalk setup
+sandwalk desktop
 ```
 
-Installs from the latest **stable** GitHub Release tag via `uv tool` (or pipx / pip).
+The installer detects macOS or Linux, bootstraps [`uv`](https://docs.astral.sh/uv/) if needed, installs `sandwalk` into an isolated tool environment from the latest GitHub Release tag (`git+https://github.com/fastfold-ai/sandwalk.git@<tag>#subdirectory=cli`), and puts `sandwalk` on your `PATH`.
 
-Pre-release / pin:
+- `sandwalk setup` walks through providers, API keys (or **Sign in with ChatGPT**), and a default model.
+- `sandwalk desktop` downloads and installs the native desktop app (`.dmg` on macOS or `.deb` on Ubuntu).
+
+### Pin a Version or Pre-Release
 
 ```bash
-# Newest release including pre-releases
-curl -fsSL https://sandwalk.sh/install | bash -s -- --pre
+# Install the newest release (including pre-releases)
+curl -fsSL https://sandwalk.sh/install.sh | bash -s -- --pre
 
-# Exact tag
-curl -fsSL https://sandwalk.sh/install | bash -s -- --version 0.0.1-rc.1
+# Install a specific release version
+curl -fsSL https://sandwalk.sh/install.sh | bash -s -- --version 0.1.11
+
+# Install from a specific git branch or commit
+curl -fsSL https://sandwalk.sh/install.sh | bash -s -- --ref main
 ```
 
-While `fastfold-ai/sandwalk` is private, authenticate GitHub first (`gh auth login` or `GITHUB_TOKEN`).
+---
 
-Fallback (raw script from the repo):
+## 2. Install from Source Checkout
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fastfold-ai/sandwalk/main/cli/install.sh | bash
+git clone https://github.com/fastfold-ai/sandwalk.git
+cd sandwalk/cli
+uv sync --extra all
+uv run sandwalk --version
 ```
 
-## uv / pip (after PyPI publish)
+---
 
-```bash
-uv tool install sandwalk
-# or: pipx install sandwalk
-# or: pip install sandwalk
-sandwalk --version
-```
-
-Optional science extras (from a git checkout or when published):
-
-```bash
-uv tool install "sandwalk[all]"
-# or: uv tool install "sandwalk[chemistry]"
-```
-
-## Upgrade
+## 3. Upgrade
 
 ```bash
 sandwalk upgrade
 ```
 
-Or re-run the curl installer to pick up the latest release.
-
-Then: [Terminal](/cli/terminal), [Serve](/cli/serve), or [Command reference](/cli/commands).
+Or re-run `curl -fsSL https://sandwalk.sh/install.sh | bash` to update to the latest release.

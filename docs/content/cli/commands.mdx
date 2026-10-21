@@ -1,49 +1,63 @@
 ---
 title: Command reference
-description: sandwalk CLI commands and interactive slash commands.
+description: Sandwalk CLI subcommands and interactive slash commands.
 ---
 
-| Command | Description | Docs |
-|---------|-------------|------|
-| `sandwalk` | Interactive terminal | [Terminal](/cli/terminal) |
-| `sandwalk "…"` | One-shot query | [One-shot](/cli/one-shot) |
-| `sandwalk serve` | API + Web UI | [Serve](/cli/serve) |
-| `sandwalk setup` | First-time wizard | [Quick Start](/quickstart) |
-| `sandwalk doctor` | Health checks | [Doctor](/cli/doctor) |
-| `sandwalk config show\|set` | Config | [Config](/cli/config) |
-| `sandwalk tool list` | Tool registry | [Tools](/cli/tools) |
-| `sandwalk skills …` | Skills | [Skills](/cli/skills) |
-| `sandwalk mcp list` | MCP servers | [MCPs](/mcps) |
-| `sandwalk data …` | Local datasets | [Data](/cli/data) |
-| `sandwalk sandbox …` | Sandbox backend helpers | [Sandbox](/cli/sandbox) |
-| `sandwalk --help` | Full flag list | |
-
-### Interactive slash commands
-
-| Slash | Description |
-|-------|-------------|
-| `/help` | List commands and shortcuts |
-| `/model` | Switch model / provider |
-| `/effort` | Set Effort / Fast (thinking) for the active model |
-| `/sandbox` | Pick Local / Modal compute (+ edit base image) |
-| `/plan` | Toggle Plan mode (sessions start in Agent mode) |
-| `/specialist` | Set / clear / list specialists |
-| `/usage` | Session token and cost usage |
-| `/tools` | Browse tools |
-| `/skills` | Installed skills |
-| `/skills-add` / `/skills-find` / `/skills-upgrade` / `/skills-remove` | Skill install lifecycle |
-| `/data` | Datasets |
-| `/keys` | API key status (`set-moonshot`, `set-compatible`, …) |
-| `/mcp` | MCP servers |
-| `/model-manager` | OpenAI-compatible profiles |
-| `/doctor` | Readiness diagnostics |
-| `/interrupt` | Stop active generation (`!` to force) |
-| `/export` / `/notebook` | Export transcript / Jupyter |
-| `/new` / `/sessions` / `/resume` | Session lifecycle |
-| `/exit` | Leave the terminal |
+## CLI Subcommands
 
 ```bash
-sandwalk --help
+sandwalk setup                    # providers, keys, default model
+sandwalk desktop                  # install the Mac app or Ubuntu .deb
+sandwalk                          # interactive session
+sandwalk "question"               # one-shot query
+sandwalk serve                    # local agent API on :8787
+sandwalk serve --host 0.0.0.0     # expose to the LAN (needs sandwalk auth)
+sandwalk auth                     # manage the API key for serve
+sandwalk login chatgpt            # use a ChatGPT Plus/Pro plan for OpenAI models
+sandwalk doctor                   # environment and configuration checks
+sandwalk eval                     # run Benchmarking suites headlessly
+sandwalk skills add fastfold-ai/skills
+sandwalk mcp list
+sandwalk sandbox status           # Local Sandbox or Modal Sandbox
+sandwalk data pull-all            # DepMap, MSigDB, STRING
+sandwalk tool list
+sandwalk upgrade
 ```
 
-More detail: [Terminal](/cli/terminal) · [Plan mode](/cli/plan) · [Sandbox](/cli/sandbox).
+| Command | Description | Guide |
+|---------|-------------|-------|
+| `sandwalk` | Interactive terminal REPL | [Terminal](/cli/terminal) |
+| `sandwalk "…"` | One-shot query for scripts & CI | [One-shot](/cli/one-shot) |
+| `sandwalk serve` | Local agent API (`:8787`) | [Serve](/cli/serve) |
+| `sandwalk setup` | First-time provider & model wizard | [Quick Start](/quickstart) |
+| `sandwalk desktop` | Download & install macOS `.dmg` or Ubuntu `.deb` | [Desktop App](/apps/macos) |
+| `sandwalk login chatgpt` | Sign in with ChatGPT Plus/Pro OAuth | [Models](/models) |
+| `sandwalk eval` | Run Benchmarking suites headlessly | [Benchmarking](/benchmarking) |
+| `sandwalk doctor` | Environment & readiness checks | [Doctor](/cli/doctor) |
+| `sandwalk config show\|set` | Inspect or update `~/.sandwalk/config.json` | [Config](/cli/config) |
+| `sandwalk tool list` | Inspect the 190+ tool registry | [Tools](/cli/tools) |
+| `sandwalk skills …` | Find, add, upgrade, or list skills | [Skills](/cli/skills) |
+| `sandwalk mcp list` | List configured MCP servers | [MCPs](/mcps) |
+| `sandwalk data …` | Pull local corpora (DepMap, MSigDB, STRING) | [Data](/cli/data) |
+| `sandwalk sandbox …` | Local vs. Modal CPU/GPU sandbox helpers | [Sandbox](/cli/sandbox) |
+
+---
+
+## Interactive Slash Commands
+
+Type `/` inside `sandwalk` to open the command palette:
+
+| Command | What it does |
+|---------|--------------|
+| `/models`, `/effort` | Switch the model; set Low / Medium / High / Fast for models with thinking controls |
+| `/plan` | Toggle Plan mode (`plans/*.md` + Mermaid flowchart) |
+| `/sandbox` | Pick Local or a Modal CPU/GPU preset; edit the base image inline |
+| `/specialist` | Use, clear, or list Specialists (including starter personas & custom profiles) |
+| `/skills`, `/skills-add`, `/skills-find` | Loaded skills; install from GitHub or a path; search the catalog |
+| `/mcps` | Connect, enable, validate, add, or remove MCP servers |
+| `/tools`, `/data` | Tool status; local datasets |
+| `/usage`, `/compact` | Token and cost for the session; compress context |
+| `/sessions`, `/resume`, `/new` | List, resume, or start sessions |
+| `/export`, `/notebook` | Export transcript to Markdown; export session to `.ipynb` |
+| `/agents` | Run a question across N parallel agents |
+| `/doctor` | Readiness diagnostics with fix hints |
