@@ -73,7 +73,7 @@ export function SpecialistsEditorAppearanceFields({
           >
             <div className="space-y-2 p-2.5">
               <p className="text-muted-foreground px-1 text-[11px] font-medium uppercase tracking-wide">
-                O’Reilly Animal Presets
+                Presets
               </p>
               <div className="grid grid-cols-5 gap-1.5 px-1">
                 {PERSONA_CHARACTERS.map(char => (
@@ -105,7 +105,7 @@ export function SpecialistsEditorAppearanceFields({
             </div>
             <div className="border-t space-y-2 p-2.5">
               <p className="text-muted-foreground px-1 text-[11px] font-medium uppercase tracking-wide">
-                Accent Color
+                Accent color
               </p>
               <div className="flex flex-wrap gap-1.5 px-1">
                 {SPECIALIST_COLORS.map(color => (

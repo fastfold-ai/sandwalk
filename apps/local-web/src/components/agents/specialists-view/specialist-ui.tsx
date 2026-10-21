@@ -53,56 +53,56 @@ export const PERSONA_CHARACTERS: Array<{
 }> = [
   {
     id: 'capybara',
-    label: 'Capybara (O’Reilly Engraving)',
+    label: 'Capybara',
     archetype: 'Calm Polymath',
     imageUrl: '/avatars/capybara.jpg',
     accentColor: '#c9402c'
   },
   {
     id: 'owl',
-    label: 'Barn Owl (O’Reilly Engraving)',
+    label: 'Barn Owl',
     archetype: 'Skeptical Reviewer',
     imageUrl: '/avatars/owl.jpg',
     accentColor: '#0d9488'
   },
   {
     id: 'fox',
-    label: 'Red Fox (O’Reilly Engraving)',
+    label: 'Red Fox',
     archetype: 'Dreamer & Explorer',
     imageUrl: '/avatars/fox.jpg',
     accentColor: '#d97706'
   },
   {
     id: 'wolf',
-    label: 'Timber Wolf (O’Reilly Engraving)',
+    label: 'Timber Wolf',
     archetype: 'Ambitious Generalist',
     imageUrl: '/avatars/wolf.jpg',
     accentColor: '#1d74d8'
   },
   {
     id: 'badger',
-    label: 'Badger Builder (O’Reilly Engraving)',
+    label: 'Badger',
     archetype: 'Project Manager',
     imageUrl: '/avatars/badger.jpg',
     accentColor: '#ea580c'
   },
   {
     id: 'octopus',
-    label: 'Pacific Octopus (O’Reilly Engraving)',
+    label: 'Octopus',
     archetype: 'Protein & Systems Architect',
     imageUrl: '/avatars/octopus.jpg',
     accentColor: '#7c3aed'
   },
   {
     id: 'falcon',
-    label: 'Peregrine Falcon (O’Reilly Engraving)',
+    label: 'Falcon',
     archetype: 'Fast Computational Scientist',
     imageUrl: '/avatars/falcon.jpg',
     accentColor: '#16a34a'
   },
   {
     id: 'chameleon',
-    label: 'Chameleon (O’Reilly Engraving)',
+    label: 'Chameleon',
     archetype: 'Omics & Adaptation Analyst',
     imageUrl: '/avatars/chameleon.jpg',
     accentColor: '#4f46e5'
@@ -135,14 +135,14 @@ export const SPECIALIST_ICONS: Array<{
   label: string
   Icon: ComponentType<{ className?: string }>
 }> = [
-  { id: 'capybara' as SpecialistIcon, label: 'Capybara (O’Reilly)', Icon: Bot },
-  { id: 'owl' as SpecialistIcon, label: 'Barn Owl (O’Reilly)', Icon: Shield },
-  { id: 'fox' as SpecialistIcon, label: 'Red Fox (O’Reilly)', Icon: Sparkles },
-  { id: 'wolf' as SpecialistIcon, label: 'Timber Wolf (O’Reilly)', Icon: Bot },
-  { id: 'badger' as SpecialistIcon, label: 'Badger (O’Reilly)', Icon: Briefcase },
-  { id: 'octopus' as SpecialistIcon, label: 'Octopus (O’Reilly)', Icon: Dna },
-  { id: 'falcon' as SpecialistIcon, label: 'Falcon (O’Reilly)', Icon: Zap },
-  { id: 'chameleon' as SpecialistIcon, label: 'Chameleon (O’Reilly)', Icon: Microscope },
+  { id: 'capybara' as SpecialistIcon, label: 'Capybara', Icon: Bot },
+  { id: 'owl' as SpecialistIcon, label: 'Barn Owl', Icon: Shield },
+  { id: 'fox' as SpecialistIcon, label: 'Red Fox', Icon: Sparkles },
+  { id: 'wolf' as SpecialistIcon, label: 'Timber Wolf', Icon: Bot },
+  { id: 'badger' as SpecialistIcon, label: 'Badger', Icon: Briefcase },
+  { id: 'octopus' as SpecialistIcon, label: 'Octopus', Icon: Dna },
+  { id: 'falcon' as SpecialistIcon, label: 'Falcon', Icon: Zap },
+  { id: 'chameleon' as SpecialistIcon, label: 'Chameleon', Icon: Microscope },
   { id: 'capy-field' as SpecialistIcon, label: 'Meadow Capy', Icon: Heart },
   { id: 'agent', label: 'Agent', Icon: Bot },
   { id: 'organization', label: 'Organization', Icon: BarChart3 },
