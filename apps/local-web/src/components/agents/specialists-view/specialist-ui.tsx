@@ -228,7 +228,7 @@ export function resolvePersonaCharacter(
     const pool = PERSONA_CHARACTERS.slice(1, PERSONA_CHARACTERS.length - 1)
     return pool[hash % pool.length]
   }
-  return PERSONA_CHARACTERS[0] // Capybara O'Reilly engraving
+  return PERSONA_CHARACTERS[0]
 }
 
 export function SpecialistGlyph({

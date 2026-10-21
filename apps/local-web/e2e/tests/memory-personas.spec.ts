@@ -63,7 +63,7 @@ test.describe('Memory, Omnigraph Cookbooks, and Persona Specialists UI', () => {
     await expect(specialistChip).toBeVisible({ timeout: 15_000 })
     await expect(specialistChip).toContainText('Otium')
 
-    // Click the specialist chip to open the + menu Specialist flyout with O'Reilly animal icons
+    // Click the specialist chip to open the + menu Specialist flyout
     await specialistChip.locator('button').first().click()
     await expect(page.getByText('SPECIALIST', { exact: false }).first()).toBeVisible()
 

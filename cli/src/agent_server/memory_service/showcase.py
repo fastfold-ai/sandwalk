@@ -26,7 +26,7 @@ def _seed_global_second_brain_wiki(wiki: Any) -> None:
             "Welcome to your **Global Second Brain** (`06 Second brain`). These Markdown pages live on disk at "
             "`~/.sandwalk/memory/wiki/global/` and cross-link with `[[wikilinks]]`.\n\n"
             "## Personal Operating Manual\n"
-            "- [[user-operating-manual]] — Working style, engineering standards, hardware setup, and O’Reilly animal persona roster.\n"
+            "- [[user-operating-manual]] — Working style, engineering standards, hardware setup, and specialist persona roster.\n"
             "- [[model-routing-playbook]] — How Sandwalk routes chat, background distillation, and Omnigraph embeddings across Cloud & Local `llama.cpp`.\n"
             "- [[sandwalk-architecture-notes]] — Design notes on Hermes-style bounded `USER.md`/`MEMORY.md` snapshots and `.omni` Lance graphs.\n"
             "- [[oral-glp1r-program-brief]] — Active biotech research thread (`SW-204` vs `hERG` safety gate) led by **Otium** and **Soren**.\n"
@@ -35,8 +35,8 @@ def _seed_global_second_brain_wiki(wiki: Any) -> None:
     wiki.write_page(
         slug="user-operating-manual",
         scope="global",
-        title="User Preferences, Stack & Persona Roster",
-        summary="Julio’s coding standards, local-first preferences, and when to summon each O’Reilly animal persona.",
+        title="User Preferences, Stack & Specialist Roster",
+        summary="Julio’s coding standards, local-first preferences, and when to summon each specialist persona.",
         tags=["user", "preferences", "personas"],
         content=(
             "## Core Preferences (`USER.md`)\n"
@@ -138,7 +138,7 @@ def _seed_global_second_brain_graph(graph: Any) -> None:
         (
             "Note",
             "note-user-preferences",
-            "User Operating Manual: Direct answers, 90% coverage gate, O’Reilly animal personas",
+            "User Operating Manual: Direct answers, 90% coverage gate, Specialist personas",
             "Core working preferences mirrored in USER.md and [[user-operating-manual]].",
             ["preferences", "workflow"],
             "wiki:user-operating-manual",
@@ -440,7 +440,7 @@ def seed_end_to_end_showcase(
                 ["preferences", "engineering"],
             ),
             (
-                "Persona roster preference: use O’Reilly animal woodcut personas — Otium (Capybara, Relaxed), Soren (Owl, Skeptical Reviewer), Nova (Fox, Dreamer), Milo (Badger, PM), Atlas (Wolf, Generalist).",
+                "Specialist roster preference: use starter personas — Otium (Relaxed), Soren (Skeptical Reviewer), Nova (Dreamer), Milo (Project Manager), Atlas (Ambitious Generalist).",
                 ["preferences", "personas"],
             ),
             (

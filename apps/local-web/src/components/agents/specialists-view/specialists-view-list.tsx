@@ -508,7 +508,7 @@ export function SpecialistsListView({
                   </div>
                   <div>
                     <label className="text-muted-foreground text-[11px] font-medium">
-                      O’Reilly Animal Portrait Preset
+                      Avatar Preset
                     </label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {PERSONA_CHARACTERS.map(char => (
