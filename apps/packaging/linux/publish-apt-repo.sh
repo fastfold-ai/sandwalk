@@ -114,7 +114,15 @@ ensure_section() {
 
 for deb in "$@"; do
   packaged="$(ensure_section "$deb")"
-  echo "==> Adding $(basename "$deb")"
+  pkg_name="$(dpkg-deb -f "$packaged" Package 2>/dev/null || echo sandwalk)"
+  pkg_arch="$(dpkg-deb -f "$packaged" Architecture 2>/dev/null || true)"
+  echo "==> Adding $(basename "$deb") (${pkg_name} ${pkg_arch})"
+  if [[ -n "$pkg_arch" ]]; then
+    reprepro -b "$ROOT" -A "$pkg_arch" remove stable "$pkg_name" 2>/dev/null || true
+  else
+    reprepro -b "$ROOT" remove stable "$pkg_name" 2>/dev/null || true
+  fi
+  reprepro -b "$ROOT" deleteunreferenced 2>/dev/null || true
   reprepro -b "$ROOT" includedeb stable "$packaged"
 done
 
