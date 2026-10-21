@@ -43,12 +43,12 @@ def _seed_global_second_brain_wiki(wiki: Any) -> None:
             "- **Environment**: macOS Apple Silicon workstation running Sandwalk (`:8787` FastAPI + `:1420` Vite/Tauri + `:9931` local `llama.cpp`).\n"
             "- **Engineering Bar**: Always run `scripts/verify.sh`, maintain `>= 90%` test coverage, keep UI responsive, and never log secrets.\n"
             "- **Knowledge Style**: Prefer structured Living Wiki pages (linked from [[index]]) and explicit `Supports` / `Contradicts` edges in Omnigraph over raw chat transcripts.\n\n"
-            "## Persona Roster\n"
-            "- **Otium (`Relaxed` Capybara)**: Calm synthesis, de-escalating complexity, and Living Wiki curation.\n"
-            "- **Soren (`Skeptical Reviewer` Barn Owl)**: Red-team audits, `Contradicts` claims, and statistical/safety gates (see [[oral-glp1r-program-brief]]).\n"
-            "- **Nova (`Dreamer` Red Fox)**: Divergent hypotheses and early weak-signal exploration.\n"
-            "- **Milo (`Project Manager` Badger)**: Milestones, decisions, and action items.\n"
-            "- **Atlas (`Ambitious Generalist` Timber Wolf)**: High-agency full-stack and scientific execution.\n"
+            "## Specialist Roster\n"
+            "- **Otium (`Relaxed`)**: Calm synthesis, de-escalating complexity, and Living Wiki curation.\n"
+            "- **Soren (`Skeptical Reviewer`)**: Red-team audits, `Contradicts` claims, and statistical/safety gates (see [[oral-glp1r-program-brief]]).\n"
+            "- **Nova (`Dreamer`)**: Divergent hypotheses and early weak-signal exploration.\n"
+            "- **Milo (`Project Manager`)**: Milestones, decisions, and action items.\n"
+            "- **Atlas (`Ambitious Generalist`)**: High-agency full-stack and scientific execution.\n"
         ),
     )
     wiki.write_page(
