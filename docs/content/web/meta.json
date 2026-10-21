@@ -1,12 +1,13 @@
 {
-  "title": "Web UI",
+  "title": "Workspace & Web UI",
   "pages": [
     "composer",
     "capy-and-grids",
     "plan-mode",
-    "multimodal",
+    "library",
     "projects",
     "artifacts",
+    "multimodal",
     "terminal"
   ]
 }

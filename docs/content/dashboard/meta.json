@@ -1,0 +1,10 @@
+{
+  "title": "Dashboard & Settings",
+  "pages": [
+    "overview",
+    "context",
+    "sandbox",
+    "runtime-and-security",
+    "operations"
+  ]
+}

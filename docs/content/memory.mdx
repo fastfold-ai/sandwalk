@@ -24,7 +24,22 @@ Sandwalk turns everyday sessions into a structured, self-improving local knowled
 
 ---
 
-## Living Markdown Wiki (`Preview` / `Split` / `Edit` + `Full Screen`)
+## 1. Memories (`MEMORY.md` & `USER.md`)
+
+When you open **Dashboard → Memory & Wiki** (`/dashboard/memory`), you land on the **Memories** tab:
+
+- **Scope Selector (Top Right)**: Switch between **Global Brain (Personal & Lab)**, any **Project Brain (`project:<id>`)**, or any **Specialist Brain (`specialist:<id>`)**.
+- **Quick Add & Session Distiller Bar**:
+  - Choose `MEMORY.md (<scope>)` or `USER.md (About You)`, type a rule or preference, and click **Add Memory**.
+  - Or pick any recent conversation from **Distill from chat session…** and click **Distill** to extract durable memories, a Living Wiki brief, and Knowledge Graph claims automatically.
+- **Two-Column Split**:
+  - **Left (`MEMORY.md`)**: Workspace and persona operating rules (`2,200` char budget).
+  - **Right (`USER.md`)**: Personal profile, role, and communication preferences (`1,375` char budget).
+- **Pending Write Approvals**: When `write_approval` is enabled, agent-proposed memory additions appear in an amber banner at the top with one-click **Approve** and **Reject** actions.
+
+---
+
+## 2. Living Markdown Wiki (`Preview` / `Split` / `Edit` + `Full Screen`)
 
 <div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
   <img
@@ -41,7 +56,7 @@ Sandwalk turns everyday sessions into a structured, self-improving local knowled
 
 ---
 
-## Versioned Knowledge Graph with Omnigraph (`01–06` Cookbooks)
+## 3. Versioned Knowledge Graph & Cookbook Modes (`01–06`)
 
 <div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
   <img
@@ -51,7 +66,17 @@ Sandwalk turns everyday sessions into a structured, self-improving local knowled
   />
 </div>
 
-Sandwalk ships with six runnable [Omnigraph](https://www.omnigraph.dev/) Cookbooks. Each Cookbook defines a 3-layer `.pg` ontology schema, linted `.gq` stored queries, and a starter graph seed:
+The **Knowledge Graph** tab opens directly on the interactive **Level 2 · Instance Graph** (with **Level 1 · Ontology Blueprint** available as a toggle to inspect `.pg` node layers and property definitions).
+
+### Six Runnable Cookbook Modes (`Cookbook Modes` Tab)
+
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/memory-cookbooks.png"
+    alt="Six runnable Omnigraph Cookbook Modes (01 Industry intel through 06 Second brain)"
+    className="w-full"
+  />
+</div>
 
 | Mode | Focus | Core Node Types |
 |---|---|---|
@@ -64,17 +89,17 @@ Sandwalk ships with six runnable [Omnigraph](https://www.omnigraph.dev/) Cookboo
 
 ---
 
-## Automatic Build-Up & Conversational Management
+## 4. Local Omnigraph Engine & Governance Settings (`⚙️ Settings`)
 
-Knowledge builds up both **automatically** as you work and **on command** through any chat agent or **Capy**:
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/memory-settings.png"
+    alt="Local Omnigraph Engine installer and Models & User Control settings"
+    className="w-full"
+  />
+</div>
 
-- **Automatic Post-Run Distillation**: When a substantive chat turn completes (`run.completed`) and `memory.distiller.mode` is `hybrid` (default) or `auto`, Sandwalk spawns a background daemon thread (`_auto_distill_after_run`) that extracts high-signal conclusions, decisions, and supporting/contradicting claims into `MEMORY.md`, a Living Wiki page, and the `.omni` Knowledge Graph. If your local `llama.cpp` GPU is busy, distillation automatically defers.
-- **Always-On Core Agent Tools (`memory.*`)**:
-  - `memory.mutate` — Add, patch, or remove entries in `USER.md`, `MEMORY.md`, or `PRIORS.md`.
-  - `memory.session_search` — Full-text search (SQLite FTS5) across past session transcripts.
-  - `memory.wiki_list`, `memory.wiki_read`, `memory.wiki_write` — Read and write Living Wiki `.md` pages with `[[wikilinks]]`.
-  - `memory.select_cookbook`, `memory.graph_upsert_node`, `memory.graph_record_claim`, `memory.graph_cookbook_query`, `memory.graph_branch` — Query or mutate the Omnigraph and manage `review/*` branches.
-  - `memory.distill_session` — Distill any session on demand.
-  - `memory.create_skill` — Crystallize a scope's Memories, Living Wiki pages, and Omnigraph Ontology into an installed Sandwalk Skill (`~/.sandwalk/skills/<slug>/SKILL.md`).
-- **Capy Meta-Agent Tools (`capy.*`)**:
-  - `capy.memory_manage`, `capy.memory_search`, `capy.wiki_digest`, `capy.distill_session`, and `capy.create_skill_from_memory`.
+Click **`⚙️ Settings`** in the **Memory & Wiki** tab bar to manage:
+
+- **1-Click Local Omnigraph Engine (`v0.13.0`)**: Installs `~/.sandwalk/bin/omnigraph` + `omnigraph-server`, generates the `~/.sandwalk/bin/sandwalk-omnigraph-mcp` stdio bridge, and syncs `schema.pg`, `queries.gq`, `SKILL.md`, and `data.jsonl` into `graph.omni`.
+- **Knowledge Distillation & Embedding Models**: Choose `Auto` (reuses the active chat model to keep prompt caches warm) or any configured Cloud, OpenRouter, or Local `llama.cpp` model, and configure governance toggles (`write_approval`, `graph_branch_on_write`, `defer_on_local_gpu`).

@@ -1,0 +1,35 @@
+---
+title: Integrations
+description: Connect Slack workspaces, Modal cloud GPUs, Hugging Face, LangSmith, and scientific APIs.
+---
+
+<div className="not-prose mb-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/dashboard-integrations.png"
+    alt="Dashboard Integrations: Boltz, Fastfold AI Cloud, Modal, Slack, Vercel, Hugging Face, IBM RXN, Lambda Labs, and LangSmith"
+    className="w-full"
+  />
+</div>
+
+**Dashboard → Integrations** (`/dashboard/integrations`) connects external services, cloud compute providers, communication channels, and scientific APIs. Credentials are stored locally on your machine in `~/.sandwalk/config.json` and automatically injected into matching tools, skills, and catalog MCP servers.
+
+## Featured & Supported Integrations
+
+| Integration | Category | What it powers |
+|-------------|----------|----------------|
+| **Modal** | Agent Runtime & Compute | On-demand cloud CPU and GPU sandboxes (`T4`, `L4`, `A10`, `A100`, `H100`) for code execution and structure prediction |
+| **Slack** | Communication | Connect a Slack workspace via Socket Mode / Relay Agent so team members can message Sandwalk agents in channels or DMs |
+| **Boltz** | Scientific API | Biomolecular structure, binding affinity, design, and screening workflows |
+| **Fastfold AI Cloud** | Scientific API | Hosted folding, docking, and high-throughput bio-compute skills |
+| **Vercel (`skills.sh`)** | Skills | Token for high-rate catalog discovery and security audit lookups on [skills.sh](https://skills.sh) |
+| **Hugging Face** | Data & MCP | Hub access token for gated weights/datasets and the Hugging Face MCP server (Models, Spaces, papers, docs) |
+| **IBM RXN** | Scientific API | AI-driven chemical retrosynthesis and forward reaction prediction |
+| **Lambda Labs** | Compute | Dedicated multi-GPU cloud instances for training and large-scale inference |
+| **LangSmith** | Observability | Optional LangChain / Deep Agents trace logging and run inspection |
+| **Lens.org / NCBI / ChEMBL** | Literature & Patents | High-rate API keys for patent landscapes, PubMed E-utilities, and bioactivity queries |
+
+## How to Configure an Integration
+
+1. Open **Dashboard → Integrations** and filter by **Status** (`All`, `Configured`, `Not configured`) or **Category** (`Featured`, `API`, `Agent Runtime`, `Communication`, `Compute`, `Data`, `Observability`, `Skills`).
+2. Click any integration card to open its setup view.
+3. Paste your API key or token (or use the 1-click OAuth / manifest wizard for **Slack** and **Fastfold AI Cloud**), click **Validate / Save**, and toggle the integration **On**.

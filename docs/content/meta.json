@@ -4,13 +4,16 @@
     "quickstart",
     "apps",
     "web",
-    "cli",
+    "dashboard",
     "specialists",
     "memory",
     "skills",
+    "tools-and-datasets",
+    "integrations",
     "mcps",
     "models",
     "benchmarking",
+    "cli",
     "configuration"
   ]
 }

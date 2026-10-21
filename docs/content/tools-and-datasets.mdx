@@ -1,0 +1,43 @@
+---
+title: Tools & Scientific Datasets
+description: Manage 236 built-in workspace, memory, and scientific tools plus local reference corpora.
+---
+
+## 1. Tools (`/dashboard/tools`)
+
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/dashboard-tools.png"
+    alt="Dashboard Tools: 236 built-in tools filtered by Core vs Extra tier and scientific category"
+    className="w-full"
+  />
+</div>
+
+**Dashboard → Tools** manages the 236 built-in tools registered in Sandwalk:
+
+- **Core Tools (`Core`, always on)**: Essential workspace, file, environment, literature/target lookup, and **`memory.*`** tools (`memory.mutate`, `memory.session_search`, `memory.wiki_write`, `memory.graph_record_claim`, `memory.create_skill`, etc.).
+- **Domain Extra Tools (`Extra`, opt-in)**: Specialized tools across 20+ scientific and engineering categories (`biomarker`, `chemistry`, `clinical`, `dna`, `genomics`, `imaging`, `literature`, `network`, `omics`, `protein`, `single_cell`, `statistics`, `structure`, `target`).
+- **Filtering & Bulk Actions**: Filter by **Tier** (`All`, `Core`, `Extra`), **Status** (`Enabled`, `Disabled`), or **Category**, or scope specific tool allowlists to individual **[Specialists](/specialists)** so everyday chats keep a lean prompt budget.
+
+---
+
+## 2. Scientific Datasets (`/dashboard/datasets`)
+
+<div className="not-prose my-6 overflow-hidden rounded-xl border border-fd-border">
+  <img
+    src="/images/dashboard-datasets.png"
+    alt="Dashboard Datasets: local DepMap, PRISM, L1000, MSigDB, STRING, and AlphaFold corpora"
+    className="w-full"
+  />
+</div>
+
+**Dashboard → Datasets** manages local scientific reference corpora stored under `~/.sandwalk/data/` (also accessible via `sandwalk data pull-all` or `/data` in the CLI):
+
+| Dataset | Mode | Contents |
+|---------|------|----------|
+| **`depmap`** | Auto-download | DepMap CRISPR gene dependencies, mutations, and cell-line metadata (24Q4, ~550 MB) |
+| **`prism`** | Auto-download | PRISM Repurposing cell-viability screening LFC table (~79 MB) |
+| **`msigdb`** | Auto-download | MSigDB gene set collections: Hallmark, KEGG, Reactome, and GO (~9.5 MB) |
+| **`string`** | Auto-download | Human STRING protein–protein interaction network and confidence scores (~79 MB) |
+| **`l1000`** | Manual / script | L1000 landmark gene expression signatures (978 genes, ~2.6 GB) |
+| **`alphafold`** | On-demand | AlphaFold predicted protein structures fetched automatically per UniProt ID by `structure.alphafold_fetch` |
