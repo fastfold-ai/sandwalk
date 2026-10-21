@@ -135,7 +135,8 @@ flowchart LR
 | **Capy & Multi-Agent Grids** | Built-in meta-agent (**Capy**) that spawns parallel sessions, arranges split grids, seeds briefs across chats, manages memory/wiki/graph, and runs diagnostics or benchmarks by voice or text. |
 | **Customizable Specialists** | Starter personas (**Otium**, **Atlas**, **Nova**, **Milo**, **Soren**) and scientific specialists—or create your own (`+ New specialist`) with custom priors (`PRIORS.md`), model, skills, MCPs, and brain. |
 | **Memory, Wiki & Omnigraph** | Automatic post-run distillation into bounded `USER.md`/`MEMORY.md` snapshots, a full-screen Markdown Wiki with live preview & `[[wikilinks]]`, and a Lance-backed `.omni` Knowledge Graph with 6 Cookbook Modes (`01–06`). |
-| **Skills & 1-Click MCPs** | Install public skills from [skills.sh](https://skills.sh), attach 1-click MCP servers, or crystallize your own project's Memory, Wiki, and Ontology into a reusable `/skill`. |
+| **Skills & 1-Click MCPs** | Install public skills from [skills.sh](https://skills.sh) (including NVIDIA's `/tao-run-on-slurm`), attach 1-click MCP servers, or crystallize your own project's Memory, Wiki, and Ontology into a reusable `/skill`. |
+| **Automations & Remote-SSH** | Schedule recurring or event-driven agent workflows (`sandwalk cron` / **Automations**) and connect to remote Linux, macOS, or HPC servers over SSH (`sandwalk ssh` / **SSH**) with automatic user-space Sandwalk installation and persistent 24/7 background daemons. |
 | **Local & Cloud GPU Sandboxes** | Execute code locally or on Modal CPU/GPU containers (`T4`, `L4`, `A10`, `A100`, `H100`). Every plot, 3D molecular structure, report, or `.ipynb` notebook lands beside the session, ready to publish to `sandwalk.site`. |
 | **Scientific & Harness Evals** | 190+ built-in tools (PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, DepMap, MSigDB, STRING) plus end-to-end harness benchmarking (`sandwalk eval`) across MMLU-Pro, LiveCodeBench, BixBench, and Bio-Capybara. |
 
@@ -188,6 +189,16 @@ flowchart LR
 <td colspan="2" valign="top">
 <img src="images/omnigraph.png" alt="Omnigraph Knowledge Graph explorer with Cookbook modes, Supports/Contradicts edges, and branches" width="100%"><br>
 <sub><strong>Versioned Knowledge Graph with Omnigraph.</strong> Six runnable Cookbook modes (01–06), supporting vs. contradicting claims, Git-style hypothesis branches, and one-click Skill crystallization.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="images/automations.png" alt="Automations hub with scheduled workflows and starter templates" width="100%"><br>
+<sub><strong>Always-on Automations.</strong> Schedule recurring or one-shot agent workflows (<code>every 15m</code>, <code>daily at 9am</code>, cron, or webhooks) in a fresh session or the same thread.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="images/ssh.png" alt="SSH server manager with 1-click remote auto-install and tunneling" width="100%"><br>
+<sub><strong>1-Click Remote-SSH.</strong> Connect to any Linux, macOS, or GPU server over SSH—Sandwalk installs automatically in user space and keeps running 24/7 after you disconnect.</sub>
 </td>
 </tr>
 <tr>

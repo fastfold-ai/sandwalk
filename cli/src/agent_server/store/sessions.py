@@ -14,7 +14,19 @@ DEFAULT_SESSION_TITLE = "New research session"
 
 # Connector / origin values a session row may carry. Mirrors ``SessionSource``
 # in ``models/sessions.py`` and the normalizer in ``store/rows.py``.
-SESSION_SOURCES = frozenset({"slack", "bench", "capy", "claude", "codex", "opencode", "fx", "hermes"})
+SESSION_SOURCES = frozenset(
+    {
+        "slack",
+        "bench",
+        "capy",
+        "automation",
+        "claude",
+        "codex",
+        "opencode",
+        "fx",
+        "hermes",
+    }
+)
 
 
 def initial_title_source(title: str | None) -> TitleSource:
@@ -55,6 +67,8 @@ class SessionCreateMixin:
         provider: str | None = None,
         model: str | None = None,
         openai_profile_id: str | None = None,
+        snoozed: bool | None = None,
+        automation_id: str | None = None,
     ) -> AgentSession:
         return self.ensure_session(
             str(uuid.uuid4()),
@@ -69,6 +83,8 @@ class SessionCreateMixin:
             provider=provider,
             model=model,
             openai_profile_id=openai_profile_id,
+            snoozed=snoozed,
+            automation_id=automation_id,
         )
 
     def ensure_session(
@@ -86,6 +102,8 @@ class SessionCreateMixin:
         provider: str | None = None,
         model: str | None = None,
         openai_profile_id: str | None = None,
+        snoozed: bool | None = None,
+        automation_id: str | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> AgentSession:
@@ -165,6 +183,8 @@ class SessionCreateMixin:
             source=normalized_source,  # type: ignore[arg-type]
             source_label=(source_label or "").strip() or None,
             client_surface=surface,  # type: ignore[arg-type]
+            snoozed=bool(snoozed),
+            automation_id=(automation_id or "").strip() or None,
             last_message_at=None,
             created_at=created,
             updated_at=updated,
@@ -176,9 +196,9 @@ class SessionCreateMixin:
                     id, title, title_source, status, organize_label, project_id,
                     specialist_id, sandbox_backend, provider, model,
                     openai_profile_id, workspace_path, source, source_label,
-                    client_surface, last_message_at, created_at, updated_at
+                    client_surface, snoozed, automation_id, last_message_at, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session.id,
@@ -196,6 +216,8 @@ class SessionCreateMixin:
                     session.source,
                     session.source_label,
                     session.client_surface,
+                    1 if session.snoozed else 0,
+                    session.automation_id,
                     None,
                     session.created_at.isoformat(),
                     session.updated_at.isoformat(),

@@ -6,6 +6,7 @@ import {
   AgentSandboxView,
   AgentSecurityView,
   AppearanceView,
+  AutomationsView,
   BenchView,
   DataView,
   DoctorView,
@@ -15,6 +16,7 @@ import {
   MemoryView,
   ModelsView,
   SandboxListView,
+  SshView,
   StorageView,
   ToolsView,
   VoiceView
@@ -149,6 +151,20 @@ export function DashboardMainSettingsPanels(props: DashboardMainViewsProps) {
         activeProjectId={activeProjectId}
       />
     )
+  }
+
+  if (dashboardSection === 'automations') {
+    return (
+      <AutomationsView
+        client={client}
+        projects={projects}
+        specialists={specialists}
+      />
+    )
+  }
+
+  if (dashboardSection === 'ssh') {
+    return <SshView client={client} />
   }
 
   if (isDashboardAgentSandbox) {

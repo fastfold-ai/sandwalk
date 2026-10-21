@@ -17,7 +17,8 @@ const FEATURED_SKILL_NAMES = new Set([
   'modal-gpu-experiment',
   'sub-agents',
   'omnigraph',
-  'knowledge-steward'
+  'knowledge-steward',
+  'tao-run-on-slurm'
 ])
 
 const SKILL_ICON_BY_NAME: Record<
@@ -26,6 +27,7 @@ const SKILL_ICON_BY_NAME: Record<
 > = {
   omnigraph: { src: '/integrations/omnigraph.png', invertInDark: false },
   'knowledge-steward': { src: '/integrations/omnigraph.png', invertInDark: false },
+  'tao-run-on-slurm': { src: '/suggestions/nvidia.png', invertInDark: false },
   boltz: { src: '/pipelines/boltzgen.svg', invertInDark: true },
   diagrams_mermaid: { src: '/mermaid-logo.png' },
   slack_report: { src: '/integrations/slack.png' },
@@ -60,9 +62,11 @@ export function isFeaturedSkill(
   return (
     author.includes('fastfold') ||
     author === 'sandwalk' ||
+    author.includes('nvidia') ||
     author.includes('firecrawl') ||
     source === 'bundled' ||
     source.includes('fastfold-ai') ||
+    source.includes('nvidia/skills') ||
     source.includes('firecrawl/anydoc') ||
     source.includes('modal-projects/modal-auto-research-skills')
   )
@@ -83,6 +87,14 @@ function inferredSkillIcon(
     source.includes('huggingface')
   ) {
     return '/integrations/huggingface.png'
+  }
+  if (
+    name.startsWith('tao-') ||
+    name.includes('slurm') ||
+    author.includes('nvidia') ||
+    source.includes('nvidia')
+  ) {
+    return '/suggestions/nvidia.png'
   }
   if (isBundledSkill(skill)) return SANDWALK_MARK
   return null

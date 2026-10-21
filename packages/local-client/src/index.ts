@@ -28,6 +28,15 @@ import type {
   PendingMemoryWrite,
   WikiPageDetail,
   WikiPageSummary,
+  Automation,
+  AutomationRun,
+  AutomationSessionMode,
+  AutomationTemplate,
+  SshConnectResponse,
+  SshExecResponse,
+  SshHost,
+  SshProbeResult,
+  SshSlurmStatusResponse,
   UseLibraryInChatResult,
   AgentCatalogLeaderboard,
   AgentCatalogLeaderboardView,
@@ -4442,6 +4451,284 @@ export class LocalAgentClient
     return this.request('/memory/skills/create', {
       method: 'POST',
       body: JSON.stringify(payload),
+      signal
+    })
+  }
+
+  // --- Automations (Cron & Event Schedules) ---
+
+  async listAutomationTemplates(
+    signal?: AbortSignal
+  ): Promise<AutomationTemplate[]> {
+    const res = await this.request<{ data: AutomationTemplate[] }>(
+      '/automations/templates',
+      { signal }
+    )
+    return res.data
+  }
+
+  async listAutomations(signal?: AbortSignal): Promise<Automation[]> {
+    const res = await this.request<{ data: Automation[] }>('/automations', {
+      signal
+    })
+    return res.data
+  }
+
+  getAutomation(id: string, signal?: AbortSignal): Promise<Automation> {
+    return this.request<Automation>(
+      `/automations/${encodeURIComponent(id)}`,
+      { signal }
+    )
+  }
+
+  createAutomation(
+    input: {
+      name?: string | null
+      description?: string | null
+      prompt?: string
+      command?: string | null
+      scheduleExpr?: string
+      sessionMode?: AutomationSessionMode
+      originSessionId?: string | null
+      specialistId?: string | null
+      projectId?: string | null
+      workdir?: string | null
+      sshHostId?: string | null
+      remoteWorkdir?: string | null
+      skillNames?: string[]
+      toolNames?: string[]
+      mcpServerIds?: string[]
+      providerPin?: string | null
+      modelPin?: string | null
+      continuity?: boolean
+      contextFrom?: string[]
+      wakeOnChangeOnly?: boolean
+      repeatLimit?: number | null
+      enabled?: boolean
+      templateId?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<Automation> {
+    return this.request<Automation>('/automations', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  updateAutomation(
+    id: string,
+    patch: {
+      name?: string | null
+      description?: string | null
+      prompt?: string | null
+      command?: string | null
+      clearCommand?: boolean
+      scheduleExpr?: string | null
+      sessionMode?: AutomationSessionMode | null
+      originSessionId?: string | null
+      clearOriginSessionId?: boolean
+      specialistId?: string | null
+      clearSpecialistId?: boolean
+      projectId?: string | null
+      clearProjectId?: boolean
+      workdir?: string | null
+      clearWorkdir?: boolean
+      sshHostId?: string | null
+      clearSshHostId?: boolean
+      remoteWorkdir?: string | null
+      clearRemoteWorkdir?: boolean
+      skillNames?: string[] | null
+      toolNames?: string[] | null
+      mcpServerIds?: string[] | null
+      providerPin?: string | null
+      modelPin?: string | null
+      clearModelPin?: boolean
+      continuity?: boolean | null
+      contextFrom?: string[] | null
+      wakeOnChangeOnly?: boolean | null
+      repeatLimit?: number | null
+      clearRepeatLimit?: boolean
+      enabled?: boolean | null
+    },
+    signal?: AbortSignal
+  ): Promise<Automation> {
+    return this.request<Automation>(
+      `/automations/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
+  async deleteAutomation(id: string, signal?: AbortSignal): Promise<void> {
+    await this.request(`/automations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      signal
+    })
+  }
+
+  triggerAutomation(
+    id: string,
+    input?: { context?: string | null; wait?: boolean },
+    signal?: AbortSignal
+  ): Promise<AutomationRun> {
+    return this.request<AutomationRun>(
+      `/automations/${encodeURIComponent(id)}/run`,
+      {
+        method: 'POST',
+        body: JSON.stringify(input ?? { wait: true }),
+        headers: { 'content-type': 'application/json' },
+        signal
+      }
+    )
+  }
+
+  async listAutomationRuns(
+    options?: { automationId?: string | null; limit?: number },
+    signal?: AbortSignal
+  ): Promise<AutomationRun[]> {
+    const params = new URLSearchParams()
+    if (options?.automationId) params.set('automation_id', options.automationId)
+    if (options?.limit) params.set('limit', String(options.limit))
+    const q = params.toString()
+    const res = await this.request<{ data: AutomationRun[] }>(
+      `/automations/runs${q ? `?${q}` : ''}`,
+      { signal }
+    )
+    return res.data
+  }
+
+  // --- SSH Manager & Remote-SSH Auto-Bootstrap ---
+
+  async listSshHosts(
+    includeSshConfig = true,
+    signal?: AbortSignal
+  ): Promise<SshHost[]> {
+    const params = new URLSearchParams({
+      include_ssh_config: includeSshConfig ? 'true' : 'false'
+    })
+    const res = await this.request<{ data: SshHost[] }>(
+      `/ssh/hosts?${params.toString()}`,
+      { signal }
+    )
+    return res.data
+  }
+
+  createSshHost(
+    input: {
+      target: string
+      alias?: string | null
+      port?: number | null
+      identityFile?: string | null
+      proxyJump?: string | null
+      remotePort?: number
+      defaultWorkdir?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<SshHost> {
+    return this.request<SshHost>('/ssh/hosts', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  async deleteSshHost(id: string, signal?: AbortSignal): Promise<void> {
+    await this.request(`/ssh/hosts/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      signal
+    })
+  }
+
+  probeSshHost(id: string, signal?: AbortSignal): Promise<SshProbeResult> {
+    return this.request<SshProbeResult>(
+      `/ssh/hosts/${encodeURIComponent(id)}/probe`,
+      { method: 'POST', signal }
+    )
+  }
+
+  getSshSlurmStatus(
+    id: string,
+    signal?: AbortSignal
+  ): Promise<SshSlurmStatusResponse> {
+    return this.request<SshSlurmStatusResponse>(
+      `/ssh/hosts/${encodeURIComponent(id)}/slurm`,
+      { signal }
+    )
+  }
+
+  connectAndBootstrapSsh(
+    input: {
+      hostIdOrTarget: string
+      alias?: string | null
+      password?: string | null
+      saveToSshConfig?: boolean
+      autoInstall?: boolean
+      startDaemon?: boolean
+      openTunnel?: boolean
+      enableWatchdog?: boolean
+      remotePort?: number | null
+      defaultWorkdir?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<SshConnectResponse> {
+    return this.request<SshConnectResponse>('/ssh/connect', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  getSshConfigFile(
+    signal?: AbortSignal
+  ): Promise<{ path: string; content: string }> {
+    return this.request<{ path: string; content: string }>('/ssh/config', {
+      signal
+    })
+  }
+
+  updateSshConfigFile(
+    content: string,
+    signal?: AbortSignal
+  ): Promise<{ path: string; content: string }> {
+    return this.request<{ path: string; content: string }>('/ssh/config', {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+      headers: { 'content-type': 'application/json' },
+      signal
+    })
+  }
+
+  disconnectSshTunnel(
+    id: string,
+    signal?: AbortSignal
+  ): Promise<{ closed: boolean }> {
+    return this.request<{ closed: boolean }>(
+      `/ssh/hosts/${encodeURIComponent(id)}/disconnect`,
+      { method: 'POST', signal }
+    )
+  }
+
+  execSshCommand(
+    input: {
+      hostIdOrTarget: string
+      command: string
+      workdir?: string | null
+      timeoutSeconds?: number
+    },
+    signal?: AbortSignal
+  ): Promise<SshExecResponse> {
+    return this.request<SshExecResponse>('/ssh/exec', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      headers: { 'content-type': 'application/json' },
       signal
     })
   }

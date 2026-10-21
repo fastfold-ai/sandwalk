@@ -1672,4 +1672,128 @@ def capy_memory_manage(
     return {"ok": False, "summary": f"Unsupported memory_manage operation: {operation}"}
 
 
+@registry.register(
+    name="capy.automation_manage",
+    description=(
+        "Create, list, pause, resume, run, complete, snooze/unsnooze, or remove scheduled "
+        "automations and cron workflows across local workspaces or SSH/Slurm servers."
+    ),
+    category="capy",
+    usage_guide=(
+        "Use when the user asks Capy to schedule a recurring agent workflow, set up a cron job, "
+        "watch a Slurm queue on an SSH cluster, or snooze/unsnooze an automated thread."
+    ),
+    parameters={
+        "action": "'create', 'list', 'get', 'update', 'pause', 'resume', 'run', 'complete', 'remove', 'snooze', 'unsnooze', or 'templates'",
+        "automation_id": "Automation ID or name",
+        "name": "Automation title",
+        "schedule": "Schedule expression (e.g. 'every 15m', 'daily at 9am', 'in 30m', '0 9 * * 1-5')",
+        "prompt": "Agent instructions for each scheduled run",
+        "command": "Optional shell/Slurm command (or sole command when session_mode='no_agent')",
+        "session_mode": "'fresh', 'continue', or 'no_agent'",
+        "session_id": "Origin session ID for 'continue' or snooze/unsnooze",
+        "specialist_id": "Optional Specialist slug or ID (e.g. 'otium-relaxed', 'ambitious-generalist')",
+        "ssh_host": "Optional SSH host alias or user@host target",
+        "remote_workdir": "Optional remote workspace path on the SSH server",
+        "continuity": "Boolean: carry previous run output forward to deduplicate reports",
+        "template_id": "Optional starter template ID (e.g. 'watch-slurm-queue')",
+    },
+)
+def capy_automation_manage(
+    action: str = "list",
+    automation_id: str = "",
+    name: str = "",
+    schedule: str = "every 1h",
+    prompt: str = "",
+    command: str = "",
+    session_mode: str = "fresh",
+    session_id: str = "",
+    specialist_id: str = "",
+    ssh_host: str = "",
+    remote_workdir: str = "",
+    continuity: bool = False,
+    template_id: str = "",
+    **kwargs,
+) -> dict:
+    from tools.automations import automation_manage
+
+    return automation_manage(
+        action=action,
+        automation_id=automation_id,
+        name=name,
+        schedule=schedule,
+        prompt=prompt,
+        command=command,
+        session_mode=session_mode,
+        session_id=session_id,
+        specialist_id=specialist_id,
+        ssh_host=ssh_host,
+        remote_workdir=remote_workdir,
+        continuity=continuity,
+        template_id=template_id,
+        **kwargs,
+    )
+
+
+@registry.register(
+    name="capy.ssh_manage",
+    description=(
+        "Manage SSH servers, run remote commands or Slurm checks (`squeue`), sync files, "
+        "or auto-install and tunnel to a remote Sandwalk server over SSH."
+    ),
+    category="capy",
+    usage_guide=(
+        "Use when the user asks Capy to list SSH hosts, probe or connect to a Linux/HPC machine, "
+        "run a command over SSH, check Slurm jobs, or auto-install Sandwalk remotely."
+    ),
+    parameters={
+        "action": "'list', 'add', 'probe', 'exec', 'slurm', 'sync', or 'bootstrap'",
+        "host": "SSH host alias, ID, or 'user@host -p 22'",
+        "command": "Remote shell command when action='exec'",
+        "workdir": "Optional remote working directory",
+        "local_path": "Local path when action='sync'",
+        "remote_path": "Remote path when action='sync'",
+        "direction": "'push' or 'pull' when action='sync'",
+    },
+)
+def capy_ssh_manage(
+    action: str = "list",
+    host: str = "",
+    command: str = "",
+    workdir: str = "",
+    local_path: str = "",
+    remote_path: str = "",
+    direction: str = "push",
+    **kwargs,
+) -> dict:
+    from tools.automations import (
+        ssh_bootstrap_remote_tool,
+        ssh_exec_tool,
+        ssh_hosts_tool,
+        ssh_slurm_status_tool,
+        ssh_sync_tool,
+    )
+
+    act = str(action or "list").strip().lower()
+    if act in {"list", "add", "probe", "remove"}:
+        return ssh_hosts_tool(
+            action=act, target=host, default_workdir=workdir, **kwargs
+        )
+    if act == "exec":
+        return ssh_exec_tool(host=host, command=command, workdir=workdir)
+    if act == "slurm":
+        return ssh_slurm_status_tool(host=host)
+    if act == "sync":
+        return ssh_sync_tool(
+            host=host,
+            local_path=local_path,
+            remote_path=remote_path,
+            direction=direction,
+        )
+    if act in {"bootstrap", "connect"}:
+        return ssh_bootstrap_remote_tool(host=host, default_workdir=workdir)
+    return {"ok": False, "summary": f"Unknown capy.ssh_manage action: {act!r}"}
+
+
+
 

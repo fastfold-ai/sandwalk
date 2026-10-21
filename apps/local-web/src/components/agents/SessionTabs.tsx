@@ -200,8 +200,8 @@ export function SessionTabs({
   onCloseTerminal?: (terminalId: string) => void
   /** FAS-107 GF5: opens a new terminal from the tab-strip "+" menu. */
   onCreateTerminal?: () => void
-  /** "+" menu: open a terminal that starts Claude Code, Codex, OpenCode, or fx. */
-  onCreateAgentTerminal?: (kind: ExternalAgentKind) => void
+  /** "+" menu: open a terminal that starts Sandwalk CLI, Claude Code, Codex, OpenCode, fx, or Hermes. */
+  onCreateAgentTerminal?: (kind: ExternalAgentKind | 'sandwalk') => void
   /** FAS-107 GF-PARITY-5: parity actions for the terminal chip context menu. */
   onRenameTerminal?: (terminalId: string) => void
   onToggleTerminalOrganizeLabel?: (

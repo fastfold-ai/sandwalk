@@ -7,6 +7,7 @@ import type {
 } from '@sandwalk/agent-ui-core'
 import {
   Bell,
+  Bot,
   Globe2,
   Home,
   LayoutDashboard,
@@ -339,6 +340,14 @@ export function AgentSessionSidebar({
         >
           <LayoutDashboard className="size-3.5" />
           Dashboard
+        </button>
+        <button
+          type="button"
+          className="text-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px]"
+          onClick={() => navigate('/dashboard/automations')}
+        >
+          <Bot className="size-3.5" />
+          Automations
         </button>
         <button
           type="button"

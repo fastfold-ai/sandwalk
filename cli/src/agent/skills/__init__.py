@@ -108,6 +108,12 @@ SUGGESTED_SKILL_SOURCES = [
         "url": "https://github.com/huggingface/skills",
         "description": "Hub skills for models, datasets, training, evals, and Gradio",
     },
+    {
+        "provider": "NVIDIA",
+        "source": "NVIDIA/skills@skills/tao-run-on-slurm",
+        "url": "https://github.com/NVIDIA/skills/tree/main/skills/tao-run-on-slurm",
+        "description": "NVIDIA SLURM GPU cluster execution over SSH (tao-run-on-slurm)",
+    },
 ]
 
 # ─── GitHub releases + update cache ─────────────────────────────────────────

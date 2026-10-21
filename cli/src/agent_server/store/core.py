@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from agent_server.store.automations import AutomationMixin
 from agent_server.store.base import AgentStoreBase
 from agent_server.store.connectors import ConnectorMixin
 from agent_server.store.events import EventMixin
@@ -36,6 +37,7 @@ class AgentStore(
     TerminalSessionMixin,
     WorkspaceItemMixin,
     UsageMixin,
+    AutomationMixin,
     AgentStoreBase,
 ):
     """Small durable store shared by CLI and web transports.

@@ -25,6 +25,9 @@ class SessionUpdateMixin:
         model: str | None = None,
         openai_profile_id: str | None = None,
         update_llm: bool = False,
+        snoozed: bool | None = None,
+        automation_id: str | None = None,
+        update_automation_id: bool = False,
     ) -> AgentSession | None:
         current = self.get_session(session_id)
         if current is None:
@@ -77,6 +80,10 @@ class SessionUpdateMixin:
                     next_model = model.strip() or None
                 if openai_profile_id is not None:
                     next_profile = openai_profile_id.strip() or None
+        next_snoozed = current.snoozed if snoozed is None else bool(snoozed)
+        next_automation_id = (
+            (automation_id.strip() or None) if automation_id else None
+        ) if update_automation_id else current.automation_id
         now = utc_now()
         with self._write_lock, self._connect() as connection:
             connection.execute(
@@ -84,7 +91,7 @@ class SessionUpdateMixin:
                 UPDATE sessions
                 SET title = ?, title_source = ?, organize_label = ?, project_id = ?,
                     specialist_id = ?, sandbox_backend = ?, provider = ?, model = ?,
-                    openai_profile_id = ?, updated_at = ?
+                    openai_profile_id = ?, snoozed = ?, automation_id = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -97,6 +104,8 @@ class SessionUpdateMixin:
                     next_provider,
                     next_model,
                     next_profile,
+                    1 if next_snoozed else 0,
+                    next_automation_id,
                     now.isoformat(),
                     session_id,
                 ),

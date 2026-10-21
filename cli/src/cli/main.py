@@ -19,6 +19,9 @@ SUBCOMMANDS = {
     "auth",
     "mcp",
     "specialists",
+    "cron",
+    "automations",
+    "ssh",
     "sandbox",
     "serve",
     "sync",
@@ -43,6 +46,11 @@ SUBCOMMANDS = {
 
 def entry():
     """Package entry point."""
+    import platform
+
+    if platform.system() == "Linux" and platform.machine() in {"aarch64", "arm64"}:
+        os.environ.setdefault("OPENBLAS_CORETYPE", "ARMV8")
+
     # Support --offline flag: set env var before importing the app
     if "--offline" in sys.argv:
         os.environ["SANDWALK_FORCE_OFFLINE"] = "1"

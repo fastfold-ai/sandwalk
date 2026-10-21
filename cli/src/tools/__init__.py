@@ -66,6 +66,7 @@ _TOOL_MODULES = (
     "remote_data",
     "environment",
     "memory",
+    "automations",
 )
 
 

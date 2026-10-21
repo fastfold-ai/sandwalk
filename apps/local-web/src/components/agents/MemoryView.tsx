@@ -580,7 +580,7 @@ export function MemoryView({
 
   return (
     <div className="chat-scrollbar flex-1 overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 pt-6 pb-10 md:px-8 md:pt-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-6 pb-10 md:px-6 md:pt-8">
         {/* Single Clean Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">

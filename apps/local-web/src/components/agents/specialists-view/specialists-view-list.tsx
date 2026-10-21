@@ -230,7 +230,7 @@ export function SpecialistsListView({
     <div className="flex h-full min-h-0 flex-1 overflow-hidden">
       {/* Main Left Column: Agents & Personas Card Grid */}
       <div className="chat-scrollbar min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-5 pt-6 pb-10 md:px-8 md:pt-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-6 pb-10 md:px-6 md:pt-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">

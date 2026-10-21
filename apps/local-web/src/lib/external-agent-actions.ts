@@ -196,6 +196,44 @@ export async function convertTerminalToAgent(
 }
 
 /**
+ * Chat → "Continue in Sandwalk CLI": native 0-loss resume (`sandwalk --resume <sessionId>`)
+ * inside a new terminal tab, because Sandwalk CLI shares the same session store.
+ */
+export async function continueSessionInSandwalkCli(
+  session: AgentSession
+): Promise<TerminalSession | null> {
+  const bindings = bindingsOrWarn()
+  if (!bindings) return null
+  const { client, openItem } = bindings
+  const key = `handoff:${session.id}`
+  const actions = useExternalAgentActions.getState()
+  if (actions.busy[key]) return null
+  actions.setBusy(key, true)
+  try {
+    const { queueTerminalStartup } = await import('@/lib/terminal-startup')
+    const terminal = await client.createTerminal({
+      title: `Sandwalk CLI · ${session.title}`,
+      projectId: session.projectId,
+      workspacePath: session.workspacePath,
+      originChatId: session.id
+    })
+    useTerminalsStore.getState().addOptimistic({
+      ...terminal,
+      title: `Sandwalk CLI · ${session.title}`
+    })
+    queueTerminalStartup(terminal.id, `sandwalk --resume ${session.id}`)
+    openItem(terminal.id)
+    toast.success('Resumed session in Sandwalk CLI.')
+    return terminal
+  } catch (error) {
+    toast.error(errorText(error, 'Could not open Sandwalk CLI.'))
+    return null
+  } finally {
+    useExternalAgentActions.getState().setBusy(key, false)
+  }
+}
+
+/**
  * Chat → "Continue in <CLI>": write the handoff file (and, for Claude Code /
  * Codex with `native`, their own session file), open a terminal running the
  * CLI on it, and route to that terminal.

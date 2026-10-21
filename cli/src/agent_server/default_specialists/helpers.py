@@ -10,6 +10,8 @@ CORE_SKILLS: list[str] = [
     "skill-find",
     "scientific-writing",
     "slack_report",
+    "automate",
+    "ssh",
 ]
 
 

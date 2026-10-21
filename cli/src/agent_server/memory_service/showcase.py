@@ -28,7 +28,7 @@ def _seed_global_second_brain_wiki(wiki: Any) -> None:
             "## Personal Operating Manual\n"
             "- [[user-operating-manual]] — Working style, engineering standards, hardware setup, and specialist persona roster.\n"
             "- [[model-routing-playbook]] — How Sandwalk routes chat, background distillation, and Omnigraph embeddings across Cloud & Local `llama.cpp`.\n"
-            "- [[sandwalk-architecture-notes]] — Design notes on Hermes-style bounded `USER.md`/`MEMORY.md` snapshots and `.omni` Lance graphs.\n"
+            "- [[sandwalk-architecture-notes]] — Design notes on bounded `USER.md`/`MEMORY.md` snapshots and `.omni` Lance graphs.\n"
             "- [[oral-glp1r-program-brief]] — Active biotech research thread (`SW-204` vs `hERG` safety gate) led by **Otium** and **Soren**.\n"
         ),
     )

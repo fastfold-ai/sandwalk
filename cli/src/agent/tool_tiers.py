@@ -25,6 +25,12 @@ CORE_TOOL_NAMES: frozenset[str] = frozenset(
         "literature.pubmed_search",
         "data_api.uniprot_lookup",
         "data_api.opentargets_search",
+        "ops.automation_manage",
+        "ssh.hosts",
+        "ssh.exec",
+        "ssh.sync",
+        "ssh.slurm_status",
+        "ssh.bootstrap_remote",
     }
 )
 

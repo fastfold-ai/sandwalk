@@ -391,3 +391,101 @@ def apply_migrations(connection: sqlite3.Connection) -> None:
             CREATE INDEX IF NOT EXISTS usage_runs_kind_day ON usage_runs(kind, day);
             """
         )
+
+    session_columns_latest = {
+        row["name"] for row in connection.execute("PRAGMA table_info(sessions)").fetchall()
+    }
+    if "snoozed" not in session_columns_latest:
+        connection.execute(
+            "ALTER TABLE sessions ADD COLUMN snoozed INTEGER NOT NULL DEFAULT 0"
+        )
+    if "automation_id" not in session_columns_latest:
+        connection.execute("ALTER TABLE sessions ADD COLUMN automation_id TEXT")
+
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS automations (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            prompt TEXT NOT NULL DEFAULT '',
+            command TEXT,
+            schedule_expr TEXT NOT NULL DEFAULT 'every 1h',
+            schedule_kind TEXT NOT NULL DEFAULT 'interval',
+            schedule_label TEXT NOT NULL DEFAULT 'Every hour',
+            session_mode TEXT NOT NULL DEFAULT 'fresh',
+            origin_session_id TEXT,
+            specialist_id TEXT,
+            project_id TEXT,
+            workdir TEXT,
+            ssh_host_id TEXT,
+            remote_workdir TEXT,
+            skill_names TEXT NOT NULL DEFAULT '[]',
+            tool_names TEXT NOT NULL DEFAULT '[]',
+            mcp_server_ids TEXT NOT NULL DEFAULT '[]',
+            provider_pin TEXT,
+            model_pin TEXT,
+            continuity INTEGER NOT NULL DEFAULT 0,
+            context_from TEXT NOT NULL DEFAULT '[]',
+            wake_on_change_only INTEGER NOT NULL DEFAULT 0,
+            repeat_limit INTEGER,
+            run_count INTEGER NOT NULL DEFAULT 0,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            next_run_at TEXT,
+            last_run_at TEXT,
+            last_status TEXT NOT NULL DEFAULT 'idle',
+            last_error TEXT,
+            webhook_token TEXT,
+            template_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS automations_enabled_next
+            ON automations(enabled, next_run_at);
+
+        CREATE TABLE IF NOT EXISTS automation_runs (
+            id TEXT PRIMARY KEY,
+            automation_id TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+            session_id TEXT,
+            status TEXT NOT NULL DEFAULT 'running',
+            trigger_source TEXT NOT NULL DEFAULT 'schedule',
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            duration_seconds REAL,
+            output_excerpt TEXT,
+            output_path TEXT,
+            error TEXT,
+            was_catchup INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS automation_runs_automation_started
+            ON automation_runs(automation_id, started_at DESC);
+
+        CREATE TABLE IF NOT EXISTS ssh_hosts (
+            id TEXT PRIMARY KEY,
+            alias TEXT NOT NULL,
+            host TEXT NOT NULL,
+            user TEXT,
+            port INTEGER NOT NULL DEFAULT 22,
+            identity_file TEXT,
+            proxy_jump TEXT,
+            remote_port INTEGER NOT NULL DEFAULT 8787,
+            default_workdir TEXT,
+            status TEXT NOT NULL DEFAULT 'unknown',
+            platform TEXT,
+            arch TEXT,
+            hostname TEXT,
+            gpu_summary TEXT,
+            slurm_available INTEGER NOT NULL DEFAULT 0,
+            sandwalk_installed INTEGER NOT NULL DEFAULT 0,
+            sandwalk_version TEXT,
+            daemon_running INTEGER NOT NULL DEFAULT 0,
+            tunnel_local_port INTEGER,
+            tunnel_url TEXT,
+            last_connected_at TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+

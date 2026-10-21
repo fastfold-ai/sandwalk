@@ -785,7 +785,11 @@ export function AgentSessionMainPanel(props: AgentSessionMainPanelProps) {
               title: preset.title,
               projectId: activeProjectId ?? null
             })
-            addTerminalOptimistic({ ...term, title: preset.title, agent: kind })
+            addTerminalOptimistic({
+              ...term,
+              title: preset.title,
+              agent: kind === 'sandwalk' ? null : kind
+            })
             queueTerminalStartup(term.id, preset.command)
             openSessionTab(term.id)
             navigate(`/terminals/${term.id}`)
