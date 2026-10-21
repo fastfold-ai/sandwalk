@@ -12,8 +12,10 @@ import {
   TabContextSeparator,
   TabContextSubmenu
 } from '@/components/agents/tab-context-menu'
+import { SandwalkMark } from '@/components/SandwalkMark'
 import {
   continueSessionIn,
+  continueSessionInSandwalkCli,
   convertTerminalToAgent,
   convertTerminalToSession,
   launchExternalAgent,
@@ -45,6 +47,17 @@ export function ContinueInSubmenu({
   const enabled = (kind: ExternalAgentKind) => installed?.[kind] ?? true
   return (
     <TabContextSubmenu icon={<ArrowRightLeft />} label="Continue in…">
+      <TabContextItem
+        icon={<SandwalkMark className="size-3.5 shrink-0" />}
+        label="Sandwalk CLI"
+        disabled={busy}
+        trailing={<span className="text-muted-foreground text-[10px]">resume</span>}
+        onClick={() => {
+          onClose()
+          void continueSessionInSandwalkCli(session)
+        }}
+      />
+      <TabContextSeparator />
       {EXTERNAL_AGENT_KINDS.map(kind => (
         <TabContextItem
           key={kind}
@@ -106,7 +119,7 @@ export function NewTabMenu({
   menuRef: RefObject<HTMLDivElement | null>
   onCreateSession: () => void
   onCreateTerminal?: () => void
-  onCreateAgentTerminal?: (kind: ExternalAgentKind) => void
+  onCreateAgentTerminal?: (kind: ExternalAgentKind | 'sandwalk') => void
 }) {
   if (!open || typeof document === 'undefined') return null
   // Fire on pointerdown so a native window drag (the tab strip is a
@@ -154,6 +167,20 @@ export function NewTabMenu({
         </button>
       ) : null}
       {onCreateTerminal ? <div className="bg-border -mx-1 my-1 h-px" /> : null}
+      <button
+        type="button"
+        role="menuitem"
+        data-tauri-drag-region="false"
+        className={MENU_BUTTON}
+        onPointerDown={event =>
+          press(event, () => {
+            onCreateAgentTerminal?.('sandwalk')
+          })
+        }
+      >
+        <SandwalkMark className="size-3.5 shrink-0" />
+        <span className="min-w-0 flex-1">Sandwalk CLI</span>
+      </button>
       {EXTERNAL_AGENT_KINDS.map(kind => (
         <AgentLaunchButton
           key={kind}

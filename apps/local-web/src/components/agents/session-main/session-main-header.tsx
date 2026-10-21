@@ -62,9 +62,9 @@ export type SessionMainHeaderProps = {
   createSession?: (projectId?: string | null) => void | Promise<void>
   /** FAS-107 GF5: create + open a new terminal via the tab-strip "+". */
   onCreateTerminal?: () => void
-  /** "+" menu: terminal that starts Claude Code, Codex, OpenCode, or fx. */
+  /** "+" menu: terminal that starts Sandwalk CLI, Claude Code, Codex, OpenCode, fx, or Hermes. */
   onCreateAgentTerminal?: (
-    kind: import('@sandwalk/agent-ui-core').ExternalAgentKind
+    kind: import('@sandwalk/agent-ui-core').ExternalAgentKind | 'sandwalk'
   ) => void
   /** FAS-107 GF1/GF6: terminals so chips render with type-terminal variant. */
   terminals?: import('@sandwalk/agent-ui-core').TerminalSession[]
