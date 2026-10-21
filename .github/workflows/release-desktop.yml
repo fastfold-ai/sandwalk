@@ -357,12 +357,18 @@ jobs:
       - name: Write release notes
         shell: bash
         env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
           TAG: ${{ steps.ver.outputs.tag }}
           TITLE: ${{ steps.ver.outputs.title }}
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          EXISTING_BODY="$(gh release view "${TAG}" --repo "${REPO}" --json body -q .body 2>/dev/null || true)"
+          if [[ -n "${EXISTING_BODY// }" ]]; then
+            printf '%s\n' "${EXISTING_BODY}" > release-notes.md
+            exit 0
+          fi
           PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           {
             echo "# ${TITLE}"
