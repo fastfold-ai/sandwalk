@@ -12,6 +12,7 @@ test.describe('Memory, Omnigraph Cookbooks, and Persona Specialists UI', () => {
       ({ apiUrl, apiKey }) => {
         window.localStorage.setItem('fastfold.backend.url', apiUrl)
         window.localStorage.setItem('fastfold.sidebar-collapsed', 'false')
+        window.localStorage.setItem('fastfold.theme', 'dark')
         if (apiKey) {
           window.localStorage.setItem(
             'sandwalk.remembered-auth',

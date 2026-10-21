@@ -12,6 +12,8 @@
 
 <p align="center">
   <a href="#install">Install</a> ·
+  <a href="#philosophy--architecture">Philosophy & Architecture</a> ·
+  <a href="#compounding-memory-wiki--omnigraph">Memory & Omnigraph</a> ·
   <a href="#models">Models</a> ·
   <a href="#cli">CLI</a> ·
   <a href="#configuration">Configuration</a> ·
@@ -80,19 +82,103 @@ Sandwalk exists to turn individual curiosity into collective discovery.
 
 It is built for scientists, engineers, and anyone chasing a question that takes days, not one prompt.
 
-Serious research cannot live inside one vendor's model, one set of tools, or one cloud. The model, the skills, the MCP servers, and the compute are separate pieces in Sandwalk, so a session can pair any of them and swap any of them as the field moves. The harness is open, self-hosted, and Apache-2.0. The work stays on the machine that ran it, and a skill or a published page is how a result is shared.
+Serious research cannot live inside one vendor's model, one set of tools, or one cloud. The model, the skills, the MCP servers, the personas, the memory, and the compute are separate pieces in Sandwalk, so a session can pair any of them and swap any of them as the field moves. The harness is open, self-hosted, and Apache-2.0. The work stays on the machine that ran it, and a crystallized skill or a published page is how a result is shared.
 
 Sandwalk is in developer preview.
 
+## Philosophy & Architecture
+
+Most AI chat tools treat every conversation as disposable: when a thread ends, the context, caveats, negative results, and domain workflows vanish with it. Dumping raw transcripts into a vector store or an ever-growing system prompt only trades amnesia for context rot and broken KV caches.
+
+Sandwalk is built around four core principles:
+
+1. **Decoupled & Local-First (`~/.sandwalk/`)**: Your models (17 cloud providers + local `llama.cpp`, Ollama, oMLX, LM Studio), your execution sandboxes (Local machine or Modal cloud CPU/GPU), your MCP servers, and your knowledge live on your machine in open formats (`.md`, `.pg`, `.gq`, `.jsonl`, Lance `.omni`, SQLite).
+2. **Cognitive Diversity via Persona Specialists**: Complex questions benefit from distinct thinking styles. Sandwalk ships with O'Reilly-style natural history animal personas—**Otium** (*Relaxed* Capybara), **Atlas** (*Ambitious Generalist* Wolf), **Nova** (*Dreamer* Fox), **Milo** (*Project Manager* Badger), and **Soren** (*Skeptical Reviewer* Owl)—alongside domain specialists. Each persona carries its own cognitive priors (`PRIORS.md`), learned memory (`MEMORY.md`), default model, and ontology lens.
+3. **Byte-Stable Prompt Prefix + Progressive Disclosure**: At session start, Sandwalk injects a compact, bounded snapshot (`USER.md` ~1,375 chars + `MEMORY.md` ~2,200 chars + `PRIORS.md` + Living Wiki TOC + Active Ontology summary) and freezes it for the session so LLM KV prefix caches stay warm. Deeper knowledge is retrieved on demand via tools.
+4. **Compounding Knowledge into Reusable Skills**: As you work with your agents or **Capy**, conversations automatically distill into **4 governed knowledge assets**—**Bounded Memories**, **Living Markdown Wiki**, **Versioned Omnigraph Knowledge Graph**, and **Reusable Skills (`SKILL.md`)**—so what you learn today becomes an executable capability tomorrow.
+
+```mermaid
+flowchart TB
+    subgraph Surfaces["Unified Client Surfaces"]
+        Desktop["macOS & Ubuntu Desktop App\n(Tauri + React)"]
+        Web["Local & LAN Web UI\n(:1420 / :8787)"]
+        CLI["Interactive Terminal CLI\n(sandwalk)"]
+        ExtCLI["External Agent CLIs\n(Claude Code · Codex · OpenCode · fx · Hermes)"]
+    end
+
+    subgraph Orchestration["Orchestration & Cognitive Personas"]
+        Capy["Capy Meta-Agent\n(Session Grids · Handoffs · Bench · Memory Steward)"]
+        Personas["Persona & Domain Specialists\n(Otium · Atlas · Nova · Milo · Soren · Bio/Chem)"]
+    end
+
+    subgraph Core["Local Sandwalk Agent Server (:8787)"]
+        Router["Unified Model Router\n(17 Cloud Providers · ChatGPT Plan · Local llama.cpp / Ollama)"]
+        PromptBudget["Frozen Session-Start Context\n(Byte-Stable KV Cache + Tool Tiering)"]
+        Distiller["Background Session Distiller\n(GPU-Aware Hybrid Extraction)"]
+    end
+
+    subgraph Execution["Sandboxes, Tools & MCP"]
+        LocalSB["Local Sandbox\n(Workspaces · PTY · Artifacts)"]
+        ModalSB["Modal Cloud CPU / GPU\n(T4 · L4 · A100 · H100)"]
+        Toolkit["190+ Scientific & Core Tools\n+ 1-Click MCP Servers"]
+    end
+
+    subgraph Knowledge["Compounding Knowledge Layer (~/.sandwalk/)"]
+        Mem["1. Bounded Snapshots\n(USER.md · MEMORY.md · PRIORS.md)"]
+        Wiki["2. Living Markdown Wiki\n([[wikilinks]] · Backlinks · Split/Full-Screen)"]
+        Omni["3. Local Omnigraph Engine (.omni)\n(6 Cookbooks 01–06 · Supports/Contradicts · Branches)"]
+        Skills["4. Crystallized Skills\n(~/.sandwalk/skills/<slug>/SKILL.md)"]
+    end
+
+    Surfaces --> Orchestration
+    Orchestration --> Core
+    Core --> Execution
+    Core --> Knowledge
+    Distiller -->|Auto-extracts after runs| Mem
+    Distiller -->|Synthesizes briefs| Wiki
+    Distiller -->|Records typed claims| Omni
+    Mem & Wiki & Omni -->|memory.create_skill / To Skill| Skills
+    Skills -->|Equipped on next run| Personas
+```
+
+## Compounding Memory, Wiki & Omnigraph
+
+Sandwalk turns everyday agent sessions into a structured, self-improving knowledge base—without requiring external database infrastructure:
+
+```mermaid
+flowchart LR
+    Chat["Agent / Persona Session\n(or Capy Command)"] -->|1. During turn| Tools["Core Memory Tools\n(memory.mutate · wiki.write · graph.record_claim)"]
+    Chat -->|2. On run.completed| AutoDistill["Background Distiller\n(_auto_distill_after_run)"]
+
+    Tools & AutoDistill --> M["Memories\nUSER.md & MEMORY.md"]
+    Tools & AutoDistill --> W["Living Wiki\n~/.sandwalk/memory/wiki/*.md"]
+    Tools & AutoDistill --> G["Omnigraph (.omni)\nschema.pg · queries.gq · data.jsonl"]
+
+    G -->|Git-style review/* branch| Review["Supports vs. Contradicts\n& Contested Claim Alerts"]
+    M & W & G -->|3. Crystallize\n(memory.create_skill / UI)| Skill["Installed Sandwalk Skill\n~/.sandwalk/skills/<slug>/SKILL.md"]
+    Skill -->|4. /skill-slug| Chat
+```
+
+- **Four Scopes**: `global` (Personal & Lab Second Brain), `project:<id>` (per-project rules and wiki), `specialist:<id>` (each persona's private brain), and `user` (`USER.md` profile).
+- **Six Runnable Omnigraph Cookbook Modes (`01–06`)**: Powered by the local [Omnigraph](https://www.omnigraph.dev/) Rust + Lance engine (`~/.sandwalk/bin/omnigraph` + auto-enabled stdio MCP bridge):
+  - `01 Industry intel` — Track market signals through the SPIKE frame (`Signal`, `Pattern`, `Insight`, `KnowHow`).
+  - `02 Pharma intel` — Monitor compounds, mechanisms, clinical trials, and competitive assumptions.
+  - `03 Context graph` — Model organizational decisions, traces, actors, and action items.
+  - `04 VC OS` — Connect deal flow, investment beliefs, founders, and portfolio signals.
+  - `05 Biomed research` — Track targets, papers, assays, hypotheses, and supporting vs. contradicting evidence.
+  - `06 Second brain` — Personal operating graph for people, organizations, notes, goals, projects, and tasks (default for Global Brain).
+- **Crystallize Knowledge into Skills (`Create Skill` / `memory.create_skill`)**: Turn any scope's curated `MEMORY.md` rules, Living Wiki pages (`[[wikilinks]]`), and Omnigraph `.pg` ontology + `.gq` stored queries into a reusable Sandwalk Skill (`~/.sandwalk/skills/<slug>/SKILL.md` + `references/{schema.pg,queries.gq,wiki-digest.md}`) in one click—or ask any agent or Capy to build it for you.
+
 ## What Sandwalk does
 
-- **Shares one session list across the app, the CLI, and remote devices.** Start a session in the terminal, continue it in the Mac app, or check on it from a phone.
+- **Shares one session list across the app, the CLI, and remote devices.** Start a session in the terminal, continue it in the Mac or Ubuntu app, or check on it from a phone.
 - **Runs on any LLM, cloud or local.** OpenAI, Anthropic, Gemini, xAI, DeepSeek, OpenRouter, Bedrock, or a local model on Ollama, oMLX, llama.cpp, or LM Studio. Sign in with ChatGPT to run OpenAI models on a Plus or Pro plan instead of an API key.
 - **Works with the other coding agents you already use.** Open Claude Code, Codex, OpenCode, or fx in a Sandwalk terminal; the tab shows which one is running. Import any of their sessions as a Sandwalk chat, or hand a Sandwalk chat to them. Claude Code and Codex can resume it as native history.
-- **Includes Capy, a meta agent for the workspace.** Aware of your active sessions, Capy spawns new sessions, seeds them with briefs, arranges them into grids, launches or imports from the other coding agents, and runs benchmarks or diagnostics on command.
-- **Installs skills in one click from skills.sh.** Pull from the public catalog, a GitHub repo, or a local folder, and attach any MCP server.
-- **Bundles workflows into Specialists.** Save a set of skills, MCP servers, and instructions as a reusable profile for any kind of work.
-- **Organizes long-horizon work into Projects.** Scope sessions, shared library files, custom instructions, and usage boards per project.
+- **Includes Capy, a meta agent for the workspace.** Aware of your active sessions and knowledge base, Capy spawns new sessions (including multi-persona grids like `"Nova,Soren"`), seeds them with briefs, manages memories/wiki/graph, crystallizes skills, and runs benchmarks or diagnostics on command.
+- **Compounds knowledge across sessions with Memory, Living Wiki & Omnigraph.** Bounded `USER.md`/`MEMORY.md` snapshots, a full-screen Markdown Wiki with live preview and `[[wikilinks]]`, and a local Lance-backed Omnigraph with 6 Cookbook Modes (`01–06`), `Supports`/`Contradicts` provenance edges, and Git-style branches.
+- **Installs skills in one click from skills.sh—or crystallizes your own.** Pull from the public catalog, a GitHub repo, or a local folder, or convert your own Wiki and Ontology into a reusable `/skill`.
+- **Bundles personas and workflows into Specialists.** Choose from O'Reilly-style woodcut animal personas (**Otium**, **Atlas**, **Nova**, **Milo**, **Soren**) or domain specialists, each with its own cognitive priors (`PRIORS.md`), model, and specialist brain.
+- **Organizes long-horizon work into Projects.** Scope sessions, shared library files, custom instructions, Living Wiki pages, and usage boards per project.
 - **Executes code locally or on cloud GPUs.** Run in a local sandbox or a Modal container, and every file, plot, report, notebook (`.ipynb`), or 3D output lands beside the session.
 - **Measures the whole harness with built-in Benchmarking.** In science and ambitious work, changing a model, a skill, or a prompt should be tested, not guessed. Run MMLU, MMLU-Pro, ARC-C, MBPP, LiveCodeBench, BixBench, or Bio-Capybara through real agent sessions, compare two runs side by side across models or Specialists, or gate changes from the CLI with `sandwalk eval`.
 - **Ships with a scientific toolkit and local corpora.** Query PubChem, ChEMBL, UniProt, PDB, Open Targets, and ClinicalTrials.gov out of the box, or pull local datasets (DepMap, MSigDB, STRING).
@@ -129,12 +215,32 @@ Sandwalk is in developer preview.
 </tr>
 <tr>
 <td width="50%" valign="top">
+<img src="images/specialists.png" alt="O'Reilly animal Persona Specialists grid with Otium's Profile & Priors drawer" width="100%"><br>
+<sub><strong>Persona Specialists think differently.</strong> Otium, Soren, Milo, Nova, and Atlas—each with its own priors, model, and brain.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="images/memory.png" alt="Memory & Knowledge showing MEMORY.md operating rules, USER.md profile, and Pending Approvals" width="100%"><br>
+<sub><strong>Bounded memory that never rots the prompt.</strong> Curated <code>MEMORY.md</code> rules, <code>USER.md</code> profile, and human-in-the-loop approvals.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="images/wiki.png" alt="Living Markdown Wiki in Split View with live preview, [[wikilinks]], Full Screen, and To Skill" width="100%"><br>
+<sub><strong>A Living Markdown Wiki on disk.</strong> Split-view editor, clickable <code>[[wikilinks]]</code>, full-screen mode, and one-click conversion to a Skill.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="images/omnigraph.png" alt="Omnigraph Knowledge Graph explorer with Cookbook modes, Supports/Contradicts edges, and branches" width="100%"><br>
+<sub><strong>Versioned Knowledge Graph with Omnigraph.</strong> Six Cookbook modes (01–06), supporting vs. contradicting claims, and Git-style branches.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 <img src="images/skills.png" alt="The composer menu with skills open" width="100%"><br>
 <sub><strong>A skill rides with the message.</strong> Files, MCP, a specialist, a sandbox.</sub>
 </td>
 <td width="50%" valign="top">
 <img src="images/skills-sh.png" alt="The public skills catalog ranked by installs" width="100%"><br>
-<sub><strong>Skills install from a public catalog.</strong> Ranked by installs.</sub>
+<sub><strong>Skills install from a public catalog.</strong> Ranked by installs—or crystallized from your own Wiki and Ontology.</sub>
 </td>
 </tr>
 <tr>
@@ -261,9 +367,11 @@ Everything lives under `~/.sandwalk/`:
 
 | Path | Contents |
 |------|----------|
-| `config.json` | Providers, keys, default model, sandbox preferences |
-| `mcp.json` | MCP servers, Cursor-compatible |
-| `skills/` | Installed skills |
+| `config.json` | Providers, keys, default model, sandbox & memory preferences |
+| `mcp.json` | MCP servers, Cursor-compatible (including `omnigraph` stdio MCP) |
+| `skills/` | Installed & crystallized skills (`<slug>/SKILL.md` + `references/`) |
+| `memory/` | `USER.md`, `MEMORY.md`, `memory.db`, `wiki/<scope>/*.md`, and `omni/<scope>/graph.omni` |
+| `bin/` | Managed local binaries (`omnigraph`, `omnigraph-server`, `sandwalk-omnigraph-mcp`) |
 | `workspaces/<session>/` | Per-session artifacts: `uploads/`, `outputs/`, `plans/`, `project/` |
 | `data/` | Local datasets from `sandwalk data pull` |
 | `agent-server.db` | Sessions, shared by the CLI and the app |
