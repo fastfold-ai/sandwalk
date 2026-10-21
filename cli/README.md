@@ -64,7 +64,7 @@ During a run the bar shows a compact comet scanner and `ctrl+c interrupt` (plus 
 - `/plan` toggles Plan ↔ Agent and **persists** the choice for the session.
 - In Plan mode the agent writes `plans/<slug>.md` (steps + Mermaid) without executing heavy tools until you switch back.
 
-See also [docs: Plan mode](../docs/content/cli/plan.mdx) and the Web UI Plan mode docs.
+See also [docs: Plan mode](https://sandwalk.sh/docs/cli/plan) and the Web UI Plan mode docs.
 
 ### Sandbox (`/sandbox`)
 

@@ -18,6 +18,7 @@
   <a href="#benchmarking--evaluation">Benchmarking</a> ·
   <a href="#models">Models</a> ·
   <a href="#cli">CLI</a> ·
+  <a href="https://sandwalk.sh/docs">Docs</a> ·
   <a href="https://sandwalk.sh">sandwalk.sh</a>
 </p>
 
@@ -123,7 +124,7 @@ flowchart LR
 1. **Decoupled & Local-First (`~/.sandwalk/`)**: Swap models (17 cloud providers, ChatGPT Plus/Pro plan, or local `llama.cpp` / Ollama), sandboxes (Local machine or Modal cloud `T4`/`L4`/`A100`/`H100` GPUs), and MCP servers per turn while keeping all data on your machine in open files (`.md`, `.pg`, `.gq`, `.jsonl`, Lance `.omni`, SQLite).
 2. **Capy Meta-Agent & Parallel Specialist Grids**: Don't settle for one point of view. **Capy** orchestrates the workspace—spawning parallel split grids (`2×2`, `3×2`), handing sessions to Claude Code or Codex, and coordinating customizable **Specialists** (starter O'Reilly animal personas **Otium**, **Atlas**, **Nova**, **Milo**, **Soren**, scientific profiles, or your own `+ New specialist`).
 3. **Byte-Stable Prompt Prefix + Progressive Disclosure**: At session start, Sandwalk freezes a bounded snapshot (`USER.md` ~1,375 chars + `MEMORY.md` ~2,200 chars + `PRIORS.md` + Living Wiki TOC + Active Ontology) so LLM KV caches stay warm, while deep context is pulled on demand via tools.
-4. **Six Runnable Omnigraph Cookbook Modes (`01–06`) & 1-Click Skill Crystallization**: Powered by the local [Omnigraph](https://www.omnigraph.dev/) Rust + Lance engine (`01 Industry intel`, `02 Pharma intel`, `03 Context graph`, `04 VC OS`, `05 Biomed research`, `06 Second brain`) with `Supports`/`Contradicts` provenance edges, Git-style `review/*` branches, and 1-click conversion of your Wiki + Ontology into reusable `~/.sandwalk/skills/<slug>/SKILL.md` skills. Deep-dive guide: [`docs/content/memory.mdx`](docs/content/memory.mdx).
+4. **Six Runnable Omnigraph Cookbook Modes (`01–06`) & 1-Click Skill Crystallization**: Powered by the local [Omnigraph](https://www.omnigraph.dev/) Rust + Lance engine (`01 Industry intel`, `02 Pharma intel`, `03 Context graph`, `04 VC OS`, `05 Biomed research`, `06 Second brain`) with `Supports`/`Contradicts` provenance edges, Git-style `review/*` branches, and 1-click conversion of your Wiki + Ontology into reusable `~/.sandwalk/skills/<slug>/SKILL.md` skills. Full guide: [sandwalk.sh/docs/memory](https://sandwalk.sh/docs/memory).
 
 ## What Sandwalk does
 
@@ -354,7 +355,6 @@ Monorepo:
 | `apps/local-web/` | React dashboard and the Tauri shell |
 | `apps/sandwalk-mac/` | Swift menubar helper that supervises the server |
 | `apps/packaging/` | Signed DMG, notarization, updater artifacts |
-| `docs/` | Product docs site (`pnpm dev:docs`) |
 
 ```bash
 scripts/verify.sh         # typecheck, lint, build, unit tests + coverage gates (web + cli) — the CI gate
