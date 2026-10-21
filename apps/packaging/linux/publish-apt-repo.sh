@@ -115,20 +115,26 @@ ensure_section() {
 for deb in "$@"; do
   packaged="$(ensure_section "$deb")"
   pkg_name="$(dpkg-deb -f "$packaged" Package 2>/dev/null || echo sandwalk)"
+  pkg_ver="$(dpkg-deb -f "$packaged" Version 2>/dev/null || true)"
   pkg_arch="$(dpkg-deb -f "$packaged" Architecture 2>/dev/null || true)"
-  echo "==> Adding $(basename "$deb") (${pkg_name} ${pkg_arch})"
+  echo "==> Adding $(basename "$deb") (${pkg_name} ${pkg_ver} ${pkg_arch})"
   if [[ -n "$pkg_arch" ]]; then
     reprepro -b "$ROOT" -A "$pkg_arch" remove stable "$pkg_name" 2>/dev/null || true
   else
     reprepro -b "$ROOT" remove stable "$pkg_name" 2>/dev/null || true
   fi
   reprepro -b "$ROOT" deleteunreferenced 2>/dev/null || true
+  if [[ -n "$pkg_ver" && -n "$pkg_arch" ]]; then
+    rel_pool="pool/main/${pkg_name:0:1}/${pkg_name}/${pkg_name}_${pkg_ver}_${pkg_arch}.deb"
+    reprepro -b "$ROOT" _forget "$rel_pool" 2>/dev/null || true
+    rm -f "$ROOT/$rel_pool"
+  fi
   reprepro -b "$ROOT" includedeb stable "$packaged"
 done
 
 echo "==> Uploading repository"
 aws s3 sync "$ROOT/dists" "s3://${BUCKET}/dists" --delete --cache-control "public, max-age=60"
-aws s3 sync "$ROOT/pool" "s3://${BUCKET}/pool" --cache-control "public, max-age=31536000"
+aws s3 cp --recursive "$ROOT/pool" "s3://${BUCKET}/pool" --cache-control "public, max-age=31536000"
 aws s3 sync "$ROOT/db" "s3://${BUCKET}/.reprepro/db" --delete
 aws s3 cp "$ROOT/sandwalk.gpg" "s3://${BUCKET}/sandwalk.gpg" \
   --cache-control "public, max-age=300" \
