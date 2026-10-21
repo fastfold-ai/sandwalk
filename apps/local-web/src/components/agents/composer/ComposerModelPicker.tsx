@@ -7,13 +7,11 @@ import {
   composerModelOptionKey,
   useComposerModelPickerNav
 } from '@/components/agents/composer/useComposerModelPickerNav'
-import { Input } from '@/components/ui/input'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   type ComposerModelOption,
   type ComposerModelPreferences,
@@ -394,7 +392,7 @@ export function ComposerModelPicker({
             </button>
           </div>
           {flyout === 'context' && selectedModel.backend === 'llama' && client ? (
-            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-14 left-full z-10 ml-2 w-44 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl">
+            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute bottom-0 left-full z-10 ml-2 w-44 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl">
               {[4096, 8192, 16384, 32768, 65536, 131072].map(tier => (
                 <button
                   key={tier}
@@ -420,7 +418,7 @@ export function ComposerModelPicker({
             </div>
           ) : null}
           {flyout === 'effort' && supportsReasoningEffort ? (
-            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-14 left-full z-10 ml-2 w-40 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl">
+            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute bottom-0 left-full z-10 ml-2 w-40 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl">
               {effortOptions.map(level => {
                 const active = selectedEffort === level
                 return (
@@ -444,81 +442,79 @@ export function ComposerModelPicker({
             </div>
           ) : null}
           {flyout === 'model' ? (
-            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-0 left-full z-10 ml-2 flex w-72 flex-col overflow-hidden rounded-2xl border shadow-lg backdrop-blur-xl">
-              <div className="border-b px-3 py-1.5">
-                <Input
+            <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute bottom-0 left-full z-10 ml-2 flex w-72 flex-col overflow-hidden rounded-2xl border shadow-lg backdrop-blur-xl">
+              <div className="border-border/50 border-b px-3 py-1.5">
+                <input
                   value={modelSearch}
                   onChange={event => setModelSearch(event.target.value)}
                   onKeyDown={event => {
                     nav.onSearchKeyDown(event, selectModelAndClose)
                   }}
                   placeholder="Search models"
-                  className="h-7 border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
+                  className="placeholder:text-muted-foreground h-7 w-full bg-transparent px-0 text-[13px] outline-none"
                   autoFocus
                 />
               </div>
-              <ScrollArea className="h-52">
-                <div className="py-1">
-                  {modelOptions.length === 0 ? (
-                    <div className="text-muted-foreground px-3 py-3 text-[13px]">
-                      No enabled models.
+              <div className="chat-scrollbar max-h-56 overflow-x-hidden overflow-y-auto py-1">
+                {modelOptions.length === 0 ? (
+                  <div className="text-muted-foreground px-3 py-3 text-[13px]">
+                    No enabled models.
+                  </div>
+                ) : sections.length === 0 ? (
+                  <div className="text-muted-foreground px-3 py-3 text-[13px]">
+                    No models match “{modelSearch.trim()}”.
+                  </div>
+                ) : (
+                  sections.map(section => (
+                    <div key={section.title || 'all'}>
+                      {section.title ? (
+                        <div className="text-muted-foreground px-3 pt-2 pb-1 text-xs">
+                          {section.title}
+                        </div>
+                      ) : null}
+                      {section.options.map(option => {
+                        const optionKey = composerModelOptionKey(option)
+                        const selected = isComposerModelSelected(
+                          option,
+                          runtimeSettings,
+                          modelOptions
+                        )
+                        return (
+                          <button
+                            key={optionKey}
+                            type="button"
+                            data-composer-model-option={optionKey}
+                            className={cn(
+                              'hover:bg-muted mx-1 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[13px]',
+                              nav.activeKey === optionKey && 'bg-muted'
+                            )}
+                            onMouseEnter={() => nav.setActiveKey(optionKey)}
+                            onClick={() => selectModelAndClose(option)}
+                          >
+                            <span className="min-w-0 truncate">
+                              {option.label}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              {option.speed ? (
+                                <span className="text-muted-foreground text-xs">
+                                  {option.speed}
+                                </span>
+                              ) : null}
+                              {selected ? (
+                                <Check className="size-3.5 shrink-0" />
+                              ) : null}
+                            </span>
+                          </button>
+                        )
+                      })}
                     </div>
-                  ) : sections.length === 0 ? (
-                    <div className="text-muted-foreground px-3 py-3 text-[13px]">
-                      No models match “{modelSearch.trim()}”.
-                    </div>
-                  ) : (
-                    sections.map(section => (
-                      <div key={section.title || 'all'}>
-                        {section.title ? (
-                          <div className="text-muted-foreground px-3 pt-2 pb-1 text-xs">
-                            {section.title}
-                          </div>
-                        ) : null}
-                        {section.options.map(option => {
-                          const optionKey = composerModelOptionKey(option)
-                          const selected = isComposerModelSelected(
-                            option,
-                            runtimeSettings,
-                            modelOptions
-                          )
-                          return (
-                            <button
-                              key={optionKey}
-                              type="button"
-                              data-composer-model-option={optionKey}
-                              className={cn(
-                                'hover:bg-muted mx-1 flex w-[calc(100%-0.5rem)] items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[13px]',
-                                nav.activeKey === optionKey && 'bg-muted'
-                              )}
-                              onMouseEnter={() => nav.setActiveKey(optionKey)}
-                              onClick={() => selectModelAndClose(option)}
-                            >
-                              <span className="min-w-0 truncate">
-                                {option.label}
-                              </span>
-                              <span className="flex shrink-0 items-center gap-1.5">
-                                {option.speed ? (
-                                  <span className="text-muted-foreground text-xs">
-                                    {option.speed}
-                                  </span>
-                                ) : null}
-                                {selected ? (
-                                  <Check className="size-3.5 shrink-0" />
-                                ) : null}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
+                  ))
+                )}
+              </div>
               {onAddModels ? (
                 <button
                   type="button"
-                  className="hover:bg-muted flex items-center gap-2 border-t px-3 py-2 text-left text-[13px]"
+                  className="hover:bg-muted border-border/50 flex items-center gap-2 border-t px-3 py-2 text-left text-[13px]"
                   onClick={() => {
                     closePicker()
                     onAddModels()

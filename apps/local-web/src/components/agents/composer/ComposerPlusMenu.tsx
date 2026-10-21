@@ -177,7 +177,11 @@ export function ComposerPlusMenu({
     if (!button || !form) return
     const buttonBox = button.getBoundingClientRect()
     const formBox = form.getBoundingClientRect()
-    setMenuWidth(formBox.width)
+    const availableWidth =
+      typeof window !== 'undefined'
+        ? Math.max(280, window.innerWidth - formBox.left - 284)
+        : formBox.width
+    setMenuWidth(Math.min(formBox.width, 360, availableWidth))
     setAlignOffset(formBox.left - buttonBox.left)
     setSideOffset(Math.max(8, buttonBox.top - formBox.top + 8))
   }
@@ -422,159 +426,163 @@ export function ComposerPlusMenu({
           alignOffset={alignOffset}
           sideOffset={sideOffset}
           avoidCollisions={false}
-          style={menuWidth ? { width: menuWidth } : undefined}
-          className="sandwalk-glass-menu border-border/60 bg-popover/90 z-[90] w-auto max-w-none overflow-visible rounded-2xl p-1.5 shadow-lg backdrop-blur-xl"
+          className="z-[90] w-auto max-w-none overflow-visible border-0 bg-transparent p-0 shadow-none"
           onOpenAutoFocus={event => {
             event.preventDefault()
             searchInputRef.current?.focus()
           }}
         >
           <div className="relative" onKeyDown={handleKeyDown}>
-            <input
-              ref={searchInputRef}
-              value={search}
-              onChange={event => {
-                setSearch(event.target.value)
-                setSearchHitIndex(0)
-                setFlyout(null)
-                setActiveRow(null)
-                setInFlyout(false)
-              }}
-              onMouseEnter={() => syncRowState(null)}
-              placeholder="Search skills, context, chats..."
-              className="placeholder:text-muted-foreground w-full bg-transparent px-2.5 py-1.5 text-sm outline-none"
-            />
-            {needle ? (
-              <div className="py-1">
-                {skillHits.length === 0 ? (
-                  <div className="text-muted-foreground px-2.5 py-2 text-sm">
-                    No matches
-                  </div>
-                ) : (
-                  skillHits.map((skill, idx) => (
-                    <MenuRow
-                      key={skill.name}
-                      icon={<SkillIcon skill={skill} />}
-                      label={skill.name}
-                      detail={cleanSkillDescription(skill.description)}
-                      active={idx === searchHitIndex}
-                      onMouseEnter={() => setSearchHitIndex(idx)}
-                      onClick={() => {
-                        onPickSkill?.(skill)
-                        close()
-                      }}
-                    />
-                  ))
-                )}
-              </div>
-            ) : (
-              <div className="py-0.5">
-                {onPlanModeChange ? (
-                  <>
-                    <MenuRow
-                      icon={<InfinityIcon className={cnIcon(!planMode)} />}
-                      label="Agent"
-                      detail="Work with tools in this project"
-                      active={activeRow === 'agent'}
-                      onMouseEnter={() => syncRowState('agent')}
-                      onClick={() => {
-                        void onPlanModeChange(false)
-                        close()
-                      }}
-                    />
+            <div
+              style={menuWidth ? { width: menuWidth } : undefined}
+              className="sandwalk-glass-menu border-border/60 bg-popover/90 rounded-2xl border p-1.5 shadow-lg backdrop-blur-xl"
+            >
+              <input
+                ref={searchInputRef}
+                value={search}
+                onChange={event => {
+                  setSearch(event.target.value)
+                  setSearchHitIndex(0)
+                  setFlyout(null)
+                  setActiveRow(null)
+                  setInFlyout(false)
+                }}
+                onMouseEnter={() => syncRowState(null)}
+                placeholder="Search skills, context, chats..."
+                className="placeholder:text-muted-foreground w-full bg-transparent px-2.5 py-1.5 text-sm outline-none"
+              />
+              {needle ? (
+                <div className="py-1">
+                  {skillHits.length === 0 ? (
+                    <div className="text-muted-foreground px-2.5 py-2 text-sm">
+                      No matches
+                    </div>
+                  ) : (
+                    skillHits.map((skill, idx) => (
+                      <MenuRow
+                        key={skill.name}
+                        icon={<SkillIcon skill={skill} />}
+                        label={skill.name}
+                        detail={cleanSkillDescription(skill.description)}
+                        active={idx === searchHitIndex}
+                        onMouseEnter={() => setSearchHitIndex(idx)}
+                        onClick={() => {
+                          onPickSkill?.(skill)
+                          close()
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="py-0.5">
+                  {onPlanModeChange ? (
+                    <>
+                      <MenuRow
+                        icon={<InfinityIcon className={cnIcon(!planMode)} />}
+                        label="Agent"
+                        detail="Work with tools in this project"
+                        active={activeRow === 'agent'}
+                        onMouseEnter={() => syncRowState('agent')}
+                        onClick={() => {
+                          void onPlanModeChange(false)
+                          close()
+                        }}
+                      />
+                      <MenuRow
+                        icon={
+                          <ListChecks className="size-4 shrink-0 text-amber-500" />
+                        }
+                        label="Plan"
+                        detail="Generate an implementation plan"
+                        active={activeRow === 'plan'}
+                        onMouseEnter={() => syncRowState('plan')}
+                        onClick={() => {
+                          void onPlanModeChange(true)
+                          close()
+                        }}
+                      />
+                      <div className="bg-border/60 my-1 h-px" />
+                    </>
+                  ) : null}
+                  <MenuRow
+                    icon={
+                      <Paperclip className="text-muted-foreground size-4 shrink-0" />
+                    }
+                    label="Files"
+                    active={activeRow === 'files'}
+                    onMouseEnter={() => syncRowState('files')}
+                    onClick={() => {
+                      uploadRef.current?.click()
+                      close()
+                    }}
+                  />
+                  {onPickSkill ? (
                     <MenuRow
                       icon={
-                        <ListChecks className="size-4 shrink-0 text-amber-500" />
+                        <Sparkles className="text-muted-foreground size-4 shrink-0" />
                       }
-                      label="Plan"
-                      detail="Generate an implementation plan"
-                      active={activeRow === 'plan'}
-                      onMouseEnter={() => syncRowState('plan')}
-                      onClick={() => {
-                        void onPlanModeChange(true)
-                        close()
-                      }}
+                      label="Skills"
+                      trailing={<FlyoutChevron />}
+                      active={activeRow === 'skills' || flyout === 'skills'}
+                      onMouseEnter={() => syncRowState('skills')}
+                      onClick={() => syncRowState('skills')}
                     />
-                    <div className="bg-border/60 my-1 h-px" />
-                  </>
-                ) : null}
-                <MenuRow
-                  icon={
-                    <Paperclip className="text-muted-foreground size-4 shrink-0" />
-                  }
-                  label="Files"
-                  active={activeRow === 'files'}
-                  onMouseEnter={() => syncRowState('files')}
-                  onClick={() => {
-                    uploadRef.current?.click()
-                    close()
-                  }}
-                />
-                {onPickSkill ? (
-                  <MenuRow
-                    icon={
-                      <Sparkles className="text-muted-foreground size-4 shrink-0" />
-                    }
-                    label="Skills"
-                    trailing={<FlyoutChevron />}
-                    active={activeRow === 'skills' || flyout === 'skills'}
-                    onMouseEnter={() => syncRowState('skills')}
-                    onClick={() => syncRowState('skills')}
-                  />
-                ) : null}
-                {onPickMcp ? (
-                  <MenuRow
-                    icon={
-                      <Plug className="text-muted-foreground size-4 shrink-0" />
-                    }
-                    label="MCP"
-                    trailing={<FlyoutChevron />}
-                    active={activeRow === 'mcp' || flyout === 'mcp'}
-                    onMouseEnter={() => syncRowState('mcp')}
-                    onClick={() => syncRowState('mcp')}
-                  />
-                ) : null}
-                {onSpecialistSelect ? (
-                  <MenuRow
-                    icon={
-                      selectedSpecialist ? (
-                        <SpecialistAvatar
-                          color={selectedSpecialist.color}
-                          icon={selectedSpecialist.icon}
-                          avatarUrl={selectedSpecialist.avatarUrl}
-                          slug={selectedSpecialist.slug}
-                          className="size-5"
-                        />
-                      ) : (
-                        <GitBranch className="text-muted-foreground size-4 shrink-0" />
-                      )
-                    }
-                    label="Specialist"
-                    detail={selectedSpecialist?.name}
-                    trailing={<FlyoutChevron />}
-                    active={
-                      activeRow === 'specialist' || flyout === 'specialist'
-                    }
-                    onMouseEnter={() => syncRowState('specialist')}
-                    onClick={() => syncRowState('specialist')}
-                  />
-                ) : null}
-                {onSandboxBackendSelect ? (
-                  <MenuRow
-                    icon={
-                      <Container className="text-muted-foreground size-4 shrink-0" />
-                    }
-                    label="Sandbox"
-                    trailing={<FlyoutChevron />}
-                    active={activeRow === 'sandbox' || flyout === 'sandbox'}
-                    onMouseEnter={() => syncRowState('sandbox')}
-                    onClick={() => syncRowState('sandbox')}
-                  />
-                ) : null}
-              </div>
-            )}
+                  ) : null}
+                  {onPickMcp ? (
+                    <MenuRow
+                      icon={
+                        <Plug className="text-muted-foreground size-4 shrink-0" />
+                      }
+                      label="MCP"
+                      trailing={<FlyoutChevron />}
+                      active={activeRow === 'mcp' || flyout === 'mcp'}
+                      onMouseEnter={() => syncRowState('mcp')}
+                      onClick={() => syncRowState('mcp')}
+                    />
+                  ) : null}
+                  {onSpecialistSelect ? (
+                    <MenuRow
+                      icon={
+                        selectedSpecialist ? (
+                          <SpecialistAvatar
+                            color={selectedSpecialist.color}
+                            icon={selectedSpecialist.icon}
+                            avatarUrl={selectedSpecialist.avatarUrl}
+                            slug={selectedSpecialist.slug}
+                            className="size-5"
+                          />
+                        ) : (
+                          <GitBranch className="text-muted-foreground size-4 shrink-0" />
+                        )
+                      }
+                      label="Specialist"
+                      detail={selectedSpecialist?.name}
+                      trailing={<FlyoutChevron />}
+                      active={
+                        activeRow === 'specialist' || flyout === 'specialist'
+                      }
+                      onMouseEnter={() => syncRowState('specialist')}
+                      onClick={() => syncRowState('specialist')}
+                    />
+                  ) : null}
+                  {onSandboxBackendSelect ? (
+                    <MenuRow
+                      icon={
+                        <Container className="text-muted-foreground size-4 shrink-0" />
+                      }
+                      label="Sandbox"
+                      trailing={<FlyoutChevron />}
+                      active={activeRow === 'sandbox' || flyout === 'sandbox'}
+                      onMouseEnter={() => syncRowState('sandbox')}
+                      onClick={() => syncRowState('sandbox')}
+                    />
+                  ) : null}
+                </div>
+              )}
+            </div>
             {flyout ? (
-              <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute top-8 left-full z-10 ml-2 overflow-hidden rounded-2xl border p-1 shadow-lg backdrop-blur-xl">
+              <div className="sandwalk-glass-menu border-border/60 bg-popover/90 absolute bottom-0 left-full z-10 ml-2 overflow-hidden rounded-2xl border p-1 shadow-lg backdrop-blur-xl">
                 <div className="chat-scrollbar max-h-72 overflow-x-hidden overflow-y-auto p-0.5">
                   {flyout === 'skills' && onPickSkill ? (
                     <SkillFlyout
