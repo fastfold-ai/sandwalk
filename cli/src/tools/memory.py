@@ -403,3 +403,70 @@ def create_skill_from_memory(
     )
     return res.model_dump(mode="json", by_alias=True)
 
+
+@registry.register(
+    name="memory.select_cookbook",
+    description=(
+        "Switch a scope's active Omnigraph Cookbook Mode (01 industry-intel, 02 pharma-intel, "
+        "03 context-graph, 04 vc-os, 05 biomed-research, 06 second-brain) and optionally seed it."
+    ),
+    category="memory",
+    parameters={
+        "cookbook_id": (
+            "Cookbook ID: 'industry-intel', 'pharma-intel', 'context-graph', "
+            "'vc-os', 'biomed-research', or 'second-brain'"
+        ),
+        "scope": "Scope: 'global', 'project:<id>', or 'specialist:<id>' (default 'global')",
+        "load_demo_seed": "Whether to populate the cookbook's starter graph seed (default False)",
+    },
+    usage_guide="Use when the user asks to change the active ontology / Cookbook mode for a brain scope.",
+)
+def select_cookbook_tool(
+    cookbook_id: str,
+    scope: str = "global",
+    load_demo_seed: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    svc = _service()
+    snap = svc.select_cookbook(
+        scope=scope,
+        cookbook_id=cookbook_id.strip(),
+        load_demo_seed=bool(load_demo_seed),
+    )
+    return {
+        "ok": True,
+        "scope": snap.scope,
+        "cookbookId": snap.active_cookbook.id,
+        "cookbookName": snap.active_cookbook.name,
+        "nodes": len(snap.nodes),
+        "edges": len(snap.edges),
+        "summary": (
+            f"Switched {snap.scope} ontology to {snap.active_cookbook.number} "
+            f"{snap.active_cookbook.name} ({len(snap.nodes)} nodes, {len(snap.edges)} edges)."
+        ),
+    }
+
+
+@registry.register(
+    name="memory.distill_session",
+    description="Distill a chat session into durable MEMORY.md notes, a Living Wiki page, and Knowledge Graph claims.",
+    category="memory",
+    parameters={
+        "session_id": "Chat session ID to distill",
+        "scope": "Optional target scope ('global', 'project:<id>', or 'specialist:<id>')",
+    },
+    usage_guide="Use when the user asks to distill or extract takeaways from a session into Memory/Wiki/Graph.",
+)
+def distill_session_tool(
+    session_id: str,
+    scope: str = "",
+    **kwargs: Any,
+) -> dict[str, Any]:
+    svc = _service()
+    res = svc.distill_session(
+        session_id.strip(),
+        scope=scope.strip() or None,
+    )
+    return res.model_dump(mode="json", by_alias=True)
+
+

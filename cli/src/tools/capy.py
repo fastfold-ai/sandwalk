@@ -1562,3 +1562,114 @@ def capy_create_skill_from_memory(
     return res.model_dump(mode="json", by_alias=True)
 
 
+@registry.register(
+    name="capy.memory_manage",
+    description=(
+        "Manage Sandwalk's Memory (USER.md / MEMORY.md), Living Wiki pages, "
+        "Knowledge Graph nodes/claims, or active Cookbook Mode (01-06)."
+    ),
+    category="capy",
+    usage_guide=(
+        "Use when the user asks Capy to remember a preference or rule, write/update a Wiki page, "
+        "record a Knowledge Graph claim, or switch Cookbook mode (industry-intel, pharma-intel, "
+        "context-graph, vc-os, biomed-research, second-brain)."
+    ),
+    parameters={
+        "operation": (
+            "'add_memory', 'add_user_memory', 'remove_memory', 'write_wiki', "
+            "'record_claim', or 'select_cookbook'"
+        ),
+        "scope": "Target scope ('global', 'project:<id>', or 'specialist:<id>').",
+        "content": "Memory text, Wiki Markdown content, or claim summary.",
+        "title": "Wiki page title or Graph subject name.",
+        "slug": "Wiki page slug or Cookbook ID (for select_cookbook).",
+        "predicate": "Graph claim predicate (e.g. 'Supports', 'Contradicts') when operation='record_claim'.",
+        "target": "Graph claim object (e.g. 'Goal:local-first') when operation='record_claim'.",
+        "polarity": "'support', 'contradict', or 'neutral' when operation='record_claim'.",
+    },
+)
+def capy_memory_manage(
+    operation: str = "add_memory",
+    scope: str = "global",
+    content: str = "",
+    title: str = "",
+    slug: str = "",
+    predicate: str = "Supports",
+    target: str = "",
+    polarity: str = "support",
+    **kwargs,
+) -> dict:
+    from agent_server.memory_service import MemoryService
+    from agent_server.models.memory import (
+        CreateGraphClaimRequest,
+        UpsertWikiPageRequest,
+    )
+
+    deps = _deps()
+    svc = MemoryService(agent_store=deps.store)
+    op = str(operation or "add_memory").strip().lower()
+    resolved_scope = str(scope or "global").strip() or "global"
+
+    if op in {"add_memory", "add_user_memory"}:
+        tgt = "user" if op == "add_user_memory" else "memory"
+        res = svc.store.mutate_by_substring(
+            scope="user" if tgt == "user" else resolved_scope,
+            target=tgt,
+            action="add",
+            content=content,
+            bypass_approval=True,
+        )
+        return {"summary": f"Saved entry to {tgt.upper()}.md ({resolved_scope}).", **res}
+    if op == "remove_memory":
+        res = svc.store.mutate_by_substring(
+            scope=resolved_scope,
+            target="memory",
+            action="remove",
+            old_text=content or title,
+            bypass_approval=True,
+        )
+        return {"summary": f"Removed memory matching '{content or title}'.", **res}
+    if op == "write_wiki":
+        page_slug = str(slug or title or "note").strip()
+        page_title = str(title or slug or "Wiki Note").strip()
+        page = svc.write_wiki_page(
+            page_slug,
+            UpsertWikiPageRequest(
+                scope=resolved_scope,
+                title=page_title,
+                content=content,
+            ),
+        )
+        return {
+            "ok": True,
+            "summary": f"Saved Living Wiki page [[{page.slug}]] ({page.title}).",
+            "page": page.model_dump(mode="json", by_alias=True),
+        }
+    if op == "record_claim":
+        edge = svc.record_graph_claim(
+            CreateGraphClaimRequest(
+                scope=resolved_scope,
+                subject_id=title or slug or "Entity:subject",
+                predicate=predicate or "Supports",
+                object_id=target or "Claim:object",
+                polarity=polarity if polarity in {"support", "contradict", "neutral"} else "support",  # type: ignore[arg-type]
+                summary=content,
+            )
+        )
+        return {
+            "ok": True,
+            "summary": f"Recorded graph claim {edge.source_id} -[{edge.predicate}]-> {edge.target_id}.",
+            "edge": edge.model_dump(mode="json", by_alias=True),
+        }
+    if op == "select_cookbook":
+        cb_id = str(slug or content or "second-brain").strip()
+        snap = svc.select_cookbook(scope=resolved_scope, cookbook_id=cb_id, load_demo_seed=True)
+        return {
+            "ok": True,
+            "summary": f"Switched {resolved_scope} to Cookbook {snap.active_cookbook.number} {snap.active_cookbook.name}.",
+            "cookbookId": snap.active_cookbook.id,
+        }
+    return {"ok": False, "summary": f"Unsupported memory_manage operation: {operation}"}
+
+
+

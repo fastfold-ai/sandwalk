@@ -768,9 +768,64 @@ def test_comprehensive_memory_omnigraph_capy_and_specialist_coverage(
         assert capy_distill_session(session_id="missing-id")["ok"] is False
         assert capy_distill_session(session_id=rich_sess.id, scope="global")["ok"] is True
 
-        # 7. Skill Crystallization (POST /v1/memory/skills/create, memory.create_skill, capy.create_skill_from_memory)
-        from tools.capy import capy_create_skill_from_memory
-        from tools.memory import create_skill_from_memory
+        # 7. Skill Crystallization + Full Agent/Capy Management (memory.create_skill, memory.select_cookbook, memory.distill_session, capy.memory_manage, capy.create_skill_from_memory)
+        from tools.capy import capy_create_skill_from_memory, capy_memory_manage
+        from tools.memory import (
+            create_skill_from_memory,
+            distill_session_tool,
+            select_cookbook_tool,
+        )
+
+        assert select_cookbook_tool("second-brain", scope="global", load_demo_seed=True)["ok"] is True
+        assert distill_session_tool(rich_sess.id, scope="global")["ok"] is True
+
+        assert (
+            capy_memory_manage(
+                operation="add_user_memory", content="User likes dark mode."
+            )["ok"]
+            is True
+        )
+        assert (
+            capy_memory_manage(
+                operation="add_memory", scope="global", content="Always run ruff check."
+            )["ok"]
+            is True
+        )
+        assert (
+            capy_memory_manage(
+                operation="remove_memory", scope="global", content="Always run ruff check."
+            )["ok"]
+            is True
+        )
+        assert (
+            capy_memory_manage(
+                operation="write_wiki",
+                scope="global",
+                slug="capy-managed-page",
+                title="Capy Managed Page",
+                content="Linked to [[index]].",
+            )["ok"]
+            is True
+        )
+        assert (
+            capy_memory_manage(
+                operation="record_claim",
+                scope="global",
+                title="Project:sandwalk",
+                predicate="AdvancesGoal",
+                target="Goal:local-first",
+                polarity="support",
+                content="Capy recorded claim.",
+            )["ok"]
+            is True
+        )
+        assert (
+            capy_memory_manage(
+                operation="select_cookbook", scope="global", slug="second-brain"
+            )["ok"]
+            is True
+        )
+        assert capy_memory_manage(operation="unknown_op")["ok"] is False
 
         route_skill = client.post(
             "/v1/memory/skills/create",

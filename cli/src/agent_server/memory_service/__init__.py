@@ -536,6 +536,12 @@ class MemoryService:
 
         if not sections:
             return ""
+        sections.append(
+            "### AUTONOMOUS KNOWLEDGE STEWARDSHIP\n"
+            "- Proactively persist durable user preferences (`memory.mutate` with `target='user'`) and workspace/scientific rules (`target='memory'`).\n"
+            "- Synthesize multi-paragraph briefs into the Living Wiki (`memory.wiki_write` with `[[wikilinks]]`) and record supporting/contradicting evidence in the Knowledge Graph (`memory.graph_record_claim`, `memory.graph_upsert_node`).\n"
+            "- When the user asks to turn what we know about a topic, Wiki page, or Cookbook ontology into a reusable Skill, call `memory.create_skill`."
+        )
         return "\n\n".join(sections)
 
 

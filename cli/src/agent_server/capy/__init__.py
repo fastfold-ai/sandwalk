@@ -38,8 +38,10 @@ CAPY_TOOL_NAMES = [
     "capy.handoff_session",
     "capy.list_specialists",
     "capy.memory_search",
+    "capy.memory_manage",
     "capy.wiki_digest",
     "capy.distill_session",
+    "capy.create_skill_from_memory",
 ]
 
 # Deep Agents builtins Capy must not see (no sandbox / PTC).
