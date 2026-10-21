@@ -272,26 +272,11 @@ Models then appear under **ChatGPT plan** in the picker. The same model under **
 
 ## Other coding agents
 
-Sandwalk is designed as an open hub that works *with* the coding and research agents on your machine—reading and writing the session stores of **Claude Code**, **Codex**, **OpenCode**, **fx**, and **Hermes** while adding multi-agent orchestration, GPU sandboxes, and compounding memory:
-
-| Capability | Sandwalk Native | Claude Code | Codex | OpenCode | fx | Hermes |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Run inside a Sandwalk terminal with live agent badge | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Import external sessions as Sandwalk chats | Native | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Bidirectional handoff via `.sandwalk/handoff-<id>.md` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Resume with synthesized native history (`--resume`) | Native | ✓ | ✓ | — | — | — |
-| Distill imported transcripts into `MEMORY.md`, Wiki & Omnigraph | ✓ | ✓ (via import) | ✓ (via import) | ✓ (via import) | ✓ (via import) | ✓ (via import) |
-| Crystallize session findings into reusable `SKILL.md` skills | ✓ | ✓ (via import) | ✓ (via import) | ✓ (via import) | ✓ (via import) | ✓ (via import) |
-| Orchestrated by **Capy** (spawn, seed, split-grid layout) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Multi-provider routing (17 Cloud + ChatGPT Plan + Local GGUF) | ✓ | — | — | ✓ | — | ✓ |
-| On-demand Modal Cloud GPU sandboxes (`T4` / `A100` / `H100`) | ✓ | — | — | — | — | — |
-| Built-in scientific toolkit (190+ bio/chem tools) & harness evals | ✓ | — | — | — | — | — |
+Sandwalk reads and writes the session stores of **Claude Code**, **Codex**, **OpenCode**, **fx**, and **Hermes**—so you can run them inside a Sandwalk terminal with a live agent badge, import their transcripts as Sandwalk chats, or hand a Sandwalk chat to them:
 
 - **Import**: Onboarding offers your recent sessions; later, right-click a terminal running one of these agents and choose **Convert to chat**, or ask Capy. The chat keeps the original folder as its workspace and is history-only until you send a message (or distill it into your Living Wiki and Omnigraph).
 - **Continue in…**: On any chat, pick the agent. Sandwalk writes `.sandwalk/handoff-<id>.md` in the workspace and opens the CLI on it. For Claude Code and Codex, **native history** also synthesizes their native session file so `claude --resume` / `codex resume` open the conversation directly (with the handoff file always present as a fallback).
 - **Capy**: *"import my last Codex session and distill its takeaways into the Wiki"*, *"open OpenCode in this project"*, *"hand this chat to Claude Code"*.
-
-Those formats belong to their vendors and change between releases; readers degrade gracefully to the handoff path when they stop matching.
 
 ## CLI
 
