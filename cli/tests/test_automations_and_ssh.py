@@ -727,4 +727,23 @@ def test_automations_update_reconcile_and_route_errors(tmp_path: Path) -> None:
     asyncio.run(_run_brief_loop())
 
 
+def test_ssh_host_deduplication_on_reconnect(tmp_path: Path) -> None:
+    store = AgentStore(tmp_path / "dedup.db")
+    svc = SshService(store)
+
+    h1 = svc.create_host(
+        CreateSshHostRequest(
+            target="parallels@10.211.55.4",
+            alias="ubuntu-server",
+        )
+    )
+    # Re-resolving by raw `user@host` or `host` must return the same host ID and preserve alias
+    h2 = svc.resolve_or_create_host("parallels@10.211.55.4")
+    h3 = svc.resolve_or_create_host("10.211.55.4")
+    assert h1.id == h2.id == h3.id
+    assert h2.alias == "ubuntu-server"
+    assert len(store.list_saved_ssh_hosts()) == 1
+
+
+
 

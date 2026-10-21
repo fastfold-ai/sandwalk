@@ -39,6 +39,7 @@ import {
   rememberRemoteHostname,
   rememberRemotePlatform
 } from '@/lib/remote-hostname'
+import { persistRememberedApiKey } from '@/lib/remembered-auth'
 import { resolveBackendApiKey } from '@/lib/resolve-backend-api-key'
 import { cn } from '@/lib/utils'
 
@@ -272,13 +273,26 @@ export function OpenRemoteWindowDialog({
           failedStep?.detail || 'Could not establish SSH tunnel to remote server'
         )
       }
-      if (res.hostname) rememberRemoteHostname(res.localUrl, res.hostname)
-      if (res.platform) rememberRemotePlatform(res.localUrl, res.platform)
+      const remoteHostLabel =
+        res.hostname ||
+        res.host?.hostname ||
+        res.host?.alias ||
+        sshAlias.trim() ||
+        target
+      const remotePlatform =
+        res.platform || res.host?.platform || 'Linux'
+      rememberRemoteHostname(res.localUrl, remoteHostLabel)
+      rememberRemotePlatform(res.localUrl, remotePlatform)
+      if (res.remoteApiKey) {
+        persistRememberedApiKey(res.localUrl, res.remoteApiKey)
+      }
       await openDesktopWindow({
         backendUrl: res.localUrl,
         apiKey: res.remoteApiKey || null,
-        hostname: res.hostname || sshAlias.trim() || target,
-        platform: res.platform || null,
+        title: remoteHostLabel,
+        hostname: remoteHostLabel,
+        platform: remotePlatform,
+        route: '/agents/new',
         focusExisting: true
       })
       onOpenChange(false)

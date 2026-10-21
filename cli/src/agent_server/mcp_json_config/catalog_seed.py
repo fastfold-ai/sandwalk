@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import sqlite3
+import threading
+
 from agent.mcp_catalog import MCP_CATALOG, catalog_create_kwargs
 from agent_server.mcp_json_config.catalog_removed import get_removed_catalog_ids
 from agent_server.mcp_service import enrich_mcp_server
 from agent_server.store import AgentStore
+
+_SEED_LOCK = threading.Lock()
 
 
 def prune_obsolete_catalog_servers(store: AgentStore) -> int:
@@ -32,23 +37,27 @@ def seed_catalog_defaults(store: AgentStore) -> int:
     Non-featured catalog entries are opt-in via install / Suggested after remove.
     Returns the number of newly created servers.
     """
-    removed = get_removed_catalog_ids()
-    by_catalog = {
-        str(s.catalog_id).strip(): s
-        for s in store.list_mcp_servers()
-        if getattr(s, "catalog_id", None)
-    }
-    created = 0
-    for entry in MCP_CATALOG:
-        if not entry.featured:
-            continue
-        if entry.id in removed:
-            continue
-        if entry.id in by_catalog:
-            continue
-        store.create_mcp_server(**catalog_create_kwargs(entry, enabled=False))
-        created += 1
-    return created
+    with _SEED_LOCK:
+        removed = get_removed_catalog_ids()
+        by_catalog = {
+            str(s.catalog_id).strip(): s
+            for s in store.list_mcp_servers()
+            if getattr(s, "catalog_id", None)
+        }
+        created = 0
+        for entry in MCP_CATALOG:
+            if not entry.featured:
+                continue
+            if entry.id in removed:
+                continue
+            if entry.id in by_catalog:
+                continue
+            try:
+                store.create_mcp_server(**catalog_create_kwargs(entry, enabled=False))
+                created += 1
+            except sqlite3.IntegrityError:
+                pass
+        return created
 
 
 def list_enriched_custom_servers(store: AgentStore) -> list:

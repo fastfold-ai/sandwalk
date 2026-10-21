@@ -184,8 +184,11 @@ pub fn normalize_url(url: &str) -> String {
 }
 
 fn is_local_url(url: &str) -> bool {
-    let u = url.to_lowercase();
-    u.contains("127.0.0.1") || u.contains("localhost")
+    let u = normalize_url(url).to_lowercase();
+    u == "http://127.0.0.1:8787"
+        || u == "http://localhost:8787"
+        || u == "http://127.0.0.1"
+        || u == "http://localhost"
 }
 
 fn is_generic_title(title: &str) -> bool {
@@ -287,7 +290,7 @@ fn emit_recents_changed(app: &AppHandle) {
 
 fn hostport_from_url(url: &str) -> Option<String> {
     let url = normalize_url(url);
-    if url.contains("127.0.0.1") || url.to_lowercase().contains("localhost") {
+    if is_local_url(&url) {
         return None;
     }
     let rest = url
@@ -555,7 +558,7 @@ pub fn window_title_for_url(url: &str) -> String {
 /// Dock / cold-start title. Prefer hostname over raw IP when known.
 pub fn window_title_for_remote(url: &str, hostname: Option<&str>) -> String {
     let url = normalize_url(url);
-    if url.contains("127.0.0.1") || url.to_lowercase().contains("localhost") {
+    if is_local_url(&url) {
         return "Sandwalk".into();
     }
     let hostport = hostport_from_url(&url).unwrap_or_else(|| url.clone());

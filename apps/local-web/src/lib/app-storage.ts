@@ -1,5 +1,18 @@
 import type { SessionGroup } from '@sandwalk/agent-ui-core'
 
+import {
+  hasDesktopBackendInject,
+  injectedDesktopBackendUrl
+} from '@/lib/backend-url'
+
+function scopedStorageKey(baseKey: string): string {
+  if (hasDesktopBackendInject()) {
+    const remoteUrl = injectedDesktopBackendUrl()
+    if (remoteUrl) return `${baseKey}@${remoteUrl}`
+  }
+  return baseKey
+}
+
 export const SIDEBAR_COLLAPSED_STORAGE_KEY =
   'agent-ide-v2-assistant-ui-base-sidebar-collapsed'
 export const FILES_PANEL_COLLAPSED_STORAGE_KEY =
@@ -54,7 +67,9 @@ export function projectTabsKey(projectId: string | null | undefined) {
 
 export function readOpenTabsByProject(): Record<string, string[]> {
   try {
-    const raw = localStorage.getItem(OPEN_SESSION_TABS_STORAGE_KEY)
+    const raw = localStorage.getItem(
+      scopedStorageKey(OPEN_SESSION_TABS_STORAGE_KEY)
+    )
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -70,6 +85,7 @@ export function readOpenTabsByProject(): Record<string, string[]> {
         return result
       }
     }
+    if (hasDesktopBackendInject()) return {}
     const legacy = localStorage.getItem(OPEN_SESSION_TABS_LEGACY_KEY)
     if (!legacy) return {}
     const parsed = JSON.parse(legacy) as unknown
@@ -85,7 +101,10 @@ export function readOpenTabsByProject(): Record<string, string[]> {
 
 export function writeOpenTabsByProject(map: Record<string, string[]>) {
   try {
-    localStorage.setItem(OPEN_SESSION_TABS_STORAGE_KEY, JSON.stringify(map))
+    localStorage.setItem(
+      scopedStorageKey(OPEN_SESSION_TABS_STORAGE_KEY),
+      JSON.stringify(map)
+    )
   } catch {
     // ignore storage failures
   }
@@ -99,7 +118,9 @@ export function readProjectScopeId(): string | null {
       )
       if (projectMatch?.[1]) return decodeURIComponent(projectMatch[1])
     }
-    const raw = localStorage.getItem(PROJECT_SCOPE_STORAGE_KEY)
+    const raw = localStorage.getItem(
+      scopedStorageKey(PROJECT_SCOPE_STORAGE_KEY)
+    )
     if (!raw || raw === ALL_PROJECTS_TABS_KEY) return null
     return raw
   } catch {
@@ -110,7 +131,7 @@ export function readProjectScopeId(): string | null {
 export function writeProjectScopeId(projectId: string | null) {
   try {
     localStorage.setItem(
-      PROJECT_SCOPE_STORAGE_KEY,
+      scopedStorageKey(PROJECT_SCOPE_STORAGE_KEY),
       projectId || ALL_PROJECTS_TABS_KEY
     )
   } catch {
@@ -120,7 +141,9 @@ export function writeProjectScopeId(projectId: string | null) {
 
 export function readLastSessionByScope(): Record<string, string> {
   try {
-    const raw = localStorage.getItem(LAST_SESSION_BY_SCOPE_KEY)
+    const raw = localStorage.getItem(
+      scopedStorageKey(LAST_SESSION_BY_SCOPE_KEY)
+    )
     if (!raw) return {}
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -140,7 +163,10 @@ export function readLastSessionByScope(): Record<string, string> {
 
 export function writeLastSessionByScope(map: Record<string, string>) {
   try {
-    localStorage.setItem(LAST_SESSION_BY_SCOPE_KEY, JSON.stringify(map))
+    localStorage.setItem(
+      scopedStorageKey(LAST_SESSION_BY_SCOPE_KEY),
+      JSON.stringify(map)
+    )
   } catch {
     // ignore storage failures
   }
@@ -148,7 +174,9 @@ export function writeLastSessionByScope(map: Record<string, string>) {
 
 export function readRecentProjectIds(): string[] {
   try {
-    const raw = localStorage.getItem(RECENT_PROJECT_IDS_STORAGE_KEY)
+    const raw = localStorage.getItem(
+      scopedStorageKey(RECENT_PROJECT_IDS_STORAGE_KEY)
+    )
     if (!raw) return []
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return []
@@ -162,7 +190,10 @@ export function readRecentProjectIds(): string[] {
 
 export function writeRecentProjectIds(ids: string[]) {
   try {
-    localStorage.setItem(RECENT_PROJECT_IDS_STORAGE_KEY, JSON.stringify(ids))
+    localStorage.setItem(
+      scopedStorageKey(RECENT_PROJECT_IDS_STORAGE_KEY),
+      JSON.stringify(ids)
+    )
   } catch {
     // ignore storage failures
   }
@@ -209,7 +240,7 @@ export function writeCollapsedSidebarSections(value: Record<string, boolean>) {
  */
 export function readTabGroups(): SessionGroup[] {
   try {
-    const raw = localStorage.getItem(TAB_GROUPS_STORAGE_KEY)
+    const raw = localStorage.getItem(scopedStorageKey(TAB_GROUPS_STORAGE_KEY))
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed)) {
@@ -245,6 +276,7 @@ export function readTabGroups(): SessionGroup[] {
           .map(g => (g.layout ? { ...g, layout: sanitizeLayout(g.layout) } : g))
       }
     }
+    if (hasDesktopBackendInject()) return []
     // Fallback: migrar desde el schema por-proyecto (aplanado + dedupe).
     const legacy = localStorage.getItem(TAB_GROUPS_LEGACY_KEY)
     if (!legacy) return []
@@ -365,7 +397,10 @@ export function writeTabGroups(groups: SessionGroup[]) {
     // de origen vuelve a ser tab suelto natural. Complementa el filtro
     // defensivo en `readTabGroups`.
     const persistable = groups.filter(g => !g.isPending)
-    localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify(persistable))
+    localStorage.setItem(
+      scopedStorageKey(TAB_GROUPS_STORAGE_KEY),
+      JSON.stringify(persistable)
+    )
   } catch {
     // ignore storage failures
   }

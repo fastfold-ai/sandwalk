@@ -489,13 +489,37 @@ class AutomationMixin:
     ) -> SshHost:
         now = utc_now().isoformat()
         hid = host_id or str(uuid.uuid4())
+        clean_alias = alias.strip() or host.strip()
+        clean_host = host.strip()
+        clean_user = user.strip() if user and user.strip() else None
+        clean_port = int(port or 22)
         with self._write_lock, self._connect() as conn:
             existing = conn.execute(
-                "SELECT * FROM ssh_hosts WHERE id = ? OR lower(alias) = lower(?)",
-                (hid, alias.strip()),
+                """
+                SELECT * FROM ssh_hosts
+                WHERE id = ?
+                   OR lower(alias) = lower(?)
+                   OR (
+                        lower(host) = lower(?)
+                        AND coalesce(lower(user), '') = coalesce(lower(?), '')
+                        AND port = ?
+                   )
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (hid, clean_alias, clean_host, clean_user or "", clean_port),
             ).fetchone()
             if existing is not None:
                 hid = existing["id"]
+                existing_alias = (existing["alias"] or "").strip()
+                # Preserve existing human alias if the incoming alias is just the raw host/IP
+                effective_alias = (
+                    existing_alias
+                    if existing_alias
+                    and existing_alias.lower() != clean_host.lower()
+                    and clean_alias.lower() == clean_host.lower()
+                    else clean_alias
+                )
                 conn.execute(
                     """
                     UPDATE ssh_hosts
@@ -504,17 +528,28 @@ class AutomationMixin:
                     WHERE id = ?
                     """,
                     (
-                        alias.strip(),
-                        host.strip(),
-                        user.strip() if user else None,
-                        int(port or 22),
-                        identity_file,
-                        proxy_jump,
-                        int(remote_port or 8787),
-                        default_workdir,
+                        effective_alias,
+                        clean_host,
+                        clean_user or existing["user"],
+                        clean_port,
+                        identity_file or existing["identity_file"],
+                        proxy_jump or existing["proxy_jump"],
+                        int(remote_port or existing["remote_port"] or 8787),
+                        default_workdir or existing["default_workdir"],
                         now,
                         hid,
                     ),
+                )
+                # Remove any stale duplicate rows for the same (host, user, port)
+                conn.execute(
+                    """
+                    DELETE FROM ssh_hosts
+                    WHERE id != ?
+                      AND lower(host) = lower(?)
+                      AND coalesce(lower(user), '') = coalesce(lower(?), '')
+                      AND port = ?
+                    """,
+                    (hid, clean_host, clean_user or existing["user"] or "", clean_port),
                 )
             else:
                 conn.execute(
@@ -526,10 +561,10 @@ class AutomationMixin:
                     """,
                     (
                         hid,
-                        alias.strip(),
-                        host.strip(),
-                        user.strip() if user else None,
-                        int(port or 22),
+                        clean_alias,
+                        clean_host,
+                        clean_user,
+                        clean_port,
                         identity_file,
                         proxy_jump,
                         int(remote_port or 8787),
@@ -547,19 +582,63 @@ class AutomationMixin:
         needle = (id_or_alias or "").strip()
         if not needle:
             return None
+        user_part: str | None = None
+        host_part = needle
+        if "@" in needle and " " not in needle:
+            u, h = needle.split("@", 1)
+            user_part = u.strip() or None
+            host_part = h.strip()
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM ssh_hosts WHERE id = ? OR lower(alias) = lower(?) OR lower(host) = lower(?) LIMIT 1",
-                (needle, needle, needle),
+                """
+                SELECT * FROM ssh_hosts
+                WHERE id = ?
+                   OR lower(alias) = lower(?)
+                   OR lower(host) = lower(?)
+                   OR lower(host) = lower(?)
+                   OR (
+                        ? IS NOT NULL
+                        AND lower(host) = lower(?)
+                        AND coalesce(lower(user), '') = lower(?)
+                   )
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (
+                    needle,
+                    needle,
+                    needle,
+                    host_part,
+                    user_part,
+                    host_part,
+                    user_part or "",
+                ),
             ).fetchone()
         return ssh_host_from_row(row) if row is not None else None
 
     def list_saved_ssh_hosts(self) -> list[SshHost]:
-        with self._connect() as conn:
+        with self._write_lock, self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM ssh_hosts ORDER BY updated_at DESC, alias ASC"
             ).fetchall()
-        return [ssh_host_from_row(r) for r in rows]
+            seen_targets: set[tuple[str, str, int]] = set()
+            kept: list[SshHost] = []
+            duplicate_ids: list[str] = []
+            for r in rows:
+                h = ssh_host_from_row(r)
+                key = (h.host.lower(), (h.user or "").lower(), int(h.port or 22))
+                if key in seen_targets:
+                    duplicate_ids.append(h.id)
+                    continue
+                seen_targets.add(key)
+                kept.append(h)
+            if duplicate_ids:
+                placeholders = ",".join("?" for _ in duplicate_ids)
+                conn.execute(
+                    f"DELETE FROM ssh_hosts WHERE id IN ({placeholders})",
+                    tuple(duplicate_ids),
+                )
+        return kept
 
     def update_ssh_host_status(
         self,

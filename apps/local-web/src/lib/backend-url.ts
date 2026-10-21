@@ -217,7 +217,25 @@ export function backendUrlFromPage(location: {
 }
 
 export function isLocalBackendUrl(url: string): boolean {
-  return /127\.0\.0\.1|localhost/i.test(url)
+  const trimmed = url.trim()
+  if (!trimmed) return true
+  try {
+    const parsed = new URL(
+      trimmed.includes('://') ? trimmed : `http://${trimmed}`
+    )
+    const host = parsed.hostname.toLowerCase()
+    const isLoopback =
+      host === '127.0.0.1' ||
+      host === 'localhost' ||
+      host === '::1' ||
+      host === '[::1]'
+    if (!isLoopback) return false
+    // Only port 8787 (or default/empty) is the local Sandwalk server.
+    // Non-8787 loopback ports are SSH port-forwarded remote tunnels (`ssh -L <port>:127.0.0.1:8787`).
+    return parsed.port === '' || parsed.port === '8787'
+  } catch {
+    return /127\.0\.0\.1:8787|localhost:8787/i.test(trimmed)
+  }
 }
 
 /** Trim trailing slashes; fall back to the default when empty. */

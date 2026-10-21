@@ -291,12 +291,12 @@ export function useAppBootstrapConnect({
       setAuthLoginError(null)
       setHealth(nextHealth)
       const [, , , , , , , settings, sandbox] = await Promise.all([
-        loadSessions({ force: true }),
-        loadProjects(),
-        loadSkills(),
-        loadIntegrations(),
-        loadMcpServers(),
-        loadMcpCatalog(),
+        loadSessions({ force: true }).catch(() => undefined),
+        loadProjects().catch(() => undefined),
+        loadSkills().catch(() => undefined),
+        loadIntegrations().catch(() => undefined),
+        loadMcpServers().catch(() => undefined),
+        loadMcpCatalog().catch(() => undefined),
         loadSpecialists(),
         dedupeAsync(`runtime:${scope}`, () => active.getRuntimeSettings()),
         dedupeAsync(`sandbox:${scope}`, () =>

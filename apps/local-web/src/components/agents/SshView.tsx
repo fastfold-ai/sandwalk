@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { isTauri, openDesktopWindow } from '@/lib/desktop'
+import { persistRememberedApiKey } from '@/lib/remembered-auth'
 import {
   rememberRemoteHostname,
   rememberRemotePlatform
@@ -111,17 +112,30 @@ export function SshView({ client }: { client: LocalAgentClient }) {
       }
 
       if (res.localUrl) {
-        if (res.hostname) rememberRemoteHostname(res.localUrl, res.hostname)
-        if (res.platform) rememberRemotePlatform(res.localUrl, res.platform)
+        const remoteHostLabel =
+          res.hostname ||
+          res.host?.hostname ||
+          res.host?.alias ||
+          sshAlias.trim() ||
+          target
+        const remotePlatform =
+          res.platform || res.host?.platform || 'Linux'
+        rememberRemoteHostname(res.localUrl, remoteHostLabel)
+        rememberRemotePlatform(res.localUrl, remotePlatform)
+        if (res.remoteApiKey) {
+          persistRememberedApiKey(res.localUrl, res.remoteApiKey)
+        }
         if (isTauri()) {
           await openDesktopWindow({
             backendUrl: res.localUrl,
             apiKey: res.remoteApiKey || null,
-            hostname: res.hostname || sshAlias.trim() || target,
-            platform: res.platform || null,
+            title: remoteHostLabel,
+            hostname: remoteHostLabel,
+            platform: remotePlatform,
+            route: '/agents/new',
             focusExisting: true
           })
-          toast.success(`Opened remote window for ${res.hostname || target}`)
+          toast.success(`Opened remote window for ${remoteHostLabel}`)
         } else {
           toast.success(
             `Connected & tunneled at ${res.localUrl} (${res.daemonPersistence || 'persistent'})`

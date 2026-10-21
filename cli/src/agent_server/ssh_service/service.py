@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 import shlex
@@ -10,6 +12,7 @@ import stat
 import subprocess
 import tempfile
 import time
+import zlib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -40,10 +43,22 @@ logger = logging.getLogger("agent_server.ssh")
 _ACTIVE_TUNNELS: dict[str, tuple[int, subprocess.Popen[Any]]] = {}
 
 
-def _find_free_local_port() -> int:
+def _find_free_local_port(preferred_port: int | None = None) -> int:
+    if preferred_port and preferred_port != 8787:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(("127.0.0.1", int(preferred_port)))
+                return int(s.getsockname()[1])
+        except OSError:
+            pass
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+def _deterministic_tunnel_port(host: SshHost) -> int:
+    key = f"{(host.user or '').lower()}@{host.host.lower()}:{host.port or 22}"
+    return 18800 + (zlib.crc32(key.encode("utf-8")) % 1000)
 
 
 def _is_local_port_listening(port: int) -> bool:
@@ -62,9 +77,11 @@ class SshService:
 
     def list_hosts(self, *, include_ssh_config: bool = True) -> list[SshHost]:
         saved = self.store.list_saved_ssh_hosts()
-        saved_keys = {
-            (h.alias.lower(), h.host.lower()) for h in saved
-        } | {h.alias.lower() for h in saved}
+        saved_keys = (
+            {(h.alias.lower(), h.host.lower()) for h in saved}
+            | {h.alias.lower() for h in saved}
+            | {h.host.lower() for h in saved}
+        )
 
         out: list[SshHost] = []
         for h in saved:
@@ -74,6 +91,7 @@ class SshService:
             for cfg_host in discover_ssh_config_hosts():
                 if (
                     cfg_host.alias.lower() in saved_keys
+                    or cfg_host.host.lower() in saved_keys
                     or (cfg_host.alias.lower(), cfg_host.host.lower()) in saved_keys
                 ):
                     continue
@@ -93,6 +111,14 @@ class SshService:
                     }
                 )
             _ACTIVE_TUNNELS.pop(host.id, None)
+        if host.tunnel_local_port and _is_local_port_listening(host.tunnel_local_port):
+            return host.model_copy(
+                update={
+                    "tunnel_local_port": host.tunnel_local_port,
+                    "tunnel_url": f"http://127.0.0.1:{host.tunnel_local_port}",
+                    "status": "tunnel_active",
+                }
+            )
         return host
 
     def resolve_or_create_host(self, id_or_target: str) -> SshHost:
@@ -340,7 +366,8 @@ class SshService:
         effective_workdir = workdir or host.default_workdir
         remote_cmd = command.strip()
         if effective_workdir:
-            remote_cmd = f"cd {shlex.quote(effective_workdir)} && {remote_cmd}"
+            q_wd = shlex.quote(effective_workdir)
+            remote_cmd = f"(mkdir -p {q_wd} 2>/dev/null; cd {q_wd} 2>/dev/null || true); {remote_cmd}"
         # Ensure ~/.local/bin and ~/.cargo/bin are on PATH for non-login SSH shells
         wrapped_cmd = (
             'export PATH="$HOME/.local/bin:$HOME/.sandwalk/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"; '
@@ -451,7 +478,7 @@ class SshService:
     def probe_host(self, host_id_or_target: str) -> SshProbeResult:
         host = self.resolve_or_create_host(host_id_or_target)
         probe_script = (
-            'echo "HOSTNAME=$(hostname)"; '
+            'echo "HOSTNAME=$(hostname 2>/dev/null || uname -n 2>/dev/null || cat /etc/hostname 2>/dev/null || true)"; '
             'echo "UNAME=$(uname -s) $(uname -m)"; '
             'echo "PWD=$HOME"; '
             'echo "GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n 2 | tr \'\\n\' \',\' || true)"; '
@@ -688,6 +715,7 @@ class SshService:
         persistence_mode = "existing"
         watchdog_installed = False
         if req.start_daemon and sw_installed:
+            self._sync_local_llm_config_to_remote(host)
             rport = host.remote_port or 8787
             daemon_script = f"""
 mkdir -p "$HOME/.sandwalk/logs"
@@ -740,18 +768,28 @@ for i in 1 2 3 4 5 6 7 8; do
   sleep 1
 done
 python3 - <<'PY' 2>/dev/null || true
-import json, os, pathlib
+import json, pathlib
+cfg_dir = pathlib.Path.home() / ".config/sandwalk"
+cfg_dir.mkdir(parents=True, exist_ok=True)
 for p in [
-    pathlib.Path.home() / ".config/sandwalk/settings.json",
+    cfg_dir / "settings.json",
     pathlib.Path.home() / "Library/Application Support/Sandwalk/settings.json",
 ]:
     if p.exists():
         data = json.loads(p.read_text())
+        onb = data.get("onboarding") or {{}}
+        if not onb.get("completed"):
+            data["onboarding"] = {{"completed": True, "step": 5}}
+            p.write_text(json.dumps(data, indent=2))
         key = (data.get("auth") or {{}}).get("api_key") or ""
         if key:
             print("REMOTE_KEY=" + key)
-            break
+        break
+else:
+    (cfg_dir / "settings.json").write_text(json.dumps({{"onboarding": {{"completed": True, "step": 5}}}}, indent=2))
 PY
+curl -fsS --max-time 2 -X PUT http://127.0.0.1:{rport}/v1/settings/onboarding -H "Content-Type: application/json" -d '{{"completed":true,"step":5}}' >/dev/null 2>&1 || true
+curl -fsS --max-time 3 http://127.0.0.1:{rport}/v1/mcp-servers >/dev/null 2>&1 || true
 """
             d_res = self.exec_command(host.id, daemon_script, timeout_seconds=35.0)
             remote_api_key: str | None = None
@@ -821,6 +859,62 @@ PY
             watchdog_installed=watchdog_installed,
         )
 
+    def _sync_local_llm_config_to_remote(self, host: SshHost) -> None:
+        """Seed missing `llm.*` model/provider settings from local ~/.sandwalk/config.json onto remote host."""
+        local_cfg_path = (Path.home() / ".sandwalk" / "config.json").expanduser()
+        if not local_cfg_path.exists():
+            return
+        try:
+            local_data = json.loads(local_cfg_path.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        if not isinstance(local_data, dict):
+            return
+        llm_subset = {
+            k: v
+            for k, v in local_data.items()
+            if k.startswith("llm.") or k in ("ui.onboarding_completed", "ui.onboarding_step")
+        }
+        if not llm_subset:
+            return
+        b64_payload = base64.b64encode(
+            zlib.compress(json.dumps(llm_subset).encode("utf-8"))
+        ).decode("ascii")
+        remote_py = """
+import base64, json, pathlib, sys, zlib
+p = pathlib.Path.home() / ".sandwalk/config.json"
+p.parent.mkdir(parents=True, exist_ok=True)
+cur = json.loads(p.read_text()) if p.exists() else {}
+inc = json.loads(zlib.decompress(base64.b64decode(sys.argv[2])).decode("utf-8"))
+first_seed = not cur.get("ssh.llm_seeded")
+changed = False
+for k, v in inc.items():
+    if first_seed or k not in cur or cur.get(k) in (None, "", [], {}):
+        if cur.get(k) != v:
+            cur[k] = v
+            changed = True
+if first_seed:
+    cur["ssh.llm_seeded"] = True
+    cur["ui.onboarding_completed"] = True
+    changed = True
+if changed:
+    p.write_text(json.dumps(cur, indent=2))
+    print("SYNCED=1")
+""".strip()
+        b64_py = base64.b64encode(remote_py.encode("utf-8")).decode("ascii")
+        sync_cmd = (
+            f"python3 -c 'import base64, sys; exec(base64.b64decode(sys.argv[1]).decode())' "
+            f"{shlex.quote(b64_py)} {shlex.quote(b64_payload)}"
+        )
+        res = self.exec_command(host.id, sync_cmd, timeout_seconds=10.0)
+        if "SYNCED=1" in (res.stdout or ""):
+            rport = host.remote_port or 8787
+            self.exec_command(
+                host.id,
+                f"systemctl --user restart sandwalk.service >/dev/null 2>&1 || kill $(lsof -ti :{rport}) >/dev/null 2>&1 || true",
+                timeout_seconds=10.0,
+            )
+
     def open_tunnel(self, host_id_or_target: str) -> int:
         host = self.resolve_or_create_host(host_id_or_target)
         existing = _ACTIVE_TUNNELS.get(host.id)
@@ -830,7 +924,11 @@ PY
                 return lport
             _ACTIVE_TUNNELS.pop(host.id, None)
 
-        local_port = _find_free_local_port()
+        if host.tunnel_local_port and _is_local_port_listening(host.tunnel_local_port):
+            return int(host.tunnel_local_port)
+
+        preferred = host.tunnel_local_port or _deterministic_tunnel_port(host)
+        local_port = _find_free_local_port(preferred)
         ssh_cmd = [
             "ssh",
             "-N",
