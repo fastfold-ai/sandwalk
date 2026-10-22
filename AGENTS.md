@@ -2,7 +2,7 @@
 
 Sandwalk is a monorepo: `cli/` (Python agent API + CLI), `apps/local-web/`
 (React dashboard, Tauri shell), `apps/sandwalk-mac/` (Swift menubar server),
-`apps/packaging/` (DMG / signing). Two skills in `.cursor/skills/` carry the
+`apps/packaging/` (DMG / signing). Two skills in `.agents/skills/` carry the
 day-to-day workflow — read them before running or testing anything:
 
 - **`sandwalk-dev-loop`** — run the API (`scripts/dev-api.sh`, :8787) and the UI

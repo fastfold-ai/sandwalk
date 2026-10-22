@@ -299,7 +299,7 @@ scripts/verify.sh e2e     # Playwright: grid, terminals, PTY round-trip
 pnpm e2e:bench            # perf report -> apps/local-web/e2e/results/grid-latest.json
 ```
 
-See [AGENTS.md](AGENTS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [.github/TESTING.md](.github/TESTING.md), and [apps/packaging/APPLE-SIGNING.md](apps/packaging/APPLE-SIGNING.md).
+See [AGENTS.md](AGENTS.md), `.agents/skills/`, [CONTRIBUTING.md](CONTRIBUTING.md), [.github/TESTING.md](.github/TESTING.md), and [apps/packaging/APPLE-SIGNING.md](apps/packaging/APPLE-SIGNING.md).
 
 ## Acknowledgments
 

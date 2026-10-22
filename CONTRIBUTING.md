@@ -73,7 +73,7 @@ pnpm test:mac
 
 See [.github/TESTING.md](.github/TESTING.md) for coverage gates, the e2e/perf
 harness, and the live multi-agent bench. The same workflow is packaged for
-coding agents in [AGENTS.md](AGENTS.md) and `.cursor/skills/`.
+coding agents in [AGENTS.md](AGENTS.md) and `.agents/skills/`.
 
 ## Pull requests
 
