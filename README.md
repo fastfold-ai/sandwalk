@@ -7,17 +7,16 @@
 </p>
 
 <p align="center">
-  <strong>An agent harness for ambitious work.</strong>
+  <strong>An agent harness for ambitious work, on a workspace you own.</strong>
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> ·
-  <a href="#philosophy--architecture">Architecture</a> ·
-  <a href="#what-sandwalk-does">Overview</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#benchmarking--evaluation">Benchmarking</a> ·
-  <a href="#models">Models</a> ·
-  <a href="#cli">CLI</a> ·
+  <a href="#quick-install">Quick Install</a> ·
+  <a href="#getting-started">Getting Started</a> ·
+  <a href="#a-look-inside">Inside Sandwalk</a> ·
+  <a href="#cli--desktop-quick-reference">CLI</a> ·
+  <a href="#architecture--memory">Architecture</a> ·
+  <a href="#benchmarking">Benchmarking</a> ·
   <a href="https://sandwalk.sh/docs">Docs</a> ·
   <a href="https://sandwalk.sh">sandwalk.sh</a>
 </p>
@@ -25,44 +24,58 @@
 <p align="center">
   <a href="https://github.com/fastfold-ai/sandwalk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fastfold-ai/sandwalk/ci.yml?branch=main&label=CI&logo=github" alt="CI status"></a>
   <a href="https://app.codecov.io/gh/fastfold-ai/sandwalk"><img src="https://img.shields.io/codecov/c/github/fastfold-ai/sandwalk?branch=main&logo=codecov&label=coverage" alt="Codecov coverage"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
 </p>
 
 <p align="center">
   <img alt="Sandwalk desktop: a chat, the files it produced, and a terminal, side by side" src="images/showcase.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
-## Install
+<p align="center">
+  <sub><em>Sessions, workspace files, terminals, and parallel agents in one local-first harness.</em></sub>
+</p>
 
-### Desktop
+**The local-first AI agent workspace and CLI built by [Fastfold AI](https://sandwalk.sh).** It is built for work that takes days or weeks, not a single prompt — combining a native macOS and Linux desktop app, a full terminal TUI, an orchestrating meta-agent (**Capy**), and a closed learning loop (`USER.md` / `MEMORY.md`, a Living Markdown Wiki, a versioned Omnigraph knowledge graph, and 1-click `SKILL.md` crystallization). Run it on your laptop, an always-on Mac mini, a remote Linux server over 1-click SSH, or on-demand Modal GPUs.
 
-| Platform | Link |
-|----------|------|
-| macOS (Apple Silicon) | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
-| Ubuntu amd64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.14_amd64.deb) |
-| Ubuntu arm64 | [Download](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.14_arm64.deb) |
+Use any model you want — 17 cloud providers (OpenAI, Anthropic, Gemini, xAI, OpenRouter, DeepSeek, Bedrock, and more), your existing **ChatGPT Plus/Pro plan**, local GGUF models via `llama.cpp` / Ollama / oMLX, or your own OpenAI-compatible endpoint. Switch models mid-session with `/models` — no subscription walls, no lock-in.
 
-macOS needs 12.0 or newer and Apple Silicon. Open the disk image and drag Sandwalk to Applications.
+<table>
+<tr><td><b>One workspace everywhere</b></td><td>Native macOS & Ubuntu desktop app, terminal TUI (<code>sandwalk</code>), Web UI, and remote windows over LAN or SSH — all sharing the same sessions, files, and memory.</td></tr>
+<tr><td><b>Capy & parallel grids</b></td><td>Built-in meta-agent (<b>Capy</b>) that spawns parallel sessions, lays out <code>2×2</code> / <code>3×2</code> split grids, coordinates custom <b>Specialists</b> (<b>Otium</b>, <b>Atlas</b>, <b>Nova</b>, <b>Milo</b>, <b>Soren</b>, or your own), and drives the workspace by voice or text.</td></tr>
+<tr><td><b>A closed learning loop</b></td><td>Byte-stable <code>USER.md</code> & <code>MEMORY.md</code> snapshots that preserve KV caches, FTS5 cross-session search, a Living Markdown Wiki with <code>[[wikilinks]]</code>, a Lance-backed <a href="https://www.omnigraph.dev/">Omnigraph</a> knowledge graph (6 Cookbook modes), and 1-click <code>SKILL.md</code> crystallization.</td></tr>
+<tr><td><b>Scheduled automations</b></td><td>Built-in cron & interval scheduler (<code>sandwalk cron</code>) with missed-run catch-up, webhook triggers, session continuity, and <code>wake_on_change_only</code> script watchers that only invoke the LLM when output changes.</td></tr>
+<tr><td><b>Runs anywhere, not just your laptop</b></td><td>1-click Remote-SSH (<code>sandwalk ssh</code>) auto-installs Sandwalk in user space on any Linux/macOS machine or cluster, starts a persistent 24/7 daemon that survives disconnects, and tunnels it back to your desktop. Plus local sandboxes and serverless Modal GPUs (<code>T4</code> to <code>H100</code>).</td></tr>
+<tr><td><b>Plays well with other CLIs</b></td><td>Run <b>Claude Code</b>, <b>Codex</b>, <b>OpenCode</b>, <b>fx</b>, and <b>Hermes</b> inside Sandwalk terminals with live status badges, import their transcripts as chats, or hand any Sandwalk session directly to them.</td></tr>
+<tr><td><b>Research & eval-ready</b></td><td>190+ scientific & engineering tools, interactive 3D molecular structures, 1-click publishing to <code>sandwalk.site</code>, and end-to-end harness benchmarking (<code>sandwalk eval</code>) across MMLU-Pro, LiveCodeBench, BixBench, and Bio-Capybara.</td></tr>
+</table>
 
-On Ubuntu 24.04 or 26.04, add the repository and install:
+---
+
+## Quick Install
+
+### CLI + Desktop (macOS & Linux)
+
+```bash
+curl -fsSL https://sandwalk.sh/install.sh | bash
+sandwalk setup      # configure providers, keys, or ChatGPT sign-in
+sandwalk desktop    # install the native macOS or Ubuntu desktop app
+```
+
+### Desktop Installers
+
+| Platform | Package |
+|----------|---------|
+| **macOS (Apple Silicon)** | [Download `Sandwalk-macos-arm64.dmg`](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) (macOS 12.0+) |
+| **Ubuntu (amd64)** | [Download `Sandwalk_0.1.14_amd64.deb`](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.14_amd64.deb) |
+| **Ubuntu (arm64)** | [Download `Sandwalk_0.1.14_arm64.deb`](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.14_arm64.deb) |
+
+On Ubuntu 24.04 or 26.04, you can also install and update from the signed APT repository:
 
 ```bash
 curl -fsSL https://apt.sandwalk.sh/sandwalk.gpg | sudo gpg --dearmor -o /usr/share/keyrings/sandwalk.gpg
 echo "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/sandwalk.gpg] https://apt.sandwalk.sh stable main" | sudo tee /etc/apt/sources.list.d/sandwalk.list
-sudo apt update
-sudo apt install sandwalk
+sudo apt update && sudo apt install sandwalk
 ```
-
-Or download the `.deb` from the table and run `sudo apt install ./Sandwalk_*.deb`. Installing the CLI first and running `sandwalk desktop` does the same download for this computer's architecture.
-
-### CLI
-
-```bash
-curl -fsSL https://sandwalk.sh/install.sh | bash
-sandwalk setup
-sandwalk desktop
-```
-
-The installer detects macOS or Linux, installs `uv` if it is missing, and puts `sandwalk` on your `PATH`. `sandwalk setup` walks through providers, keys, and a default model. `sandwalk desktop` installs the desktop app from the latest release. Upgrade the CLI later with `sandwalk upgrade`.
 
 ### From source
 
@@ -75,82 +88,48 @@ scripts/dev-api.sh        # agent API on :8787
 scripts/dev-ui.sh         # Tauri window + Vite on :1420 (`web` for browser only)
 ```
 
-See [Development](#development) for the test and packaging loop.
+---
 
-## Why Sandwalk exists
+## Getting Started
 
-Sandwalk exists to eliminate repetitive work—freeing human minds and teams to focus on ambitious questions that take days or months, not a single prompt—so individual curiosity compounds into collective discovery.
-
-Serious research and engineering cannot live inside one vendor's model, one set of tools, or behind a subscription wall. Sandwalk is built for **maximum freedom of where and how you work**:
-
-- **Run anywhere**: on your laptop, an always-on Mac mini at home, a Linux workstation, an HPC cluster, a cloud VM, or from your phone on the go.
-- **No subscription walls or lock-in**: the entire harness—multi-agent grids, Capy, Memory, Living Wiki, Omnigraph, and Benchmarking—is open, self-hosted, and Apache-2.0. You bring your own keys, your existing ChatGPT plan, or your own hardware.
-- **Switch effortlessly between cloud and local**: move between frontier cloud models and local models (`llama.cpp`, Ollama, oMLX, LM Studio), or between local execution and on-demand cloud GPUs, within the same session.
-- **Share what you discover**: the work stays on the machine that ran it, and a crystallized skill (`SKILL.md`) or a published page (`sandwalk.site`) is how a verified method or result is passed on to the next person or agent.
-
-Sandwalk is in developer preview.
-
-## Philosophy & Architecture
-
-Most AI tools lock you into one model vendor, run in a single disposable chat thread, and forget everything the moment the session closes. Dumping raw transcripts into a vector database or an ever-growing system prompt only trades amnesia for context rot and broken KV caches.
-
-Sandwalk is architected as a **local-first, multi-agent research and engineering harness**:
-
-```mermaid
-flowchart LR
-    Surfaces["Client Surfaces"] --> Orch["Capy & Specialists"]
-    Orch --> Server["Agent Runtime"]
-    Server --> Models["Cloud & Local LLMs"]
-    Server --> Compute["Sandboxes & Tools"]
-    Server <--> Memory[("Memory Hub")]
-    Compute --> Outputs["Artifacts & Sites"]
+```bash
+sandwalk                  # Interactive TUI — start a conversation
+sandwalk "question"       # Run a one-shot prompt from the shell
+sandwalk setup            # Full setup wizard (providers, keys, default model)
+sandwalk login chatgpt    # Use your ChatGPT Plus/Pro plan for OpenAI models
+sandwalk serve            # Start the local agent API on :8787
+sandwalk cron list        # List and manage scheduled Automations
+sandwalk ssh list         # Manage SSH hosts, remote commands, and tunnels
+sandwalk eval             # Run benchmark suites headlessly
+sandwalk doctor           # Diagnose environment and provider health
+sandwalk upgrade          # Upgrade to the latest release
 ```
 
-### Cold Start: Load the Save File, Then Get to Work
+📖 **[Full documentation →](https://sandwalk.sh/docs)**
 
-Instead of forcing every new agent to re-learn your project from scratch, Sandwalk turns the learning cost you have already paid into a **governed local save file** (`~/.sandwalk/`):
+---
 
-```mermaid
-flowchart LR
-    S1["Past Sessions"] --> A1["Chat Memory"]
-    S2["Docs & Notes"] --> A2["Living Wiki"]
-    S3["Domain Data"] --> A3["Omnigraph"]
-    S4["Completed Tasks"] --> A4["Skills"]
+## Three little stories
 
-    A1 & A2 & A3 & A4 --> Hub[("Memory Hub")]
-    Hub --> Next["Next Agent"]
-```
+**Cold start with a save file.** You spend a week investigating a codebase or a biological target across ten chats. Instead of starting chat #11 from zero, Sandwalk distills the durable operating rules into `MEMORY.md`, links the findings in your **Living Wiki**, maps the entities and claims into **Omnigraph**, and crystallizes the workflow into a reusable `/skill` with one click. The next agent loads the save file and starts warm.
 
-1. **Decoupled & Local-First (`~/.sandwalk/`)**: Swap models (17 cloud providers, ChatGPT Plus/Pro plan, or local `llama.cpp` / Ollama), sandboxes (Local machine or Modal cloud `T4`/`L4`/`A100`/`H100` GPUs), and MCP servers per turn while keeping all data on your machine in open files (`.md`, `.pg`, `.gq`, `.jsonl`, Lance `.omni`, SQLite).
-2. **Capy Meta-Agent & Parallel Specialist Grids**: Don't settle for one point of view. **Capy** orchestrates the workspace—spawning parallel split grids (`2×2`, `3×2`), handing sessions to Claude Code or Codex, and coordinating customizable **Specialists** (starter personas **Otium**, **Atlas**, **Nova**, **Milo**, **Soren**, scientific profiles, or your own `+ New specialist`).
-3. **Byte-Stable Prompt Prefix + Progressive Disclosure**: At session start, Sandwalk freezes a bounded snapshot (`USER.md` ~1,375 chars + `MEMORY.md` ~2,200 chars + `PRIORS.md` + Living Wiki TOC + Active Ontology) so LLM KV caches stay warm, while deep context is pulled on demand via tools.
-4. **Six Runnable Omnigraph Cookbook Modes (`01–06`) & 1-Click Skill Crystallization**: Powered by the local [Omnigraph](https://www.omnigraph.dev/) Rust + Lance engine (`01 Industry intel`, `02 Pharma intel`, `03 Context graph`, `04 VC OS`, `05 Biomed research`, `06 Second brain`) with `Supports`/`Contradicts` provenance edges, Git-style `review/*` branches, and 1-click conversion of your Wiki + Ontology into reusable `~/.sandwalk/skills/<slug>/SKILL.md` skills. Full guide: [sandwalk.sh/docs/memory](https://sandwalk.sh/docs/memory).
+**Remote-SSH that stays awake.** You type `user@gpu-box` in **SSH** and click **Connect**. Sandwalk logs in, installs the CLI in `~/.local/bin` (no `sudo` required), starts a persistent background server with a `crontab` watchdog, syncs your model configuration, and opens a native client window tunneled to that machine. You schedule an Automation to check your jobs every 15 minutes (`wake_on_change_only`) and close your laptop — the remote daemon keeps running 24/7.
 
-## What Sandwalk does
+**Four minds on one hard question.** You ask **Capy** to compare four hypotheses in parallel. Capy opens a `2×2` split grid with four Specialists on different models, runs the compute in a Modal GPU sandbox, pulls the plots and 3D structures back into the session workspace, and publishes the final interactive report to `sandwalk.site`.
 
-| Pillar | What you get |
-|--------|--------------|
-| **One Workspace Everywhere** | Shared session list across the macOS/Ubuntu desktop app, Web UI, terminal CLI (`sandwalk`), LAN/phone, and external coding CLIs (**Claude Code**, **Codex**, **OpenCode**, **fx**, **Hermes**). |
-| **Any Model, Cloud or Local** | 17 cloud providers (OpenAI, Anthropic, Gemini, xAI, DeepSeek, OpenRouter, Bedrock, etc.), **Sign in with ChatGPT** (Plus/Pro), local GGUF models via `llama.cpp`, Ollama, oMLX, and LM Studio, or **any OpenAI-compatible endpoint** (vLLM, SGLang, TGI, LiteLLM, custom HPC servers). |
-| **Capy & Multi-Agent Grids** | Built-in meta-agent (**Capy**) that spawns parallel sessions, arranges split grids, seeds briefs across chats, manages memory/wiki/graph, and runs diagnostics or benchmarks by voice or text. |
-| **Customizable Specialists** | Starter personas (**Otium**, **Atlas**, **Nova**, **Milo**, **Soren**) and scientific specialists—or create your own (`+ New specialist`) with custom priors (`PRIORS.md`), model, skills, MCPs, and brain. |
-| **Memory, Wiki & Omnigraph** | Automatic post-run distillation into bounded `USER.md`/`MEMORY.md` snapshots, a full-screen Markdown Wiki with live preview & `[[wikilinks]]`, and a Lance-backed `.omni` Knowledge Graph with 6 Cookbook Modes (`01–06`). |
-| **Skills & 1-Click MCPs** | Install public skills from [skills.sh](https://skills.sh) (including NVIDIA's `/tao-run-on-slurm`), attach 1-click MCP servers, or crystallize your own project's Memory, Wiki, and Ontology into a reusable `/skill`. |
-| **Automations & Remote-SSH** | Schedule recurring or event-driven agent workflows (`sandwalk cron` / **Automations**) and connect to remote Linux, macOS, or HPC servers over SSH (`sandwalk ssh` / **SSH**) with automatic user-space Sandwalk installation and persistent 24/7 background daemons. |
-| **Local & Cloud GPU Sandboxes** | Execute code locally or on Modal CPU/GPU containers (`T4`, `L4`, `A10`, `A100`, `H100`). Every plot, 3D molecular structure, report, or `.ipynb` notebook lands beside the session, ready to publish to `sandwalk.site`. |
-| **Scientific & Harness Evals** | 190+ built-in tools (PubChem, ChEMBL, UniProt, PDB, Open Targets, ClinicalTrials.gov, DepMap, MSigDB, STRING) plus end-to-end harness benchmarking (`sandwalk eval`) across MMLU-Pro, LiveCodeBench, BixBench, and Bio-Capybara. |
+---
 
-## Features
+## A look inside
 
 <table>
 <tr>
 <td width="50%" valign="top">
 <img src="images/welcome.png" alt="Welcome: connect locally or open a remote server" width="100%"><br>
-<sub><strong>Sandwalk runs locally by default.</strong> Or it opens a remote server on your LAN or Tailnet.</sub>
+<sub><strong>Local by default, remote in one click.</strong> Connect to this Mac or open a remote server over LAN, Tailscale, or SSH.</sub>
 </td>
 <td width="50%" valign="top">
 <img src="images/new-agent.png" alt="An empty session with model, Plan, Skills, and sandbox" width="100%"><br>
-<sub><strong>The composer is where a session starts.</strong> Model, Plan, Skills, Specialist, and Sandbox are right on the bar.</sub>
+<sub><strong>Everything starts in the composer.</strong> Model, Plan, Skills, Specialist, and Sandbox sit right on the bar.</sub>
 </td>
 </tr>
 <tr>
@@ -162,7 +141,7 @@ flowchart LR
 <tr>
 <td width="50%" valign="top">
 <img src="images/grid.png" alt="A grid of sessions on one research question" width="100%"><br>
-<sub><strong>Several agents, one question.</strong> Same brief across different models or Specialists in a live split grid.</sub>
+<sub><strong>Several agents, one question.</strong> Fan the same brief across different models or Specialists in a live split grid.</sub>
 </td>
 <td width="50%" valign="top">
 <img src="images/plan-mode.png" alt="A plan with a flowchart beside the session" width="100%"><br>
@@ -172,7 +151,7 @@ flowchart LR
 <tr>
 <td colspan="2" valign="top">
 <img src="images/specialists.png" alt="Specialists grid with + New specialist button and Otium's Profile & Priors drawer" width="100%"><br>
-<sub><strong>Specialists are customizable.</strong> Start from built-in personas (Otium, Soren, Milo, Nova, Atlas) and scientific profiles, or click <code>+ New specialist</code> to create your own with custom priors, model, skills, MCPs, and brain.</sub>
+<sub><strong>Specialists with their own brains.</strong> Start from built-in personas (Otium, Soren, Milo, Nova, Atlas) and scientific profiles, or create your own with custom priors, model, skills, and MCPs.</sub>
 </td>
 </tr>
 <tr>
@@ -198,17 +177,17 @@ flowchart LR
 </td>
 <td width="50%" valign="top">
 <img src="images/ssh.png" alt="SSH server manager with 1-click remote auto-install and tunneling" width="100%"><br>
-<sub><strong>1-Click Remote-SSH.</strong> Connect to any Linux, macOS, or GPU server over SSH—Sandwalk installs automatically in user space and keeps running 24/7 after you disconnect.</sub>
+<sub><strong>1-Click Remote-SSH.</strong> Connect to any Linux, macOS, or GPU server over SSH — Sandwalk installs automatically in user space and keeps running 24/7 after you disconnect.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 <img src="images/skills.png" alt="The composer menu with skills open" width="100%"><br>
-<sub><strong>A skill rides with the message.</strong> Attach Files, Skills, MCP servers, a Specialist, or a Sandbox inline.</sub>
+<sub><strong>Skills ride with the message.</strong> Attach Files, Skills, MCP servers, a Specialist, or a Sandbox inline.</sub>
 </td>
 <td width="50%" valign="top">
 <img src="images/skills-sh.png" alt="The public skills catalog ranked by installs" width="100%"><br>
-<sub><strong>Install from skills.sh—or crystallize your own.</strong> Browse the public catalog ranked by installs, or turn your own Wiki and Ontology into a reusable <code>/skill</code>.</sub>
+<sub><strong>Install from skills.sh — or crystallize your own.</strong> Browse the public catalog ranked by installs, or turn your own Wiki and Ontology into a reusable <code>/skill</code>.</sub>
 </td>
 </tr>
 <tr>
@@ -245,145 +224,111 @@ flowchart LR
 </tr>
 </table>
 
-## Benchmarking & Evaluation
+---
 
-In science and ambitious engineering, changing a model, a Specialist, a skill, or a memory architecture should be **measured, not guessed**. Sandwalk includes a built-in evaluation harness (**Dashboard → Benchmarking** and `sandwalk eval` in the CLI) that runs real agent sessions end-to-end:
+## CLI & Desktop Quick Reference
 
-- **Shipped Benchmark Suites**: **MMLU**, **MMLU-Pro**, **ARC-C**, **MBPP**, **LiveCodeBench**, **BixBench** (bioinformatics & computational biology), and **Bio-Capybara**.
-- **Full-Harness A/B Comparisons**: Queue multiple models or Specialists on the same suite, inspect per-question trajectories, token/cost breakdowns, and failed reasoning steps side by side.
+Sandwalk shares the same database, workspaces, and memory between the terminal TUI (`sandwalk`) and the Desktop / Web app:
 
-### Benchmarking Roadmap (`TODO`)
+| Action | CLI / Slash Command | Desktop App |
+|--------|---------------------|-------------|
+| Start or switch sessions | `sandwalk`, `/new`, `/sessions`, `/resume` | **New Agent** (`⌘N`) or sidebar session list |
+| Switch model & reasoning effort | `/models`, `/effort` | Composer model picker (`Fast`, `Effort`, `Model`) |
+| Toggle Plan vs. Agent mode | `/plan` | `Plan` (`⇧Tab`) pill in the composer |
+| Pick a Specialist persona | `/specialist` | `+` menu → **Specialist** or **Dashboard → Specialists** |
+| Attach or install Skills | `/skills`, `/skills-add`, `/skills-find` | `+` menu → **Skills** or **Dashboard → Skills** |
+| Manage MCP servers | `sandwalk mcp list`, `/mcps` | `+` menu → **MCP** or **Dashboard → MCPs** |
+| Switch Local vs. Modal GPU sandbox | `sandwalk sandbox status`, `/sandbox` | `+` menu → **Sandbox** (`Local` / `Modal T4–H100`) |
+| Schedule recurring Automations | `sandwalk cron list \| add \| run` | **Dashboard → Automations** |
+| Connect to remote SSH servers | `sandwalk ssh list \| connect \| exec \| sync` | **File → New Window (Remote)…** or **Dashboard → SSH** |
+| Run parallel agents on one prompt | `/agents` | Ask **Capy** or drag tabs into a `2×2` / `3×2` split grid |
+| Export or check token usage | `/export`, `/notebook`, `/usage`, `/compact` | Session header export menu & usage inspector |
 
-We are actively expanding the evaluation harness to benchmark long-horizon memory, multi-agent collaboration, and skill crystallization:
+Full CLI reference: [`cli/README.md`](cli/README.md).
 
-- [ ] **Long-Horizon Memory & Omnigraph Recall Bench (`TODO`)** — Measure multi-session fact retention, `Supports` vs. `Contradicts` claim resolution, and KV-cache token efficiency across Cookbook modes `01–06`.
-- [ ] **Skill Crystallization Lift Eval (`TODO`)** — Quantify accuracy and step-count improvements before vs. after crystallizing domain sessions into reusable `~/.sandwalk/skills/<slug>/SKILL.md` skills.
-- [ ] **Multi-Specialist Grid vs. Single-Agent Ablations (`TODO`)** — Benchmark parallel Specialist cohorts (e.g., *Nova* + *Soren* + *Otium*) orchestrated by Capy against single-session baselines.
-- [ ] **SWE-bench Verified & Terminal-Bench Suites (`TODO`)** — First-class software engineering and PTY terminal benchmark suites alongside `BixBench` and `Bio-Capybara`.
-- [ ] **Automated CI Harness Regression Gates (`TODO`)** — Per-Specialist accuracy, latency, and token-budget gates enforced via `sandwalk eval` in CI.
+### Models & Providers
 
-## Models
+| Kind | Supported Providers |
+|------|---------------------|
+| **Cloud** | OpenAI, Claude (Anthropic), Gemini (Google), xAI, Kimi (Moonshot), NVIDIA, OpenCode Zen, DeepSeek, MiniMax, Mistral, Qwen Cloud, Together AI, OpenRouter, Cerebras, Groq, Fireworks AI, Amazon Bedrock |
+| **ChatGPT Plan** | Sign in with a **ChatGPT Plus or Pro** subscription (`sandwalk login chatgpt` or **Dashboard → Models**) — no API key required |
+| **Local & Custom** | `llama.cpp` (built-in GGUF manager), Ollama, oMLX, Unsloth, LM Studio, or any OpenAI-compatible `/v1/models` endpoint (vLLM, SGLang, TGI, LiteLLM) |
 
-Keys stay on this computer. Connected providers show up in the composer.
+### Interoperability with Other Coding CLIs
 
-| Kind | Providers |
-|------|-----------|
-| Cloud | OpenAI, Claude (Anthropic), Gemini (Google), xAI, Kimi (Moonshot), NVIDIA, OpenCode Zen, DeepSeek, MiniMax, Mistral, Qwen Cloud, Together AI, OpenRouter, Cerebras, Groq, Fireworks AI, Amazon Bedrock |
-| Local | Ollama, oMLX, Unsloth, DS4, llama.cpp, LM Studio, any OpenAI-compatible endpoint |
+Sandwalk reads and writes the session stores of **Claude Code**, **Codex**, **OpenCode**, **fx**, and **Hermes**:
+- **Run inline**: Launch any of them from the `+` terminal tab menu (`⌘⇧T`) with live status badges.
+- **Import to chat**: Right-click a terminal running an external CLI and choose **Convert to chat**, or ask Capy to import and distill its takeaways into your Wiki and Omnigraph.
+- **Continue in…**: Hand any Sandwalk chat directly to Claude Code (`claude --resume`) or Codex (`codex resume`) with synthesized native history and a `.sandwalk/handoff-<id>.md` brief.
 
-Local endpoints are discovered from `/v1/models` or Ollama's `/api/tags`. Add one with **Add Local LLM**, or in the CLI with `/model-manager`.
+---
 
-### Sign in with ChatGPT
+## Architecture & Memory
 
-OpenAI models can run on a ChatGPT Plus or Pro plan with no API key. In the app it is **Continue with ChatGPT** on the Model step or under Dashboard → Models; in a terminal:
+Instead of dumping raw transcripts into an ever-growing system prompt, Sandwalk freezes a **byte-stable prompt prefix** at session start (`USER.md` + `MEMORY.md` + `PRIORS.md` + Living Wiki TOC + Active Ontology) so LLM KV caches stay warm, and turns everything your agents learn into a **governed local save file** under `~/.sandwalk/`:
 
-```bash
-sandwalk login chatgpt            # opens the browser, keeps tokens in ~/.sandwalk/chatgpt-auth.json
-sandwalk login status
-sandwalk logout chatgpt
+```mermaid
+flowchart LR
+    S1["Past Sessions"] --> A1["Chat Memory"]
+    S2["Docs & Notes"] --> A2["Living Wiki"]
+    S3["Domain Data"] --> A3["Omnigraph"]
+    S4["Completed Tasks"] --> A4["Skills"]
+
+    A1 & A2 & A3 & A4 --> Hub[("~/.sandwalk/")]
+    Hub --> Next["Next Agent"]
 ```
 
-Models then appear under **ChatGPT plan** in the picker. The same model under **OpenAI** still bills your API key; the row you pick decides.
-
-## Other coding agents
-
-Sandwalk reads and writes the session stores of **Claude Code**, **Codex**, **OpenCode**, **fx**, and **Hermes**—so you can run them inside a Sandwalk terminal with a live agent badge, import their transcripts as Sandwalk chats, or hand a Sandwalk chat to them:
-
-- **Import**: Onboarding offers your recent sessions; later, right-click a terminal running one of these agents and choose **Convert to chat**, or ask Capy. The chat keeps the original folder as its workspace and is history-only until you send a message (or distill it into your Living Wiki and Omnigraph).
-- **Continue in…**: On any chat, pick the agent. Sandwalk writes `.sandwalk/handoff-<id>.md` in the workspace and opens the CLI on it. For Claude Code and Codex, **native history** also synthesizes their native session file so `claude --resume` / `codex resume` open the conversation directly (with the handoff file always present as a fallback).
-- **Capy**: *"import my last Codex session and distill its takeaways into the Wiki"*, *"open OpenCode in this project"*, *"hand this chat to Claude Code"*.
-
-## CLI
-
-Same sessions, same files. Type `sandwalk` in a terminal, or press **⌘⇧T** and type it in the app. `/` opens the command list.
-
-### Commands
-
-```bash
-sandwalk setup                    # providers, keys, default model
-sandwalk desktop                  # install the Mac app or Ubuntu .deb
-sandwalk                          # interactive session
-sandwalk "question"               # one-shot
-sandwalk serve                    # local agent API on :8787
-sandwalk serve --host 0.0.0.0     # expose to the LAN (needs sandwalk auth)
-sandwalk auth                     # manage the API key for serve
-sandwalk login chatgpt            # use a ChatGPT Plus/Pro plan for OpenAI models
-sandwalk doctor                   # environment and configuration checks
-sandwalk eval                     # run Bench suites headlessly
-sandwalk skills add fastfold-ai/skills
-sandwalk mcp list
-sandwalk sandbox status           # Local Sandbox or Modal Sandbox
-sandwalk data pull-all            # DepMap, MSigDB, STRING
-sandwalk tool list
-sandwalk upgrade
-```
-
-### Slash commands
-
-| Command | What it does |
-|---------|--------------|
-| `/models`, `/effort` | Switch the model; set Low / Medium / High / Fast for models with thinking controls |
-| `/plan` | Toggle Plan mode. Writes `plans/*.md` until you switch back to Agent |
-| `/sandbox` | Pick Local or a Modal CPU/GPU preset; edit the base image inline |
-| `/specialist` | Use, clear, or list specialists |
-| `/skills`, `/skills-add`, `/skills-find` | Loaded skills; install from GitHub or a path; search the catalog |
-| `/mcps` | Connect, enable, validate, add, or remove MCP servers |
-| `/tools`, `/data` | Tool status; local datasets |
-| `/usage`, `/compact` | Token and cost for the session; compress context |
-| `/sessions`, `/resume`, `/new` | List, resume, or start sessions |
-| `/export`, `/notebook` | Transcript to markdown; session to `.ipynb` |
-| `/agents` | Run a question across N parallel agents |
-| `/doctor` | Readiness diagnostics with fix hints |
-
-`Enter` submits, `Ctrl+J` inserts a newline, paste an image to attach it, `Ctrl+C` interrupts. Full reference: [`cli/README.md`](cli/README.md).
-
-## Configuration
-
-Everything lives under `~/.sandwalk/`:
-
-| Path | Contents |
-|------|----------|
+| Path in `~/.sandwalk/` | Contents |
+|------------------------|----------|
 | `config.json` | Providers, keys, default model, sandbox & memory preferences |
-| `mcp.json` | MCP servers, Cursor-compatible (including `omnigraph` stdio MCP) |
+| `mcp.json` | Cursor-compatible MCP server definitions (including `omnigraph` stdio MCP) |
 | `skills/` | Installed & crystallized skills (`<slug>/SKILL.md` + `references/`) |
 | `memory/` | `USER.md`, `MEMORY.md`, `memory.db`, `wiki/<scope>/*.md`, and `omni/<scope>/graph.omni` |
 | `bin/` | Managed local binaries (`omnigraph`, `omnigraph-server`, `sandwalk-omnigraph-mcp`) |
-| `workspaces/<session>/` | Per-session artifacts: `uploads/`, `outputs/`, `plans/`, `project/` |
-| `data/` | Local datasets from `sandwalk data pull` |
-| `agent-server.db` | Sessions, shared by the CLI and the app |
+| `workspaces/<session>/` | Per-session files: `uploads/`, `outputs/`, `plans/`, `project/` |
+| `agent-server.db` | Sessions, Automations, and SSH hosts shared by the CLI and Desktop app |
 
-The Mac app stores its own window and server settings in `~/Library/Application Support/Sandwalk/`. `sandwalk config show` prints the active configuration; `sandwalk config set <key> <value>` changes one key.
+Full memory & Omnigraph guide: [sandwalk.sh/docs/memory](https://sandwalk.sh/docs/memory).
 
-Provider keys can also come from the environment (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `MOONSHOT_API_KEY`, and so on). Modal needs `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`, or run `modal setup`.
+---
+
+## Benchmarking
+
+Changing a model, a Specialist, a skill, or a memory architecture should be **measured, not guessed**. Sandwalk ships with an end-to-end evaluation harness (**Dashboard → Benchmarking** and `sandwalk eval`):
+
+| ✅ Shipped Today | 🚧 In Active Development |
+|---|---|
+| **MMLU**, **MMLU-Pro**, **ARC-C**, **MBPP**, **LiveCodeBench** | **Long-Horizon Memory & Omnigraph Recall Bench** (multi-session fact retention & KV-cache efficiency across Cookbook modes `01–06`) |
+| **BixBench** (bioinformatics & computational biology) & **Bio-Capybara** | **Skill Crystallization Lift Eval** (accuracy & step-count gains before vs. after crystallizing `/skill` packages) |
+| Side-by-side multi-model / multi-Specialist A/B comparisons | **Multi-Specialist Grid vs. Single-Agent Ablations** |
+| Per-question trajectory, tool trace, and token/cost breakdowns | **SWE-bench Verified** & **Terminal-Bench** PTY suites |
+
+---
 
 ## Development
 
-Monorepo:
-
 | Directory | Contents |
 |-----------|----------|
-| `cli/` | Python agent, tools, skills, and the FastAPI server |
-| `apps/local-web/` | React dashboard and the Tauri shell |
-| `apps/sandwalk-mac/` | Swift menubar helper that supervises the server |
-| `apps/packaging/` | Signed DMG, notarization, updater artifacts |
+| `cli/` | Python agent runtime, 190+ tools, built-in skills, Automations & SSH services, and FastAPI server |
+| `apps/local-web/` | React dashboard and Tauri desktop shell |
+| `apps/sandwalk-mac/` | Swift menubar helper that supervises the local server |
+| `apps/packaging/` | Signed macOS DMG, notarization, Ubuntu `.deb` & APT publishing |
 
 ```bash
-scripts/verify.sh         # typecheck, lint, build, unit tests + coverage gates (web + cli) — the CI gate
+scripts/verify.sh         # typecheck, lint, build, unit tests + coverage gates (web + cli)
 scripts/verify.sh e2e     # Playwright: grid, terminals, PTY round-trip
 pnpm e2e:bench            # perf report → apps/local-web/e2e/results/grid-latest.json
-./apps/packaging/package-macos-dmg.sh    # signed DMG; INSTALL=1 copies it to ~/Applications
 ```
 
-Working with an AI agent? [AGENTS.md](AGENTS.md) and the project skills in `.cursor/skills/` encode the dev and test loop. See [CONTRIBUTING.md](CONTRIBUTING.md), [.github/TESTING.md](.github/TESTING.md), and [apps/packaging/APPLE-SIGNING.md](apps/packaging/APPLE-SIGNING.md).
+Working with an AI agent? [AGENTS.md](AGENTS.md) and `.cursor/skills/` encode the dev and test loop. See [CONTRIBUTING.md](CONTRIBUTING.md), [.github/TESTING.md](.github/TESTING.md), and [apps/packaging/APPLE-SIGNING.md](apps/packaging/APPLE-SIGNING.md).
 
-## References & Acknowledgments
+## Acknowledgments
 
-Sandwalk builds on and draws direct inspiration from several open-source projects and research harnesses:
-
-- **[Omnigraph (`ModernRelay/omnigraph`)](https://github.com/ModernRelay/omnigraph)** & **[omnigraph.dev](https://www.omnigraph.dev/)** — Versioned Rust + Lance graph engine, declarative `.pg` schemas, `.gq` stored queries, Git-style branching, and runnable Cookbook ontologies.
-- **[LangChain](https://github.com/langchain-ai/langchain)**, **[LangGraph](https://github.com/langchain-ai/langgraph)** & **[Deep Agents (`langchain-ai/deepagents`)](https://github.com/langchain-ai/deepagents)** — Core agent execution graph, streaming tool orchestration, and multi-provider model adapters.
-- **[Hermes Agent (`NousResearch/hermes-agent`)](https://github.com/NousResearch/hermes-agent)** — Bounded session-start `USER.md` / `MEMORY.md` snapshot architecture (preserving KV prefix caches) and SQLite FTS5 `session_search`.
-- **[TencentDB Agent Memory (`TencentCloud/TencentDB-Agent-Memory`)](https://github.com/TencentCloud/TencentDB-Agent-Memory)** — Four-asset memory hub (`Chat Memory`, `Skill`, `Wiki`, `Graph`) and the "Cold Start: Load the Save File" skill crystallization model.
+Sandwalk builds on and draws direct inspiration from:
+- **[Omnigraph (`ModernRelay/omnigraph`)](https://github.com/ModernRelay/omnigraph)** & **[omnigraph.dev](https://www.omnigraph.dev/)** — Versioned Rust + Lance graph engine, `.pg` schemas, `.gq` queries, Git-style branching, and runnable Cookbook ontologies.
+- **[LangChain](https://github.com/langchain-ai/langchain)**, **[LangGraph](https://github.com/langchain-ai/langgraph)** & **[Deep Agents (`langchain-ai/deepagents`)](https://github.com/langchain-ai/deepagents)** — Core agent execution graph, streaming tool orchestration, and model adapters.
+- **[Hermes Agent (`NousResearch/hermes-agent`)](https://github.com/NousResearch/hermes-agent)** — Bounded session-start `USER.md` / `MEMORY.md` snapshot architecture and SQLite FTS5 `session_search`.
+- **[TencentDB Agent Memory (`TencentCloud/TencentDB-Agent-Memory`)](https://github.com/TencentCloud/TencentDB-Agent-Memory)** — Four-asset memory hub (`Chat Memory`, `Skill`, `Wiki`, `Graph`) and the "Cold Start: Load the Save File" crystallization model.
 - **[skills.sh (`vercel-labs/skills`)](https://skills.sh)** — Open `SKILL.md` package specification and public agent skills catalog.
 - **[llama.cpp (`ggml-org/llama.cpp`)](https://github.com/ggml-org/llama.cpp)** & **[Modal](https://modal.com)** — Local GGUF model/embedding inference and on-demand cloud CPU/GPU sandboxes.
 
