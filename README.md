@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="#the-short-version">Overview</a> ·
+  <a href="#the-thinking-path">Overview</a> ·
   <a href="#why-people-use-it">Why Sandwalk</a> ·
   <a href="#tour">Tour</a> ·
   <a href="#install">Install</a> ·
@@ -33,7 +33,7 @@
 
 ---
 
-## The short version
+## The thinking path
 
 Darwin had a gravel path behind Down House that he called the Sandwalk. When he had a hard problem, he walked loops around it until the pieces fit together.
 
