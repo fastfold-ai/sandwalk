@@ -66,13 +66,19 @@ You bring your own keys, your existing ChatGPT Plus/Pro login, or local GGUF wei
 
 <table>
 <tr>
+<td colspan="2" valign="top">
+<img src="images/new-agent.png" alt="An empty session with model, Plan, Skills, and sandbox" width="100%"><br>
+<sub><strong>The composer holds the controls.</strong> Model, Plan, Skills, Specialist, and Sandbox sit right on the input bar.</sub>
+</td>
+</tr>
+<tr>
 <td width="50%" valign="top">
 <img src="images/welcome.png" alt="Welcome: connect locally or open a remote server" width="100%"><br>
 <sub><strong>Local first, remote when you need it.</strong> Connect to this Mac or open a remote server over LAN, Tailscale, or SSH.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="images/new-agent.png" alt="An empty session with model, Plan, Skills, and sandbox" width="100%"><br>
-<sub><strong>The composer holds the controls.</strong> Model, Plan, Skills, Specialist, and Sandbox sit right on the input bar.</sub>
+<img src="images/sandbox.png" alt="Composer menu showing Local vs Modal GPU sandbox selector with H100 80GB and PyTorch CUDA image" width="100%"><br>
+<sub><strong>Local compute or cloud GPUs on demand.</strong> Run on your machine or switch to a Modal GPU container (<code>T4</code> up to <code>H100 · 80GB</code>) with a custom base image right from the composer.</sub>
 </td>
 </tr>
 <tr>
