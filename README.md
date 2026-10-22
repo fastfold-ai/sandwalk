@@ -28,11 +28,7 @@
 </p>
 
 <p align="center">
-  <img alt="Sandwalk desktop: a chat, the files it produced, and a terminal, side by side" src="images/showcase.png" width="1024" style="max-width:100%; border-radius:8px;">
-</p>
-
-<p align="center">
-  <sub><em>A chat, the files it produced, and a terminal, side by side.</em></sub>
+  <img alt="Sandwalk" src="images/showcase.png" width="1024" style="max-width:100%; border-radius:8px;">
 </p>
 
 ---
