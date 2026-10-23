@@ -17,7 +17,7 @@ on:
       name:
         description: 'Release name after the version, e.g. "Need for Speed" → "v0.1.4: Need for Speed". A song, film, or game that fits what shipped.'
         type: string
-        required: false
+        required: true
       draft:
         description: 'Create a draft GitHub Release (recommended until public).'
         type: boolean
