@@ -38,6 +38,7 @@ from agent.deepagents_runtime.chat_model import (
 from agent.deepagents_runtime.event_processor import process_events
 from agent.deepagents_runtime.event_text import (
     _text_from_content,
+    _tool_output_images,
     _tool_output_text,
     _usage_from_message,
 )

@@ -166,6 +166,115 @@ def _stub_text(kind: ModalityKind, saved_path: str | None) -> str:
     )
 
 
+def _as_openai_image_url(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Turn a LangChain image block into an OpenAI/OpenRouter ``image_url`` part.
+
+    OpenRouter's SDK only accepts ``image_url`` (plus file/text/audio/video)
+    on tool messages. Anthropic accepts ``type: image`` natively, so this
+    rewrite is OpenRouter-only.
+    """
+    if str(data.get("type") or "") == "image_url":
+        return None
+
+    url = str(data.get("url") or "").strip()
+    image_url = data.get("image_url")
+    if not url and isinstance(image_url, dict):
+        url = str(image_url.get("url") or "").strip()
+    elif not url and isinstance(image_url, str):
+        url = image_url.strip()
+
+    source = data.get("source")
+    mime = str(
+        data.get("mime_type") or data.get("mimeType") or data.get("media_type") or ""
+    ).strip()
+    raw_b64 = data.get("base64") if isinstance(data.get("base64"), str) else None
+    if raw_b64 is None and isinstance(data.get("data"), str):
+        raw_b64 = data["data"]
+    if isinstance(source, dict):
+        source_type = str(source.get("type") or "")
+        if source_type == "url" and not url:
+            url = str(source.get("url") or "").strip()
+        elif source_type == "base64":
+            mime = mime or str(source.get("media_type") or source.get("mime_type") or "")
+            if raw_b64 is None and isinstance(source.get("data"), str):
+                raw_b64 = source["data"]
+
+    if url:
+        return {"type": "image_url", "image_url": {"url": url}}
+    if raw_b64 and raw_b64.strip():
+        media = mime or "image/png"
+        return {
+            "type": "image_url",
+            "image_url": {"url": f"data:{media};base64,{raw_b64.strip()}"},
+        }
+    return None
+
+
+def _image_block_for_openrouter(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a replacement block, or None when this block should stay as-is."""
+    kind = detect_block_modality(data)
+    if kind != "image":
+        return None
+    if str(data.get("type") or "") == "image_url":
+        return None
+    converted = _as_openai_image_url(data)
+    if converted is not None:
+        return converted
+    mime = str(data.get("mime_type") or data.get("mimeType") or "image").strip()
+    return {
+        "type": "text",
+        "text": (
+            f"[Image ({mime}) omitted from the provider payload: "
+            "no url or base64 was attached to the tool result.]"
+        ),
+    }
+
+
+def normalize_openrouter_content(content: Any) -> tuple[Any, bool]:
+    """Rewrite LangChain image blocks so OpenRouter tool messages validate."""
+    if not isinstance(content, list):
+        return content, False
+    kept: list[Any] = []
+    changed = False
+    for block in content:
+        data = _block_dict(block)
+        replacement = _image_block_for_openrouter(data) if data is not None else None
+        if replacement is None:
+            kept.append(block)
+            continue
+        kept.append(replacement)
+        changed = True
+    if not changed:
+        return content, False
+    return kept, True
+
+
+def normalize_openrouter_messages(messages: list[Any]) -> tuple[list[Any], bool]:
+    """Apply :func:`normalize_openrouter_content` to every message."""
+    if not messages:
+        return messages, False
+    out: list[Any] = []
+    changed = False
+    for message in messages:
+        content = getattr(message, "content", None)
+        new_content, msg_changed = normalize_openrouter_content(content)
+        if not msg_changed:
+            out.append(message)
+            continue
+        changed = True
+        copy = getattr(message, "model_copy", None)
+        if callable(copy):
+            out.append(copy(update={"content": new_content}))
+        else:
+            try:
+                message.content = new_content
+            except Exception:  # noqa: BLE001
+                out.append(message)
+                continue
+            out.append(message)
+    return out, changed
+
+
 def sanitize_content_blocks(
     content: Any,
     *,
@@ -276,21 +385,29 @@ class UnsupportedModalityMiddleware(AgentMiddleware[Any, Any, Any]):
         self._model_id = str(model_id or "")
 
     def _filter_request(self, request: ModelRequest[Any]) -> ModelRequest[Any]:
-        if not self._unsupported:
-            return request
-        messages, changed = sanitize_messages(
-            list(request.messages or []),
-            unsupported=self._unsupported,
-            save_dir=self._save_dir,
-        )
+        messages = list(request.messages or [])
+        changed = False
+        # langchain-openrouter forwards ToolMessage.content as-is. LangChain
+        # image blocks (type=image) fail OpenRouter's request schema, which
+        # only allows image_url. Anthropic accepts type=image, so leave it.
+        if self._provider == "openrouter":
+            messages, changed = normalize_openrouter_messages(messages)
+        if self._unsupported:
+            messages, stripped = sanitize_messages(
+                messages,
+                unsupported=self._unsupported,
+                save_dir=self._save_dir,
+            )
+            if stripped:
+                changed = True
+                logger.info(
+                    "Stripped unsupported multimodal blocks for %s/%s (kinds=%s)",
+                    self._provider or "?",
+                    self._model_id or "?",
+                    ",".join(sorted(self._unsupported)),
+                )
         if not changed:
             return request
-        logger.info(
-            "Stripped unsupported multimodal blocks for %s/%s (kinds=%s)",
-            self._provider or "?",
-            self._model_id or "?",
-            ",".join(sorted(self._unsupported)),
-        )
         return request.override(messages=messages)
 
     def wrap_model_call(

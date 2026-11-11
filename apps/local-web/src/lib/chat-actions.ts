@@ -1,10 +1,7 @@
 import type { AgentEvent, PendingHitlApproval } from '@sandwalk/agent-ui-core'
 
 import { composerToMessage } from '@/components/agents/composer-parts'
-import {
-  emptySessionChatState,
-  type SessionChatState
-} from '@/lib/sessions'
+import { emptySessionChatState, type SessionChatState } from '@/lib/sessions'
 
 export type ChatPatch =
   | Partial<SessionChatState>
@@ -22,8 +19,7 @@ export function applyChatPatch(
   patch: ChatPatch
 ): SessionChatState {
   const base = normalizeSessionChatState(prev)
-  const next =
-    typeof patch === 'function' ? patch(base) : { ...base, ...patch }
+  const next = typeof patch === 'function' ? patch(base) : { ...base, ...patch }
   return normalizeSessionChatState(next)
 }
 
@@ -41,11 +37,7 @@ export function buildSendContent(input: BuildSendContentInput): string {
   const legacyFiles = composerFiles
     .filter(path => !composerText.includes(`⟦@:${path}⟧`))
     .map(path => `@${path}`)
-  return [
-    ...legacySkills,
-    ...legacyFiles,
-    composerToMessage(composerText)
-  ]
+  return [...legacySkills, ...legacyFiles, composerToMessage(composerText)]
     .filter(Boolean)
     .join(' ')
     .trim()
@@ -204,6 +196,7 @@ export function reduceChatOnAgentEvent(
                 ? ('error' as const)
                 : ('completed' as const),
               result: event.payload.output,
+              images: event.payload.images,
               durationSeconds: event.payload.durationSeconds,
               endedAt: event.timestamp
             }
@@ -317,8 +310,8 @@ export function reduceChatOnAgentEvent(
       event.type === 'run.interrupted'
         ? 'Interrupted'
         : event.type === 'run.failed'
-          ? 'Run failed'
-          : 'Run ended'
+        ? 'Run failed'
+        : 'Run ended'
     return {
       ...prev,
       runActive: false,

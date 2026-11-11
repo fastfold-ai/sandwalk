@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, ToolMessage
 
 from agent.deepagents_runtime.modality_sanitize import (
     detect_block_modality,
+    normalize_openrouter_messages,
     sanitize_content_blocks,
     sanitize_messages,
     unsupported_modalities,
@@ -84,6 +85,35 @@ def test_sanitize_messages_tool_and_human():
         if isinstance(msg.content, list)
     )
     assert "cannot accept image" in out[1].content[0]["text"]
+
+
+def test_openrouter_rewrites_tool_image_blocks():
+    png = base64.b64encode(b"\x89PNG").decode("ascii")
+    messages = [
+        ToolMessage(
+            content=[
+                {"type": "text", "text": "Image URL: https://example.test/dog.webp"},
+                {
+                    "type": "image",
+                    "id": "lc_d31-8b17-066fd88fe0cb",
+                    "base64": png,
+                    "mime_type": "image/webp",
+                },
+                {"type": "image", "url": "https://example.test/dog.webp", "mime_type": "image/webp"},
+                {"type": "image", "id": "lc_only", "mime_type": "image/webp"},
+            ],
+            tool_call_id="call_1",
+        )
+    ]
+    out, changed = normalize_openrouter_messages(messages)
+    assert changed
+    blocks = out[0].content
+    assert blocks[0]["type"] == "text"
+    assert blocks[1]["type"] == "image_url"
+    assert blocks[1]["image_url"]["url"] == f"data:image/webp;base64,{png}"
+    assert blocks[2]["image_url"]["url"] == "https://example.test/dog.webp"
+    assert blocks[3]["type"] == "text"
+    assert "omitted" in blocks[3]["text"]
 
 
 def test_sanitize_noop_when_supported():

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+_IMAGE_URL_RE = re.compile(r"Image URL:\s*(https?://\S+)", re.IGNORECASE)
 
 
 def _text_from_content(content: Any) -> str:
@@ -19,6 +22,64 @@ def _text_from_content(content: Any) -> str:
                 parts.append(block)
         return "".join(parts)
     return ""
+
+
+def _add_image_url(urls: list[str], seen: set[str], url: str) -> None:
+    cleaned = url.strip().rstrip(").,;\"'")
+    if not cleaned or cleaned in seen:
+        return
+    if not (
+        cleaned.startswith(("http://", "https://"))
+        or cleaned.startswith("data:image/")
+    ):
+        return
+    seen.add(cleaned)
+    urls.append(cleaned)
+
+
+def _tool_output_images(output: Any) -> list[str]:
+    """Image URLs or data URLs carried by a tool result.
+
+    MCP image tools often return a text line (``Image URL: https://...``) plus
+    a content block the transcript currently drops. The chat needs the URL
+    so it can render the picture.
+    """
+    content = getattr(output, "content", output)
+    urls: list[str] = []
+    seen: set[str] = set()
+    blocks = content if isinstance(content, list) else []
+    texts: list[str] = [content] if isinstance(content, str) else []
+    for block in blocks:
+        if isinstance(block, str):
+            texts.append(block)
+            continue
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "text":
+            texts.append(str(block.get("text") or ""))
+            continue
+        kind = str(block.get("type") or "")
+        mime = str(block.get("mime_type") or block.get("mimeType") or "")
+        if kind not in {"image", "image_url"} and not mime.startswith("image/"):
+            continue
+        url = str(block.get("url") or "").strip()
+        image_url = block.get("image_url")
+        if not url and isinstance(image_url, dict):
+            url = str(image_url.get("url") or "").strip()
+        elif not url and isinstance(image_url, str):
+            url = image_url.strip()
+        raw = block.get("base64") if isinstance(block.get("base64"), str) else None
+        if raw is None and isinstance(block.get("data"), str):
+            raw = block["data"]
+        if raw and raw.strip() and not url and len(raw) <= 1_500_000:
+            media = mime or "image/png"
+            url = f"data:{media};base64,{raw.strip()}"
+        if url:
+            _add_image_url(urls, seen, url)
+    for text in texts:
+        for match in _IMAGE_URL_RE.finditer(text):
+            _add_image_url(urls, seen, match.group(1))
+    return urls[:4]
 
 
 def _tool_output_text(output: Any) -> str:

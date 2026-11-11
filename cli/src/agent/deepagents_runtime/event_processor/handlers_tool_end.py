@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from agent.deepagents_runtime.event_text import _tool_output_text
+from agent.deepagents_runtime.event_text import _tool_output_images, _tool_output_text
 
 
 class EventProcessorToolEndMixin:
@@ -16,6 +16,7 @@ class EventProcessorToolEndMixin:
         run_id = event.get("run_id", "") or ""
         output = data.get("output")
         result_text = _tool_output_text(output)
+        images = _tool_output_images(output)
         is_error = str(getattr(output, "status", "") or "").lower() == "error"
 
         tracked = self.inflight.pop(run_id, None)
@@ -30,6 +31,7 @@ class EventProcessorToolEndMixin:
             "tool_end",
             name=display,
             output=result_text,
+            images=images,
             is_error=is_error,
             duration_s=duration,
             tool_call_id=run_id,

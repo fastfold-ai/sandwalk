@@ -908,6 +908,7 @@ export type AgentEvent =
       {
         name: string
         output: unknown
+        images?: string[]
         toolCallId: string
         isError: boolean
         durationSeconds: number

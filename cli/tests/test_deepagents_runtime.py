@@ -271,6 +271,29 @@ class TestHelpers:
         assert dr._tool_output_text(_ToolOut(None)) == ""
         assert dr._tool_output_text(123) == "123"
 
+    def test_tool_output_images(self):
+        class _ToolOut:
+            def __init__(self, content):
+                self.content = content
+
+        urls = dr._tool_output_images(
+            _ToolOut(
+                [
+                    {
+                        "type": "text",
+                        "text": "Image URL: https://example.test/capybara.webp",
+                    },
+                    {
+                        "type": "image",
+                        "mime_type": "image/webp",
+                        "base64": "abcd",
+                    },
+                ]
+            )
+        )
+        assert urls[0] == "data:image/webp;base64,abcd"
+        assert "https://example.test/capybara.webp" in urls
+
     def test_usage_from_message(self):
         msg = _Msg(usage_metadata={
             "input_tokens": 10,

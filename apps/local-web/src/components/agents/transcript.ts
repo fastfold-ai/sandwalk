@@ -52,8 +52,7 @@ export function buildConversationTimeline({
   // timeline; anchoring them here too showed each card twice (a "mirror"
   // stuck under the run's user message until the run settled).
   const tools = allTools.filter(
-    tool =>
-      !(activeRunId && tool.runId === activeRunId && !tool.messageId)
+    tool => !(activeRunId && tool.runId === activeRunId && !tool.messageId)
   )
   const timeline: TranscriptEntry[] = []
   const usedToolIds = new Set<string>()
@@ -66,7 +65,10 @@ export function buildConversationTimeline({
   // Build) must not spawn another Created Plan card.
   const lastAssistantByRun = new Map<string, string>()
   const lastMessageByRun = new Map<string, string>()
-  const planPathFirstRun = new Map<string, { plan: AgentPlanCard; runId: string }>()
+  const planPathFirstRun = new Map<
+    string,
+    { plan: AgentPlanCard; runId: string }
+  >()
   let unscopedToolSinkId: string | null = null
   for (const message of messages) {
     const runId = runMap[message.id]
@@ -257,7 +259,11 @@ export function toolsFromEvents(events: AgentEvent[]): {
   }
 
   for (const event of events) {
-    if (event.type === 'run.started' && event.runId && event.payload.messageId) {
+    if (
+      event.type === 'run.started' &&
+      event.runId &&
+      event.payload.messageId
+    ) {
       runIdByMessageId[event.payload.messageId] = event.runId
     }
     if (
@@ -301,6 +307,7 @@ export function toolsFromEvents(events: AgentEvent[]): {
         status: event.payload.isError ? 'error' : 'completed',
         args: existing?.args,
         result: event.payload.output,
+        images: event.payload.images,
         startedAt: existing?.startedAt || event.timestamp,
         endedAt: event.timestamp,
         durationSeconds: event.payload.durationSeconds
@@ -314,8 +321,8 @@ export function toolsFromEvents(events: AgentEvent[]): {
         event.type === 'run.interrupted'
           ? 'Interrupted'
           : event.type === 'run.failed'
-            ? 'Run failed'
-            : 'Run ended'
+          ? 'Run failed'
+          : 'Run ended'
       for (const [id, tool] of toolsById) {
         if (tool.status !== 'pending') continue
         const sameRun = Boolean(event.runId && tool.runId === event.runId)

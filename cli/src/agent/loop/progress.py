@@ -52,6 +52,7 @@ class LoopProgressMixin:
             event_payload = {
                 "name": str(payload.get("name") or "tool"),
                 "output": payload.get("output"),
+                "images": list(payload.get("images") or []),
                 "isError": bool(payload.get("is_error")),
                 "durationSeconds": float(payload.get("duration_s") or 0.0),
                 "toolCallId": str(payload.get("tool_call_id") or ""),

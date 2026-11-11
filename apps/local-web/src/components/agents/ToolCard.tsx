@@ -10,9 +10,32 @@ export type TranscriptTool = {
   status: 'pending' | 'completed' | 'error'
   args?: unknown
   result?: unknown
+  images?: string[]
   startedAt: string
   endedAt?: string
   durationSeconds?: number
+}
+
+function imageSourcesFromResult(value: unknown): string[] {
+  const text = formatToolPayload(value)
+  const found: string[] = []
+  const seen = new Set<string>()
+  const add = (url: string) => {
+    const clean = url.trim().replace(/[)\]>,.'"\]]+$/g, '')
+    if (!clean || seen.has(clean)) return
+    if (!/^https?:\/\//i.test(clean) && !clean.startsWith('data:image/')) return
+    seen.add(clean)
+    found.push(clean)
+  }
+  for (const match of text.matchAll(/Image URL:\s*(https?:\/\/\S+)/gi)) {
+    add(match[1])
+  }
+  for (const match of text.matchAll(
+    /!\[[^\]]*]\((https?:\/\/[^)\s]+|data:image\/[^)\s]+)\)/g
+  )) {
+    add(match[1])
+  }
+  return found.slice(0, 4)
 }
 
 function formatToolPayload(value: unknown) {
@@ -75,73 +98,94 @@ export function ToolCard({
     previewSource.length > 96
       ? `${previewSource.slice(0, 96).trimEnd()}…`
       : previewSource
+  const images = [
+    ...(tool.images || []),
+    ...imageSourcesFromResult(tool.result)
+  ]
+    .filter((url, index, all) => url && all.indexOf(url) === index)
+    .slice(0, 4)
 
   return (
-    <details
-      open={tool.status === 'pending'}
-      className="border-border/70 bg-muted/25 rounded-md border px-2 py-1"
-    >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1 text-sm">
-        <span className="flex min-w-0 items-center gap-2">
-          <Terminal className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-          <span className="min-w-0">
-            <span
-              className={cn(
-                'block truncate font-medium leading-none',
-                tool.status === 'pending'
-                  ? 'text-foreground animate-pulse'
-                  : 'text-muted-foreground'
-              )}
-            >
-              {tool.name}
-            </span>
-            {previewText ? (
-              <span className="text-muted-foreground/70 block max-w-[36rem] truncate pt-0.5 text-xs">
-                {previewText}
+    <div className="space-y-2">
+      <details
+        open={tool.status === 'pending'}
+        className="border-border/70 bg-muted/25 rounded-md border px-2 py-1"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 py-1 text-sm">
+          <span className="flex min-w-0 items-center gap-2">
+            <Terminal className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0">
+              <span
+                className={cn(
+                  'block truncate font-medium leading-none',
+                  tool.status === 'pending'
+                    ? 'text-foreground animate-pulse'
+                    : 'text-muted-foreground'
+                )}
+              >
+                {tool.name}
               </span>
+              {previewText ? (
+                <span className="text-muted-foreground/70 block max-w-[36rem] truncate pt-0.5 text-xs">
+                  {previewText}
+                </span>
+              ) : null}
+            </span>
+          </span>
+          <span className="text-muted-foreground flex shrink-0 items-center justify-end gap-2 text-xs">
+            <span className="w-[48px] whitespace-nowrap text-right tabular-nums">
+              {executionTime || ''}
+            </span>
+            <span className="flex h-3 w-3 items-center justify-center">
+              {tool.status === 'pending' ? (
+                <Loader className="text-muted-foreground h-2.5 w-2.5 animate-spin [animation-duration:1.8s]" />
+              ) : tool.status === 'error' ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500/70" />
+              ) : null}
+            </span>
+            {tool.status === 'pending' && isRunning && onStop ? (
+              <button
+                type="button"
+                className="border-border/70 bg-background/80 text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium"
+                onClick={event => {
+                  event.preventDefault()
+                  onStop()
+                }}
+              >
+                <Square className="h-2.5 w-2.5 fill-current" />
+                <span>Stop</span>
+              </button>
             ) : null}
           </span>
-        </span>
-        <span className="text-muted-foreground flex shrink-0 items-center justify-end gap-2 text-xs">
-          <span className="w-[48px] whitespace-nowrap text-right tabular-nums">
-            {executionTime || ''}
-          </span>
-          <span className="flex h-3 w-3 items-center justify-center">
-            {tool.status === 'pending' ? (
-              <Loader className="text-muted-foreground h-2.5 w-2.5 animate-spin [animation-duration:1.8s]" />
-            ) : tool.status === 'error' ? (
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500/70" />
+        </summary>
+        {hasArgs || hasResult ? (
+          <div className="space-y-1 pb-1 pt-0.5">
+            {hasArgs ? (
+              <pre className="border-border/40 bg-background/60 text-muted-foreground max-h-32 overflow-auto whitespace-pre-wrap rounded-sm border px-2 py-1.5 font-mono text-xs">
+                {argsText}
+              </pre>
             ) : null}
-          </span>
-          {tool.status === 'pending' && isRunning && onStop ? (
-            <button
-              type="button"
-              className="border-border/70 bg-background/80 text-muted-foreground hover:bg-destructive/10 hover:text-destructive inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium"
-              onClick={event => {
-                event.preventDefault()
-                onStop()
-              }}
-            >
-              <Square className="h-2.5 w-2.5 fill-current" />
-              <span>Stop</span>
-            </button>
-          ) : null}
-        </span>
-      </summary>
-      {hasArgs || hasResult ? (
-        <div className="space-y-1 pb-1 pt-0.5">
-          {hasArgs ? (
-            <pre className="border-border/40 bg-background/60 text-muted-foreground max-h-32 overflow-auto whitespace-pre-wrap rounded-sm border px-2 py-1.5 font-mono text-xs">
-              {argsText}
-            </pre>
-          ) : null}
-          {hasResult ? (
-            <pre className="border-border/40 bg-background/60 text-muted-foreground max-h-48 overflow-auto whitespace-pre-wrap rounded-sm border px-2 py-1.5 font-mono text-xs">
-              {resultText}
-            </pre>
-          ) : null}
+            {hasResult ? (
+              <pre className="border-border/40 bg-background/60 text-muted-foreground max-h-48 overflow-auto whitespace-pre-wrap rounded-sm border px-2 py-1.5 font-mono text-xs">
+                {resultText}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
+      </details>
+      {images.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {images.map(url => (
+            <img
+              key={url}
+              src={url}
+              alt={tool.name}
+              referrerPolicy="no-referrer"
+              className="border-border/60 max-h-[28rem] w-full rounded-md border object-contain"
+            />
+          ))}
         </div>
       ) : null}
-    </details>
+    </div>
   )
 }
