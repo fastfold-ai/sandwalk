@@ -22,7 +22,7 @@ from agent_server.models.library import (
 )
 from agent_server.service import AgentService
 from agent_server.store import AgentStore
-from agent_server.workspace import TEXT_SUFFIXES
+from agent_server.workspace.constants import is_workspace_text
 from agent_server.workspace.filenames import (
     sanitize_upload_filename,
     unique_upload_relative_path,
@@ -321,8 +321,7 @@ class LibraryService:
         data = path.read_bytes()
         name = item.display_name or item.original_name
         mime = item.mime or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        suffix = Path(name).suffix.lower()
-        is_text = mime.startswith("text/") or suffix in TEXT_SUFFIXES
+        is_text = is_workspace_text(name, mime)
         encoding: Literal["text", "base64"]
         if is_text:
             try:

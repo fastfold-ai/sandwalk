@@ -19,7 +19,7 @@ from agent_server.models import (
     WorkspaceFileContent,
 )
 from agent_server.project_folder import PROJECT_FOLDER_LINK_NAME
-from agent_server.workspace.constants import TEXT_SUFFIXES
+from agent_server.workspace.constants import is_workspace_text
 from agent_server.workspace.filenames import sanitize_upload_filename
 
 _SKIP_DIR_NAMES = frozenset(
@@ -136,7 +136,7 @@ def read_project_folder_file(folder_path: str, relative_path: str) -> WorkspaceF
         raise ValueError("File is too large to preview.")
 
     mime_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
-    is_text = mime_type.startswith("text/") or candidate.suffix.lower() in TEXT_SUFFIXES
+    is_text = is_workspace_text(candidate.name, mime_type)
     encoding: Literal["text", "base64"]
     if is_text:
         try:

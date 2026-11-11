@@ -113,7 +113,7 @@ export function titleFromPlanPath(path: string) {
 }
 
 export function isTextLike(path: string) {
-  return /\.(json|md|mdx|markdown|txt|ya?ml|py|ts|tsx|js|jsx|css|html?|xml|cif|mmcif|pdb|sdf|jinja|jinja2|j2|toml)$/i.test(
+  return /\.(json|md|mdx|markdown|txt|ya?ml|py|ts|tsx|js|jsx|css|html?|xml|cif|mmcif|pdb|sdf|jinja|jinja2|j2|toml|sh|bash|zsh|ksh|fish|csh|slurm|sbatch)$/i.test(
     path
   )
 }
@@ -270,6 +270,14 @@ export function languageFor(path: string) {
   return (
     {
       py: 'python',
+      sh: 'shell',
+      bash: 'shell',
+      zsh: 'shell',
+      ksh: 'shell',
+      fish: 'shell',
+      csh: 'shell',
+      slurm: 'shell',
+      sbatch: 'shell',
       ts: 'typescript',
       tsx: 'typescript',
       js: 'javascript',

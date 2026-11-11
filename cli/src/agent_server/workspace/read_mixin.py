@@ -14,7 +14,7 @@ from typing import Literal
 
 from agent_server.models import WorkspaceFile, WorkspaceFileContent
 from agent_server.project_folder import PROJECT_FOLDER_LINK_NAME
-from agent_server.workspace.constants import TEXT_SUFFIXES
+from agent_server.workspace.constants import is_workspace_text
 from agent_server.workspace.errors import WorkspacePathError
 
 _SKIP_DIR_NAMES = frozenset(
@@ -217,7 +217,7 @@ class WorkspaceReadMixin:
             raise IsADirectoryError(relative_path)
         data = path.read_bytes()
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        is_text = mime_type.startswith("text/") or path.suffix.lower() in TEXT_SUFFIXES
+        is_text = is_workspace_text(path.name, mime_type)
         encoding: Literal["text", "base64"]
         if is_text:
             try:
