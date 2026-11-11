@@ -201,8 +201,8 @@ Download an installer from the [latest release](https://github.com/fastfold-ai/s
 | Platform | Package |
 |---|---|
 | macOS (Apple Silicon, 12.0+) | [Sandwalk-macos-arm64.dmg](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk-macos-arm64.dmg) |
-| Ubuntu (amd64) | [Sandwalk_0.1.14_amd64.deb](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.14_amd64.deb) |
-| Ubuntu (arm64) | [Sandwalk_0.1.14_arm64.deb](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.14_arm64.deb) |
+| Ubuntu (amd64) | [Sandwalk_0.1.15_amd64.deb](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.15_amd64.deb) |
+| Ubuntu (arm64) | [Sandwalk_0.1.15_arm64.deb](https://github.com/fastfold-ai/sandwalk/releases/latest/download/Sandwalk_0.1.15_arm64.deb) |
 
 On Ubuntu 24.04 or 26.04, you can also install and update through APT:
 
