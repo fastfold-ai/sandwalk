@@ -262,7 +262,8 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark .sandwalk-chrome-tabs {
 html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark
   .sandwalk-chrome-tabs
   .chrome-tab[data-active='true'] {
-  --tab-fill: rgb(255 255 255 / 0.1);
+  /* Match the main-column frost so the selected tab reads as a filled chip. */
+  --tab-fill: rgb(36 36 40 / 0.94);
 }
 
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.dark)
@@ -1749,6 +1750,14 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active .chrome-tabs-bottom-bar {
 .sandwalk-drag-region [role='button'],
 .sandwalk-drag-region [role='menuitem'],
 .sandwalk-drag-region [data-no-window-drag],
+/*
+ * The tab strip lives inside the overlay title-bar drag region. On a
+ * transparent window, WebKit does not paint descendants of a drag region
+ * unless they opt out, so the chrome shapes and titles vanish while the
+ * <button> overflow/new controls (already no-drag) stay visible.
+ */
+.sandwalk-drag-region .sandwalk-tab-strip-main,
+.sandwalk-drag-region .sandwalk-tab-strip-main *,
 [data-capy-root],
 [data-capy-root] *,
 /* Menus portal to <body>, outside the title-bar drag region. On the desktop
