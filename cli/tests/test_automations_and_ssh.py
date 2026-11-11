@@ -745,5 +745,34 @@ def test_ssh_host_deduplication_on_reconnect(tmp_path: Path) -> None:
     assert len(store.list_saved_ssh_hosts()) == 1
 
 
+def test_ssh_sync_download_means_pull(tmp_path: Path) -> None:
+    store = AgentStore(tmp_path / "sync.db")
+    svc = SshService(store)
+    host = svc.create_host(
+        CreateSshHostRequest(target="user@10.0.0.8", alias="box")
+    )
+    seen: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):  # noqa: ANN001
+        seen.append(list(cmd))
+        result = MagicMock()
+        result.returncode = 0
+        result.stdout = "ok"
+        result.stderr = ""
+        return result
+
+    with patch("agent_server.ssh_service.service.subprocess.run", side_effect=fake_run):
+        res = svc.sync_files(
+            host.id,
+            local_path=str(tmp_path),
+            remote_path="/tmp/slurm_pi_results/",
+            direction="download",
+        )
+    assert res.direction == "pull"
+    assert seen
+    assert seen[0][-2].startswith("user@10.0.0.8:")
+    assert seen[0][-1] == str(tmp_path)
+
+
 
 

@@ -309,7 +309,7 @@ class SshSyncRequest(ApiModel):
     host_id_or_target: str
     local_path: str
     remote_path: str
-    direction: Literal["push", "pull"] = "push"
+    direction: Literal["push", "pull", "upload", "download"] = "push"
     delete: bool = False
 
 

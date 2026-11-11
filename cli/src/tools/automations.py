@@ -399,7 +399,7 @@ def ssh_exec_tool(
         "host": "SSH host alias, ID, or 'user@host'",
         "local_path": "Local file or directory path",
         "remote_path": "Remote file or directory path on the SSH server",
-        "direction": "'push' (local -> remote, default) or 'pull' (remote -> local)",
+        "direction": "'push'/'upload' (local -> remote, default) or 'pull'/'download' (remote -> local)",
     },
     usage_guide="Use to stage scripts/configs to an HPC workspace or pull Slurm results back locally.",
 )

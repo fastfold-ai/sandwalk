@@ -1753,7 +1753,7 @@ def capy_automation_manage(
         "workdir": "Optional remote working directory",
         "local_path": "Local path when action='sync'",
         "remote_path": "Remote path when action='sync'",
-        "direction": "'push' or 'pull' when action='sync'",
+        "direction": "'push'/'upload' or 'pull'/'download' when action='sync'",
     },
 )
 def capy_ssh_manage(

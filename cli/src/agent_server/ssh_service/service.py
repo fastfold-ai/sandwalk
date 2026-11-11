@@ -61,6 +61,26 @@ def _deterministic_tunnel_port(host: SshHost) -> int:
     return 18800 + (zlib.crc32(key.encode("utf-8")) % 1000)
 
 
+_SYNC_PULL = {"pull", "download", "get", "fetch"}
+_SYNC_PUSH = {"push", "upload", "put", "send"}
+
+
+def _normalize_sync_direction(direction: str | None) -> str:
+    """Map agent wording onto rsync push/pull.
+
+    ``download`` used to fall through to push, which uploaded an empty local
+    folder instead of fetching the remote files.
+    """
+    value = (direction or "push").strip().lower()
+    if value in _SYNC_PULL:
+        return "pull"
+    if value in _SYNC_PUSH:
+        return "push"
+    raise ValueError(
+        f"Unknown sync direction {direction!r}. Use push/upload or pull/download."
+    )
+
+
 def _is_local_port_listening(port: int) -> bool:
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=0.6):
@@ -437,7 +457,8 @@ class SshService:
         rsync_cmd = ["rsync", "-az", "-e", ssh_transport]
         if delete:
             rsync_cmd.append("--delete")
-        if direction == "pull":
+        sync_direction = _normalize_sync_direction(direction)
+        if sync_direction == "pull":
             rsync_cmd.extend([f"{dest_prefix}:{remote_path}", local_expanded])
         else:
             rsync_cmd.extend([local_expanded, f"{dest_prefix}:{remote_path}"])
@@ -454,7 +475,7 @@ class SshService:
             summary = (proc.stdout or proc.stderr or "Sync completed.").strip()[:500]
             return SshSyncResponse(
                 host_id=host.id,
-                direction="pull" if direction == "pull" else "push",
+                direction=sync_direction,
                 local_path=local_expanded,
                 remote_path=remote_path,
                 exit_code=proc.returncode,
@@ -465,7 +486,7 @@ class SshService:
             dur = round(time.monotonic() - t0, 3)
             return SshSyncResponse(
                 host_id=host.id,
-                direction="pull" if direction == "pull" else "push",
+                direction=_normalize_sync_direction(direction),
                 local_path=local_expanded,
                 remote_path=remote_path,
                 exit_code=1,
