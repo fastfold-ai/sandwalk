@@ -93,11 +93,7 @@ export function LiveToolStack({
             key={`active-${group.id}`}
             className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
           >
-            <ToolCard
-              tool={group}
-              isRunning={runActive}
-              onStop={onInterrupt}
-            />
+            <ToolCard tool={group} isRunning={runActive} onStop={onInterrupt} />
           </div>
         )
       })}

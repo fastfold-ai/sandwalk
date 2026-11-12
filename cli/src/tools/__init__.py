@@ -67,6 +67,7 @@ _TOOL_MODULES = (
     "environment",
     "memory",
     "automations",
+    "image_generate",
 )
 
 

@@ -21,6 +21,7 @@ PTC_DIRECT_TOOLS: tuple[str, ...] = (
     "shell.run",
     "environment.install_package",
     "environment.list_packages",
+    "image.generate",
 )
 
 

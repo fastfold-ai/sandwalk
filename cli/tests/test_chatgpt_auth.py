@@ -421,11 +421,12 @@ def test_models_list_hides_chatgpt_rows_until_connected(tmp_path: Path, monkeypa
     assert "gpt-5.6-sol" in after
 
 
-def test_chat_model_uses_oauth_token_and_lifts_system_prompt():
+def test_chat_model_uses_oauth_token_and_lifts_system_prompt(monkeypatch):
     from langchain_core.messages import HumanMessage, SystemMessage
 
     from agent.deepagents_runtime.chat_model_chatgpt import build_chatgpt_chat_model
 
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://127.0.0.1:9931/v1")
     ca.save_credentials(_creds(access_token="oauth-token"))
 
     class _Cfg:
@@ -441,6 +442,7 @@ def test_chat_model_uses_oauth_token_and_lifts_system_prompt():
     assert model.model_name == "gpt-5.6-sol"
     assert model.openai_api_key.get_secret_value() == "oauth-token"
     assert model.use_responses_api is True
+    assert str(model.openai_api_base).startswith("https://api.openai.com/v1")
     assert model.store is False
     assert model.temperature is None  # GPT-5 rejects custom temperature
     assert model.reasoning_effort == "high"

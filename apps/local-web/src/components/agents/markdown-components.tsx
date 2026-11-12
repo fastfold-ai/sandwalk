@@ -202,6 +202,27 @@ export function buildMarkdownComponents({
     pre({ children }) {
       return <>{children}</>
     },
+    // Workspace pictures are drawn once under the reply. A markdown image
+    // with a relative path such as artifacts/images/photo.png otherwise
+    // loads against the app URL and shows a broken box above the real preview.
+    img({ src, alt }) {
+      const source = typeof src === 'string' ? src.trim() : ''
+      const remote =
+        source.startsWith('data:image/') ||
+        source.startsWith('blob:') ||
+        /^https?:\/\//i.test(source)
+      if (!remote) return null
+      return (
+        <img
+          src={source}
+          alt={typeof alt === 'string' ? alt : ''}
+          className="my-2 max-h-[32rem] max-w-full rounded-[2rem]"
+          onError={event => {
+            event.currentTarget.remove()
+          }}
+        />
+      )
+    },
     table({ children }) {
       return (
         <div className="border-border my-3 overflow-x-auto rounded-md border">

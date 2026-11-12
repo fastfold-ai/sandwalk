@@ -47,6 +47,9 @@ def run_existing_agent(
             config.set_openai_active_profile(session_profile)
         except Exception:  # noqa: BLE001
             pass
+    # ChatGPT plan and the OpenAI API key are different connections. When the
+    # plan is not signed in, a saved API key should run the selected GPT model.
+    config.prefer_openai_api_key_over_signed_out_chatgpt()
     try:
         profile = config.get_openai_profile()
     except Exception:  # noqa: BLE001

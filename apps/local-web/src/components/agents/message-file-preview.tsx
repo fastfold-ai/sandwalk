@@ -4,6 +4,7 @@ import { FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { decodeContent } from '@/components/agents/artifact-grid-thumb-utils'
+import { ImageContextTarget } from '@/components/agents/image-context-menu'
 import { AudioPlayPreview } from '@/components/agents/AudioPlayPreview'
 import { PdfFirstPagePreview } from '@/components/agents/PdfFirstPagePreview'
 import { Py2dMolMiniPreview } from '@/components/agents/py2dmol/Py2dMolMiniPreview'
@@ -11,8 +12,10 @@ import { VideoPlayPreview } from '@/components/agents/VideoPlayPreview'
 import { isStructure } from '@/components/agents/workspace-utils'
 import { getFileIcon } from '@/lib/file-icons'
 import { mediaObjectUrlFromFile } from '@/lib/media-src'
+import { parseMessageParts } from '@/components/agents/composer-parts'
 import { multimodalKindForFile } from '@/lib/multimodal-attach'
 import { cn } from '@/lib/utils'
+import { matchWorkspacePaths } from '@/lib/workspace-file-paths'
 
 export type MessagePreviewKind =
   | 'image'
@@ -20,6 +23,66 @@ export type MessagePreviewKind =
   | 'video'
   | 'audio'
   | 'structure'
+
+/** Workspace image paths mentioned in assistant text or a tool result. */
+export function workspaceImagePathsInText(
+  text: string,
+  workspacePath?: string | null
+): string[] {
+  const found: string[] = []
+  const add = (path: string | null | undefined) => {
+    const cleaned = String(path || '')
+      .trim()
+      .replace(/\\/g, '/')
+      .replace(/^@/, '')
+    if (!cleaned || messageFilePreviewKind(cleaned) !== 'image') return
+    if (!found.includes(cleaned)) found.push(cleaned)
+  }
+  for (const match of matchWorkspacePaths(text, workspacePath)) {
+    add(match.relative)
+  }
+  for (const part of parseMessageParts(text)) {
+    if (part.type === 'file') add(part.path)
+  }
+  return found.slice(0, 4)
+}
+
+/** Images that belong under the assistant reply, not between tool rows. */
+export function responseImageSources(
+  text: string,
+  toolResults: unknown[],
+  workspacePath?: string | null,
+  toolImages: string[] = []
+): { paths: string[]; urls: string[] } {
+  const paths: string[] = []
+  const addPath = (path: string) => {
+    if (!paths.includes(path)) paths.push(path)
+  }
+  for (const path of workspaceImagePathsInText(text, workspacePath)) addPath(path)
+  const urls: string[] = []
+  const addUrl = (url: string) => {
+    const clean = url.trim().replace(/[)\]>,.'"\]]+$/g, '')
+    if (!clean || urls.includes(clean)) return
+    if (!/^https?:\/\//i.test(clean) && !clean.startsWith('data:image/')) return
+    urls.push(clean)
+  }
+  for (const url of toolImages) addUrl(url)
+  for (const result of toolResults) {
+    const rendered =
+      typeof result === 'string' ? result : JSON.stringify(result ?? '')
+    for (const path of workspaceImagePathsInText(rendered, workspacePath)) {
+      addPath(path)
+    }
+    for (const match of rendered.matchAll(/Image URL:\s*(https?:\/\/\S+)/gi)) {
+      addUrl(match[1])
+    }
+  }
+  // A saved workspace file and its data URL are the same picture.
+  const visibleUrls = paths.length
+    ? urls.filter(url => !url.startsWith('data:'))
+    : urls
+  return { paths: paths.slice(0, 4), urls: visibleUrls.slice(0, 4) }
+}
 
 export function messageFilePreviewKind(path: string): MessagePreviewKind | null {
   const name = path.split('/').at(-1) || path
@@ -71,12 +134,15 @@ export function MessageFilePreview({
   client,
   sessionId,
   path,
-  onOpenFile
+  onOpenFile,
+  prominent = false
 }: {
   client: LocalAgentClient
   sessionId: string
   path: string
   onOpenFile?: (path: string) => void
+  /** Large reply image, closer to the ChatGPT result card. */
+  prominent?: boolean
 }) {
   const kind = messageFilePreviewKind(path)
   const name = path.split('/').at(-1) || path
@@ -288,27 +354,90 @@ export function MessageFilePreview({
         src={src}
         alt={name}
         className={cn(
-          'max-h-64 max-w-full rounded-lg object-contain transition-opacity',
+          'block h-auto w-auto max-w-full object-contain transition-opacity',
+          prominent ? 'max-h-[32rem]' : 'max-h-64',
           loaded ? 'opacity-100' : 'opacity-0'
         )}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />
     )
-    if (onOpenFile) {
-      return (
-        <button
-          type="button"
-          className="bg-background/40 block max-w-full cursor-pointer overflow-hidden rounded-lg text-left"
-          title={`Open @${path}`}
-          onClick={() => onOpenFile(path)}
-        >
-          {img}
-        </button>
-      )
-    }
-    return <div className="max-w-full overflow-hidden rounded-lg">{img}</div>
+    const frame = (
+      <ImageContextTarget
+        src={src}
+        filename={name}
+        workspacePath={path}
+        className="bg-background/40 w-fit max-w-full"
+      >
+        {onOpenFile ? (
+          <button
+            type="button"
+            className="block w-full cursor-pointer text-left"
+            title={`Open @${path}`}
+            onClick={() => onOpenFile(path)}
+          >
+            {img}
+          </button>
+        ) : (
+          img
+        )}
+      </ImageContextTarget>
+    )
+    return frame
   }
 
   return null
+}
+
+/** Pictures for a finished or streaming reply. Rendered under the text. */
+export function ResponseImages({
+  text,
+  toolResults = [],
+  toolImages = [],
+  workspacePath,
+  client,
+  sessionId,
+  onOpenFile
+}: {
+  text: string
+  toolResults?: unknown[]
+  toolImages?: string[]
+  workspacePath?: string | null
+  client?: LocalAgentClient | null
+  sessionId?: string | null
+  onOpenFile?: (path: string) => void
+}) {
+  const { paths, urls } = responseImageSources(
+    text,
+    toolResults,
+    workspacePath,
+    toolImages
+  )
+  if (paths.length === 0 && urls.length === 0) return null
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      {client && sessionId
+        ? paths.map(path => (
+            <MessageFilePreview
+              key={path}
+              client={client}
+              sessionId={sessionId}
+              path={path}
+              onOpenFile={onOpenFile}
+              prominent
+            />
+          ))
+        : null}
+      {urls.map(url => (
+        <ImageContextTarget key={url} src={url} className="w-fit max-w-full">
+          <img
+            src={url}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="block h-auto max-h-[32rem] w-auto max-w-full object-contain"
+          />
+        </ImageContextTarget>
+      ))}
+    </div>
+  )
 }

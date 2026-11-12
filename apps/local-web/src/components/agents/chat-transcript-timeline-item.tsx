@@ -119,11 +119,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
             key={tool.id}
             className="fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] px-2 duration-150"
           >
-            <ToolCard
-              tool={tool}
-              isRunning={runActive}
-              onStop={onInterrupt}
-            />
+            <ToolCard tool={tool} isRunning={runActive} onStop={onInterrupt} />
           </div>
         ))}
       </div>
@@ -213,6 +209,7 @@ export const ChatTranscriptTimelineItem = memo(function ChatTranscriptTimelineIt
       workspaceFiles={workspaceFiles}
       mentionChats={mentionChats}
       onResendMessage={onResendMessage}
+      tools={tools}
     />
   )
 },

@@ -193,7 +193,6 @@ class UsageUIMixin:
             )
         if (
             "chatgpt.tokens.use.direct" in lower
-            or ("plan" in lower and "429" in lower)
             or ("usage limit" in lower and "chatgpt" in lower)
         ):
             return (

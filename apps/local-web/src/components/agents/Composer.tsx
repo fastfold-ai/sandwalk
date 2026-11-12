@@ -31,6 +31,7 @@ import {
 import { useComposerFileDrop } from '@/components/agents/composer/useComposerFileDrop'
 import { useComposerVoice } from '@/components/agents/composer/useComposerVoice'
 import { parseComposerParts } from '@/components/agents/composer-parts'
+import { COMPOSER_ADD_FILE_EVENT } from '@/components/agents/image-context-menu'
 import { cn } from '@/lib/utils'
 
 export type { SandboxActionPhase, SandboxComputeChange }
@@ -163,6 +164,19 @@ export function Composer({
     captureWindow: captureWindowDrops,
     onDraggingChange: kind => onDropActiveChange?.(Boolean(kind))
   })
+
+  const addFileToDraft = draftState.chipInserters.appendFileChips
+  const addFileRef = useRef(addFileToDraft)
+  addFileRef.current = addFileToDraft
+  useEffect(() => {
+    const onAdd = (event: Event) => {
+      const path = (event as CustomEvent<{ path?: string }>).detail?.path?.trim()
+      if (!path) return
+      addFileRef.current([path])
+    }
+    window.addEventListener(COMPOSER_ADD_FILE_EVENT, onAdd)
+    return () => window.removeEventListener(COMPOSER_ADD_FILE_EVENT, onAdd)
+  }, [])
 
   useComposerMentionFocus(
     draftState.slashOpen,

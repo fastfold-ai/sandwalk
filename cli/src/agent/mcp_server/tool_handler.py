@@ -63,6 +63,17 @@ def _make_tool_handler(tool_obj, session):
                 "is_error": True,
             }
 
-        return {"content": [{"type": "text", "text": text}]}
+        content: list[dict[str, Any]] = [{"type": "text", "text": text}]
+        if isinstance(result, dict):
+            encoded = result.get("image_base64")
+            if isinstance(encoded, str) and encoded.strip():
+                content.append(
+                    {
+                        "type": "image",
+                        "base64": encoded.strip(),
+                        "mime_type": str(result.get("image_mime") or "image/png"),
+                    }
+                )
+        return {"content": content}
 
     return handler

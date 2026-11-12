@@ -15,7 +15,7 @@ from agent_server.models_service.catalog_static import (
 
 
 def _drop_unconfirmed_curated(items: list[AgentModel]) -> list[AgentModel]:
-    """Drop hardcoded OpenAI/Anthropic rows the provider did not return.
+    """Drop hardcoded OpenAI/Anthropic/Gemini rows the provider did not return.
 
     Live /v1/models is the source of truth once a fetch succeeds. Curated
     names that are not in that list (and therefore cannot be called) stay
@@ -26,8 +26,9 @@ def _drop_unconfirmed_curated(items: list[AgentModel]) -> list[AgentModel]:
     live = {
         "openai": confirmed_live_ids("openai"),
         "anthropic": confirmed_live_ids("anthropic"),
+        "google": confirmed_live_ids("google"),
     }
-    if live["openai"] is None and live["anthropic"] is None:
+    if all(value is None for value in live.values()):
         return items
     kept: list[AgentModel] = []
     for item in items:
@@ -60,8 +61,8 @@ def list_models(
     items.extend(_cloud_catalog_items(cfg, hidden, known_ids, enabled_only=enabled_only))
     items.extend(_custom_model_items(cfg, hidden, known_ids, enabled_only=enabled_only))
     if discover:
-        # OpenAI + Anthropic: anything their /v1/models lists that the curated
-        # catalog does not, so a new family appears without a Sandwalk release.
+        # OpenAI, Anthropic, and Gemini: anything their model list returns that
+        # the curated catalog does not, so a new family appears without a release.
         from agent_server.models_service.first_party_discovery import (
             first_party_discovered_items,
         )

@@ -25,6 +25,7 @@ _PINNED_TOOL_NAMES = (
     "sandbox_status",
     "sandbox_start",
     "sandbox_stop",
+    "image_generate",
 )
 
 
@@ -49,10 +50,15 @@ def build_chat_model(config, *, streaming: bool = True):
     ChatCerebras, ``groq`` via ChatGroq, ``fireworks`` via ChatFireworks,
     and other first-party OpenAI-compatible providers (xAI, NVIDIA, OpenCode Zen).
     """
-    from agent.deepagents_runtime.llm_http import install_stable_tls_httpx
+    from agent.deepagents_runtime.llm_http import (
+        install_stable_tls_httpx,
+        reset_cached_async_http_client,
+    )
 
     install_stable_tls_httpx()
     provider = str(config.get("llm.provider", "openai") or "openai").strip().lower()
+    if provider in {"openai", "openai-chatgpt"}:
+        reset_cached_async_http_client()
     temperature = float(config.get("llm.temperature", 0.1))
 
     if provider == "anthropic":

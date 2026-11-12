@@ -24,6 +24,7 @@ import { ChatTranscriptTimelineItem } from '@/components/agents/chat-transcript-
 import { HitlDecisionCard } from '@/components/agents/hitl/HitlDecisionCard'
 import { LiveToolStack } from '@/components/agents/live-tool-stack'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
+import { ResponseImages } from '@/components/agents/message-file-preview'
 import { TodoListInline } from '@/components/agents/TodoListInline'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
@@ -271,6 +272,17 @@ export function ChatTranscript({
                   mentionChats={mentionChats}
                   className="max-w-full space-y-3 [&_*]:max-w-full"
                 />
+                {client && sessionId ? (
+                  <ResponseImages
+                    text={deferredDelta}
+                    toolResults={activeRunTools.map(tool => tool.result)}
+                    toolImages={activeRunTools.flatMap(tool => tool.images || [])}
+                    workspacePath={session?.workspacePath}
+                    client={client}
+                    sessionId={sessionId}
+                    onOpenFile={onOpenFile}
+                  />
+                ) : null}
               </div>
             ) : null}
             {runActive ? (

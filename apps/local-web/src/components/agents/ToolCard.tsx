@@ -16,28 +16,6 @@ export type TranscriptTool = {
   durationSeconds?: number
 }
 
-function imageSourcesFromResult(value: unknown): string[] {
-  const text = formatToolPayload(value)
-  const found: string[] = []
-  const seen = new Set<string>()
-  const add = (url: string) => {
-    const clean = url.trim().replace(/[)\]>,.'"\]]+$/g, '')
-    if (!clean || seen.has(clean)) return
-    if (!/^https?:\/\//i.test(clean) && !clean.startsWith('data:image/')) return
-    seen.add(clean)
-    found.push(clean)
-  }
-  for (const match of text.matchAll(/Image URL:\s*(https?:\/\/\S+)/gi)) {
-    add(match[1])
-  }
-  for (const match of text.matchAll(
-    /!\[[^\]]*]\((https?:\/\/[^)\s]+|data:image\/[^)\s]+)\)/g
-  )) {
-    add(match[1])
-  }
-  return found.slice(0, 4)
-}
-
 function formatToolPayload(value: unknown) {
   if (value == null) return ''
   if (typeof value === 'string') return value
@@ -98,13 +76,6 @@ export function ToolCard({
     previewSource.length > 96
       ? `${previewSource.slice(0, 96).trimEnd()}…`
       : previewSource
-  const images = [
-    ...(tool.images || []),
-    ...imageSourcesFromResult(tool.result)
-  ]
-    .filter((url, index, all) => url && all.indexOf(url) === index)
-    .slice(0, 4)
-
   return (
     <div className="space-y-2">
       <details
@@ -173,19 +144,6 @@ export function ToolCard({
           </div>
         ) : null}
       </details>
-      {images.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {images.map(url => (
-            <img
-              key={url}
-              src={url}
-              alt={tool.name}
-              referrerPolicy="no-referrer"
-              className="border-border/60 max-h-[28rem] w-full rounded-md border object-contain"
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   )
 }

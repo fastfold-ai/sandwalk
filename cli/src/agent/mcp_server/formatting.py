@@ -20,7 +20,7 @@ def _format_tool_result(result: Any, max_chars: int = 8000) -> str:
 
     # Absolute download paths next — keep them whole so the model can cite them
     # even when stdout is dominated by long CloudFront URLs.
-    skip = {"summary"}
+    skip = {"summary", "image_base64", "image_mime"}
     local_paths = result.get("local_paths")
     if isinstance(local_paths, list) and local_paths:
         listed = "\n".join(str(p) for p in local_paths if str(p).strip())

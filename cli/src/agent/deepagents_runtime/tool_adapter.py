@@ -67,6 +67,17 @@ def _make_lc_tool(*, name: str, description: str, args_schema, handler, strip_no
             for part in parts
             if isinstance(part, dict) and part.get("type") == "text"
         )
+        images = [
+            part
+            for part in parts
+            if isinstance(part, dict) and part.get("type") == "image"
+        ]
+        if images:
+            blocks: list[dict[str, Any]] = []
+            if text:
+                blocks.append({"type": "text", "text": text})
+            blocks.extend(images)
+            return blocks
         return text or "(no output)"
 
     def _sync_unsupported(**_kwargs):  # pragma: no cover - deepagents runs async

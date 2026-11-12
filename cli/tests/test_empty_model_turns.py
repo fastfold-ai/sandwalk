@@ -6,7 +6,7 @@ import asyncio
 from types import SimpleNamespace
 
 from agent.deepagents_runtime.event_processor import process_events
-from agent.runner.deepagents_build import _empty_output_summary
+from agent.runner.deepagents_build import _empty_output_summary, _turn_saved_image
 from agent.runner.deepagents_run import _merge_deepagents_chunks
 
 
@@ -61,6 +61,15 @@ def test_merge_keeps_empty_turns_across_resume_loops() -> None:
              "empty_model_turns": [{"call": 1, "stop_reason": "refusal"}]}
     merged = _merge_deepagents_chunks(acc, chunk)
     assert [t["stop_reason"] for t in merged["empty_model_turns"]] == ["max_tokens", "refusal"]
+
+
+def test_saved_image_counts_as_the_reply() -> None:
+    assert _turn_saved_image(
+        [{"name": "image.generate", "result_text": "Saved to /tmp/artifacts/images/star.png"}]
+    )
+    assert not _turn_saved_image(
+        [{"name": "image.generate", "result_text": "image request failed (400): no"}]
+    )
 
 
 def test_summary_mentions_stop_reason() -> None:

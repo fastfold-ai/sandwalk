@@ -152,9 +152,68 @@ def test_list_models_hides_curated_ids_the_provider_did_not_return(tmp_path, mon
     assert "gpt-6-luna" not in openai_ids
 
 
+GOOGLE_PAYLOAD = {
+    "models": [
+        {
+            "name": "models/gemini-3.8-flash",
+            "displayName": "Gemini 3.8 Flash",
+            "supportedGenerationMethods": ["generateContent"],
+            "inputTokenLimit": 1048576,
+        },
+        {
+            "name": "models/gemini-3.5-flash",
+            "displayName": "Gemini 3.5 Flash",
+            "supportedGenerationMethods": ["generateContent"],
+        },
+        {
+            "name": "models/gemini-2.5-pro",
+            "displayName": "Gemini 2.5 Pro",
+            "supportedGenerationMethods": ["generateContent"],
+        },
+        {
+            "name": "models/gemini-3.1-flash-lite-image",
+            "displayName": "Nano Banana 2 Lite",
+            "supportedGenerationMethods": ["generateContent"],
+        },
+        {
+            "name": "models/gemini-flash-latest",
+            "displayName": "Gemini Flash Latest",
+            "supportedGenerationMethods": ["generateContent"],
+        },
+        {
+            "name": "models/gemini-embedding-001",
+            "displayName": "Gemini Embedding",
+            "supportedGenerationMethods": ["embedContent"],
+        },
+        {
+            "name": "models/lyria-3.5",
+            "displayName": "Lyria 3.5",
+            "supportedGenerationMethods": ["generateContent"],
+        },
+    ]
+}
+
+
+def test_google_fetch_keeps_chat_and_image_models():
+    with patch.object(fpd, "_get_json", return_value=GOOGLE_PAYLOAD):
+        models = fpd.fetch_google_models("test-key")
+    by_id = {m.id: m for m in models}
+    assert set(by_id) == {
+        "gemini-3.8-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-pro",
+        "gemini-3.1-flash-lite-image",
+    }
+    assert by_id["gemini-3.8-flash"].label == "Gemini 3.8 Flash"
+    assert by_id["gemini-3.8-flash"].context_window == 1048576
+    assert fpd._google_default_enabled("gemini-3.8-flash") is True
+    assert fpd._google_default_enabled("gemini-2.5-pro") is False
+    assert fpd._google_default_enabled("gemini-3.1-flash-lite-image") is False
+
+
 def test_no_key_means_no_request():
     cfg = Config.load()
-    for key in ("llm.openai_api_key", "llm.anthropic_api_key"):
+    for key in ("llm.openai_api_key", "llm.anthropic_api_key", "llm.google_api_key"):
         cfg.set(key, "")
     with patch.object(fpd, "_get_json", side_effect=AssertionError("should not fetch")):
         assert fpd.first_party_discovered_items(cfg, set(), set(), enabled_only=False) == []

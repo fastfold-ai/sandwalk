@@ -40,6 +40,24 @@ def _stable_limits(existing: Any | None) -> Any:
     return httpx.Limits(max_keepalive_connections=0, max_connections=max_conn)
 
 
+def reset_cached_async_http_client() -> None:
+    """Drop LangChain's process-wide async OpenAI client.
+
+    Each agent run uses a new event loop and then closes it. The cached
+    httpx client keeps connections bound to the previous loop, so the next
+    GPT call dies with ``Event loop is closed`` before the request is sent.
+    """
+    try:
+        from langchain_openai.chat_models._client_utils import (
+            _cached_async_httpx_client,
+        )
+    except Exception:  # noqa: BLE001
+        return
+    cache_clear = getattr(_cached_async_httpx_client, "cache_clear", None)
+    if callable(cache_clear):
+        cache_clear()
+
+
 def install_stable_tls_httpx() -> None:
     """Patch httpx clients used by OpenAI / Anthropic / OpenRouter SDKs."""
     global _INSTALLED

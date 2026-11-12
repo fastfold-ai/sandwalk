@@ -1,6 +1,34 @@
 import { describe, expect, it } from 'vitest'
 
-import { messageFilePreviewKind } from '@/components/agents/message-file-preview'
+import {
+  messageFilePreviewKind,
+  responseImageSources,
+  workspaceImagePathsInText
+} from '@/components/agents/message-file-preview'
+
+describe('workspaceImagePathsInText', () => {
+  it('keeps workspace image paths and ignores other files', () => {
+    const text = [
+      'Saved to /Users/andxeg/.sandwalk/workspaces/abc/artifacts/capybara.jpg',
+      'and notes.txt'
+    ].join(' ')
+    expect(workspaceImagePathsInText(text)).toEqual(['artifacts/capybara.jpg'])
+  })
+})
+
+describe('responseImageSources', () => {
+  it('keeps one workspace file and drops the matching data url', () => {
+    const text = 'Saved to /Users/a/.sandwalk/workspaces/abc/artifacts/images/star.png'
+    const sources = responseImageSources(
+      text,
+      [],
+      undefined,
+      ['data:image/png;base64,aaaa']
+    )
+    expect(sources.paths).toEqual(['artifacts/images/star.png'])
+    expect(sources.urls).toEqual([])
+  })
+})
 
 describe('messageFilePreviewKind', () => {
   it('detects common image extensions', () => {

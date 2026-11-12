@@ -594,6 +594,28 @@ fn save_bytes_file(default_filename: String, contents_base64: String) -> Result<
     write_download_file(&default_filename, &bytes)
 }
 
+/// Write bytes to a path the user already chose in the native save dialog.
+#[tauri::command]
+fn save_bytes_to_path(path: String, contents_base64: String) -> Result<String, String> {
+    use base64::Engine;
+    let target = PathBuf::from(path.trim());
+    if !target.is_absolute() {
+        return Err("Choose a folder in the save dialog.".into());
+    }
+    let parent = target
+        .parent()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .ok_or_else(|| "Choose a folder in the save dialog.".to_string())?;
+    if !parent.is_dir() {
+        return Err("That folder is not available.".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(contents_base64.trim())
+        .map_err(|e| format!("Invalid base64 payload: {e}"))?;
+    fs::write(&target, &bytes).map_err(|e| e.to_string())?;
+    Ok(target.display().to_string())
+}
+
 /// First executable token of a desktop file `Exec=` line.
 ///
 /// Skips a leading `env KEY=VAL` wrapper. Field codes (`%u`, `%f`) are the
@@ -1167,6 +1189,7 @@ pub fn run() {
             copy_to_clipboard,
             save_text_file,
             save_bytes_file,
+            save_bytes_to_path,
             set_sidebar_glass_dark,
             set_sidebar_glass_options,
             set_dock_icon,

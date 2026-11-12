@@ -38,6 +38,7 @@ def _event_payload(event: str, payload: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": str(payload.get("name") or "tool"),
             "output": payload.get("output"),
+            "images": list(payload.get("images") or []),
             "isError": bool(payload.get("is_error")),
             "durationSeconds": float(payload.get("duration_s") or 0.0),
             "toolCallId": str(payload.get("tool_call_id") or ""),

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from agent.config import chatgpt_auth
+from agent.deepagents_runtime.chat_model_openai import OPENAI_CLOUD_BASE_URL
 
 
 def _message_text(content: Any) -> str:
@@ -62,7 +63,9 @@ def build_chatgpt_chat_model(config: Any, *, temperature: float) -> Any:
       the store refreshes it under a lock when it is about to expire.
     - Always ``use_responses_api=True`` and ``store=False`` (plan requirement).
     - System prompts are sent as ``instructions``, which the plan accepts.
-    - No ``base_url`` override: plan usage is only valid against api.openai.com.
+    - ``base_url`` is pinned to api.openai.com. The OpenAI SDK otherwise
+      reads ``OPENAI_BASE_URL``, which this server sets from the local Llama
+      profile, and the plan request would hit localhost and 400.
     """
     from langchain_openai import ChatOpenAI
 
@@ -86,6 +89,7 @@ def build_chatgpt_chat_model(config: Any, *, temperature: float) -> Any:
     kwargs: dict[str, Any] = {
         "model": model,
         "api_key": token,
+        "base_url": OPENAI_CLOUD_BASE_URL,
         "use_responses_api": True,
         "store": False,
         "stream_usage": True,

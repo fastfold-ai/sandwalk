@@ -15,6 +15,9 @@ class _Config:
         self.fail_set = False
         self.fail_get = False
 
+    def prefer_openai_api_key_over_signed_out_chatgpt(self):
+        return False
+
     def set_openai_active_profile(self, profile_id):
         if self.fail_set:
             raise RuntimeError("no profile")

@@ -24,6 +24,26 @@ from agent.types import ExecutionResult, Plan, Step
 logger = logging.getLogger("runner")
 
 
+def _turn_saved_image(tool_calls: object) -> bool:
+    """True when a tool in this turn already produced a picture.
+
+    The image in the transcript is the reply. An empty trailing model turn
+    should not add a diagnostic sentence on top of it.
+    """
+    for call in tool_calls or []:
+        if not isinstance(call, dict):
+            continue
+        result = str(call.get("result_text") or "")
+        lowered = result.lower()
+        if "image request failed" in lowered or "error:" in lowered[:80]:
+            continue
+        if any(ext in lowered for ext in (".png", ".jpg", ".jpeg", ".webp")):
+            return True
+        if "image url:" in lowered:
+            return True
+    return False
+
+
 def _empty_output_summary(empty_turns: object) -> str:
     """User-facing text for a run whose model turns produced no prose.
 
@@ -492,9 +512,9 @@ class DeepAgentsBuildMixin:
         token_usage = dict(result.get("token_usage") or {})
         model_call_count = int(result.get("model_call_count", 0))
 
-        summary = "\n".join(full_text).strip() or _empty_output_summary(
-            result.get("empty_model_turns")
-        )
+        summary = "\n".join(full_text).strip()
+        if not summary and not _turn_saved_image(tool_calls):
+            summary = _empty_output_summary(result.get("empty_model_turns"))
         guardrail_unverified_execution = False
         if _looks_like_unverified_execution_claim(summary, tool_calls):
             guardrail_unverified_execution = True

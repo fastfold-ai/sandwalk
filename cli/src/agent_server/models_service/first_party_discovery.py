@@ -1,4 +1,4 @@
-"""Live model lists from OpenAI and Anthropic, so new families show up on release day.
+"""Live model lists from OpenAI, Anthropic, and Gemini, so new families show up on release day.
 
 The curated catalog in ``agent.model_catalog.data`` gives the well-known rows
 good labels and descriptions. This module asks each provider's ``/v1/models``
@@ -41,6 +41,7 @@ _TIMEOUT_S = 8.0
 _OPENAI_URL = "https://api.openai.com/v1/models"
 _ANTHROPIC_URL = "https://api.anthropic.com/v1/models"
 _ANTHROPIC_VERSION = "2023-06-01"
+_GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 # OpenAI chat families we surface; everything else on /v1/models is a
 # specialised endpoint (audio, images, embeddings, moderation, ...).
@@ -226,6 +227,81 @@ def fetch_anthropic_models(api_key: str) -> list[DiscoveredModel]:
     return out
 
 
+# -- Google Gemini --------------------------------------------------------------
+
+# Specialised Gemini endpoints. Chat and image models stay; these do not.
+_GOOGLE_EXCLUDE = re.compile(
+    r"(embed|aqa|tts|native-audio|lyria|transcribe|decision|"
+    r"antigravity|deep-research|customtools|robotics|computer-use)"
+)
+_GOOGLE_ENABLED_PREFIXES = (
+    "gemini-3.5",
+    "gemini-3.6",
+    "gemini-3.7",
+    "gemini-3.8",
+    "gemini-3.9",
+    "gemini-4",
+)
+
+
+def _google_model_id(name: str) -> str:
+    text = str(name or "").strip()
+    if text.startswith("models/"):
+        return text[len("models/") :]
+    return text
+
+
+def _google_default_enabled(model_id: str) -> bool:
+    """Current Gemini chat families start on. Image and older ids start hidden."""
+    if "image" in model_id or "banana" in model_id:
+        return False
+    return model_id.startswith(_GOOGLE_ENABLED_PREFIXES)
+
+
+def _google_family_rank(model_id: str) -> tuple[float, str]:
+    match = re.search(r"(\d+(?:\.\d+)?)", model_id)
+    version = float(match.group(1)) if match else 0.0
+    return (-version, model_id)
+
+
+def fetch_google_models(api_key: str) -> list[DiscoveredModel]:
+    """Gemini ``models.list``. Keeps generateContent models, drops specialised ones."""
+    found: list[DiscoveredModel] = []
+    page_token: str | None = None
+    for _ in range(5):
+        params: dict[str, Any] = {"pageSize": 200}
+        if page_token:
+            params["pageToken"] = page_token
+        payload = _get_json(_GOOGLE_URL, {"x-goog-api-key": api_key}, params)
+        rows = payload.get("models") if isinstance(payload, dict) else None
+        for row in rows or []:
+            if not isinstance(row, dict):
+                continue
+            methods = row.get("supportedGenerationMethods") or []
+            if "generateContent" not in methods:
+                continue
+            model_id = _google_model_id(str(row.get("name") or ""))
+            if not model_id or model_id.endswith("-latest"):
+                continue
+            if _GOOGLE_EXCLUDE.search(model_id):
+                continue
+            limit = row.get("inputTokenLimit")
+            found.append(
+                DiscoveredModel(
+                    id=model_id,
+                    label=str(row.get("displayName") or "").strip()
+                    or format_discovered_model_label(model_id),
+                    description="Google Gemini (discovered)",
+                    context_window=int(limit) if isinstance(limit, int) else None,
+                )
+            )
+        page_token = str(payload.get("nextPageToken") or "") if isinstance(payload, dict) else ""
+        if not page_token:
+            break
+    found.sort(key=lambda model: _google_family_rank(model.id))
+    return found
+
+
 # -- shared ---------------------------------------------------------------------
 
 
@@ -238,6 +314,8 @@ def _models_for(provider: str, api_key: str) -> _CacheEntry:
             models = fetch_openai_models(api_key)
         elif provider == "anthropic":
             models = fetch_anthropic_models(api_key)
+        elif provider == "google":
+            models = fetch_google_models(api_key)
         else:
             models = []
         return _store(provider, models, None)
@@ -284,6 +362,12 @@ def _cloud_key(cfg: Config, provider: str) -> str | None:
             or cfg._normalized_secret(cfg.get("llm.api_key"))
             or cfg._normalized_secret(os.environ.get("ANTHROPIC_API_KEY"))
         )
+    if provider == "google":
+        return (
+            cfg._normalized_secret(cfg.get("llm.google_api_key"))
+            or cfg._normalized_secret(os.environ.get("GEMINI_API_KEY"))
+            or cfg._normalized_secret(os.environ.get("GOOGLE_API_KEY"))
+        )
     return cfg.llm_api_key(provider)
 
 
@@ -301,9 +385,9 @@ def confirmed_live_ids(provider: str) -> set[str] | None:
 def first_party_discovered_items(
     cfg: Config, hidden: set[str], known_ids: set[str], *, enabled_only: bool
 ) -> list[AgentModel]:
-    """OpenAI + Anthropic models not already in the curated catalog."""
+    """OpenAI, Anthropic, and Gemini models not already in the curated catalog."""
     items: list[AgentModel] = []
-    for provider in ("openai", "anthropic"):
+    for provider in ("openai", "anthropic", "google"):
         api_key = _cloud_key(cfg, provider)
         if not api_key:
             continue
@@ -314,6 +398,8 @@ def first_party_discovered_items(
             continue
         if provider == "openai":
             start_hidden = [m.id for m in fresh if not _openai_default_enabled(m.id)]
+        elif provider == "google":
+            start_hidden = [m.id for m in fresh if not _google_default_enabled(m.id)]
         else:
             start_hidden = [m.id for m in fresh if not _anthropic_default_enabled(m, curated)]
         _seed_hidden(cfg, provider, start_hidden, [m.id for m in fresh])
@@ -346,6 +432,7 @@ def first_party_discovered_items(
 __all__ = [
     "DiscoveredModel",
     "fetch_anthropic_models",
+    "fetch_google_models",
     "confirmed_live_ids",
     "fetch_openai_models",
     "first_party_discovered_items",

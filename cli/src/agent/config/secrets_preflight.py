@@ -125,6 +125,33 @@ class SecretsPreflightMixin:
             "ANTHROPIC_FOUNDRY_RESOURCE"
         )
 
+    def prefer_openai_api_key_over_signed_out_chatgpt(self) -> bool:
+        """Use the OpenAI API key when this chat is on an unsigned ChatGPT plan.
+
+        The plan and the API key are different connections. A saved key should
+        run the selected GPT model instead of the generic "no model" error.
+        The ChatGPT plan stays the saved default so signing in later still works.
+        """
+        provider = str(self.get("llm.provider") or "").strip().lower()
+        if provider != "openai-chatgpt":
+            return False
+        from .chatgpt_auth import is_connected
+
+        if is_connected():
+            return False
+        key = self._normalized_secret(self.get("llm.openai_api_key"))
+        if not key:
+            return False
+        model = self.get("llm.model")
+        self._data["llm.provider"] = "openai"
+        try:
+            self.set_openai_active_profile("openai_cloud")
+        except Exception:  # noqa: BLE001 - cloud profile may be absent in tests
+            pass
+        if model:
+            self._data["llm.model"] = model
+        return True
+
     def model_setup_message(self) -> str | None:
         """User-facing prompt when chat cannot run because no model is ready.
 
@@ -132,7 +159,15 @@ class SecretsPreflightMixin:
         active provider needs a key, and an Anthropic provider cannot run an
         OpenAI model id left over from onboarding.
         """
-        if self.llm_preflight_issue():
+        issue = self.llm_preflight_issue()
+        if issue:
+            provider = str(self.get("llm.provider") or "").strip().lower()
+            if provider == "openai-chatgpt":
+                return (
+                    "This chat is using the ChatGPT plan, which is not signed in. "
+                    "Choose Continue with ChatGPT in [Models](/dashboard/models), "
+                    "or select the OpenAI provider to use your API key."
+                )
             return MODEL_SETUP_MESSAGE
         provider = str(self.get("llm.provider") or "").strip().lower()
         model = str(self.get("llm.model") or "").strip()

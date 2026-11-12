@@ -16,7 +16,9 @@ import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 
 
 import { ConnectorMessageCard } from '@/components/agents/ConnectorMessageCard'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
+import { ResponseImages } from '@/components/agents/message-file-preview'
 import { type TranscriptEntry } from '@/components/agents/transcript'
+import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { UserMessageContent } from '@/components/agents/UserMessageContent'
 import {
   Popover,
@@ -59,7 +61,8 @@ export function ChatTranscriptMessageEntry({
   mcpServers = [],
   workspaceFiles = [],
   mentionChats = [],
-  onResendMessage
+  onResendMessage,
+  tools = []
 }: {
   entry: Extract<TranscriptEntry, { kind: 'message' }>
   runActive: boolean
@@ -81,6 +84,7 @@ export function ChatTranscriptMessageEntry({
    * in the transcript; if a run is active it is stopped first.
    */
   onResendMessage?: (text: string) => void | Promise<void>
+  tools?: TranscriptTool[]
 }) {
   perfCount('render.MessageEntry')
   const message = entry.message
@@ -91,6 +95,13 @@ export function ChatTranscriptMessageEntry({
   const messageUsage = (messageRunId && usageByRunId[messageRunId]) || null
   const hideActionsWhileStreaming =
     runActive && isAssistant && message.id === lastMessageId
+  const turnTools = isAssistant
+    ? tools.filter(
+        tool =>
+          tool.messageId === message.id ||
+          (messageRunId != null && tool.runId === messageRunId)
+      )
+    : []
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
@@ -240,15 +251,28 @@ export function ChatTranscriptMessageEntry({
           )}
         >
           {entry.content.trim() ? (
-            <MarkdownContent
-              content={entry.content}
-              streaming={hideActionsWhileStreaming}
-              onOpenFile={onOpenFile}
-              workspacePath={session?.workspacePath}
-              skills={skills}
-              mentionChats={mentionChats}
-              className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
-            />
+            <>
+              <MarkdownContent
+                content={entry.content}
+                streaming={hideActionsWhileStreaming}
+                onOpenFile={onOpenFile}
+                workspacePath={session?.workspacePath}
+                skills={skills}
+                mentionChats={mentionChats}
+                className="max-w-full [&_*]:max-w-full [&_pre]:w-full [&_pre]:max-w-full [&_pre_code]:whitespace-pre-wrap [&_table]:w-full [&_table]:table-auto"
+              />
+              {isAssistant && client && sessionId ? (
+                <ResponseImages
+                  text={entry.content}
+                  toolResults={turnTools.map(tool => tool.result)}
+                  toolImages={turnTools.flatMap(tool => tool.images || [])}
+                  workspacePath={session?.workspacePath}
+                  client={client}
+                  sessionId={sessionId}
+                  onOpenFile={onOpenFile}
+                />
+              ) : null}
+            </>
           ) : null}
           {isAssistant && entry.content && !hideActionsWhileStreaming ? (
             <div className="text-muted-foreground -mb-7.5 min-h-7.5 -ml-1 flex items-center gap-0.5 pt-1.5">

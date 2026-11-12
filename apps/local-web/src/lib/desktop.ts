@@ -292,6 +292,42 @@ export const saveBytesFile = (defaultFilename: string, contentsBase64: string) =
     contentsBase64
   })
 
+/** Write bytes to a path the user picked in the native save dialog. */
+export const saveBytesToPath = (path: string, contentsBase64: string) =>
+  invokeStrict<string>('save_bytes_to_path', {
+    path,
+    contentsBase64
+  })
+
+/**
+ * Native save panel (folder sidebar + filename). Returns null when canceled
+ * or when this window is not the desktop app.
+ */
+export async function pickSavePath(options: {
+  defaultPath: string
+  title: string
+  extensions: string[]
+}): Promise<string | null> {
+  if (!isTauri()) return null
+  try {
+    const dialog = await import('@tauri-apps/plugin-dialog')
+    const selected = await dialog.save({
+      defaultPath: options.defaultPath,
+      title: options.title,
+      canCreateDirectories: true,
+      filters: [
+        {
+          name: 'Image',
+          extensions: options.extensions
+        }
+      ]
+    })
+    return typeof selected === 'string' && selected.trim() ? selected : null
+  } catch {
+    return null
+  }
+}
+
 /** Open any http(s) URL in the system browser (Tauri) or a new tab (web). */
 export async function openInSystemBrowser(url: string): Promise<void> {
   const trimmed = url.trim()

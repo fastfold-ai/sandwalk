@@ -129,6 +129,30 @@ def test_model_setup_message_when_openai_model_on_anthropic(monkeypatch):
     assert "/dashboard/models" in message
 
 
+def test_signed_out_chatgpt_plan_uses_the_openai_api_key(monkeypatch):
+    monkeypatch.setattr("agent.config.chatgpt_auth.is_connected", lambda: False)
+    cfg = Config(
+        data={
+            "llm.provider": "openai-chatgpt",
+            "llm.model": "gpt-6.1-sol",
+            "llm.openai_api_key": "sk-test",
+        }
+    )
+    assert cfg.prefer_openai_api_key_over_signed_out_chatgpt() is True
+    assert cfg.get("llm.provider") == "openai"
+    assert cfg.get("llm.model") == "gpt-6.1-sol"
+    assert cfg.model_setup_message() is None
+
+
+def test_signed_out_chatgpt_plan_explains_the_plan_when_no_api_key(monkeypatch):
+    monkeypatch.setattr("agent.config.chatgpt_auth.is_connected", lambda: False)
+    cfg = Config(data={"llm.provider": "openai-chatgpt", "llm.model": "gpt-6.1-sol"})
+    message = cfg.model_setup_message()
+    assert message is not None
+    assert "ChatGPT plan" in message
+    assert "No model is set up yet" not in message
+
+
 def test_model_setup_message_ready_for_matching_model():
     cfg = Config(
         data={
