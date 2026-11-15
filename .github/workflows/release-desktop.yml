@@ -127,8 +127,15 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
+      # Pinned: Rust 1.100 moved build-script output to
+      # `target/<profile>/build/<pkg>/<hash>/out`. ort-sys 2.0.0-rc.13 walks
+      # a fixed number of parents up from OUT_DIR to symlink the ONNX Runtime
+      # provider libraries next to the binary, lands in `build/` instead, and
+      # panics on the missing `build/examples` (x86_64 Linux is the only
+      # target whose prebuilt ONNX Runtime ships dylibs). Unpin once ort is
+      # past rc.13.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.1
 
       - name: Cache cargo
         uses: swatinem/rust-cache@v2
@@ -239,8 +246,15 @@ jobs:
       - name: Install JS deps
         run: pnpm install --frozen-lockfile
 
+      # Pinned: Rust 1.100 moved build-script output to
+      # `target/<profile>/build/<pkg>/<hash>/out`. ort-sys 2.0.0-rc.13 walks
+      # a fixed number of parents up from OUT_DIR to symlink the ONNX Runtime
+      # provider libraries next to the binary, lands in `build/` instead, and
+      # panics on the missing `build/examples` (x86_64 Linux is the only
+      # target whose prebuilt ONNX Runtime ships dylibs). Unpin once ort is
+      # past rc.13.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.1
 
       - name: Cache cargo
         uses: swatinem/rust-cache@v2
