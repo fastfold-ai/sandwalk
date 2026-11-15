@@ -6,6 +6,7 @@ import { AboutUpdateWindow } from '@/components/AboutUpdateWindow'
 import { CapyOverlay } from '@/components/agents/capy/CapyOverlay'
 import { OpenRemoteWindowDialog } from '@/components/agents/OpenRemoteWindowDialog'
 import { PaneContextMenu } from '@/components/agents/PaneContextMenu'
+import { TerminalSurfaceContextMenu } from '@/components/agents/TerminalThemeSubmenu'
 import {
   buildSessionSidebarModel,
   computeShowSessionTabs,
@@ -633,7 +634,12 @@ export default function App() {
   )
 
   const handleSplitPane = useCallback(
-    (sourceId: string, direction: PaneSplitDirection, target: PaneSplitTarget) => {
+    (
+      sourceId: string,
+      direction: PaneSplitDirection,
+      target: PaneSplitTarget,
+      side: 'before' | 'after' = 'after'
+    ) => {
       void (async () => {
         const source = isDraftAgentSessionId(sourceId)
           ? await layer.actions.ensureAgentSession(undefined, { navigate: false })
@@ -680,7 +686,7 @@ export default function App() {
           tabGroupsStore.setGroupLayoutForMonitor(
             existing.id,
             fingerprint,
-            splitPane(base, source, direction, partnerId, 'after')
+            splitPane(base, source, direction, partnerId, side)
           )
           navigate(`/agents/${existing.id}`)
           return
@@ -690,7 +696,7 @@ export default function App() {
         tabGroupsStore.setGroupLayoutForMonitor(
           groupId,
           fingerprint,
-          splitPane(sourceLeaf, source, direction, partnerId, 'after')
+          splitPane(sourceLeaf, source, direction, partnerId, side)
         )
         navigate(`/agents/${groupId}`)
       })().catch(err => console.error('split pane failed', err))
@@ -1485,6 +1491,11 @@ export default function App() {
         activeChatId={effectiveSessionId}
       />
       <PaneContextMenu />
+      <TerminalSurfaceContextMenu
+        onSplitPane={(terminalId, direction, side) =>
+          handleSplitPane(terminalId, direction, 'terminal', side)
+        }
+      />
     </>
   )
 }

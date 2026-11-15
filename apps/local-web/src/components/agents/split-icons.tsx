@@ -44,6 +44,18 @@ export function SplitRightIcon({ className }: { className?: string }) {
   )
 }
 
+export function SplitLeftIcon({ className }: { className?: string }) {
+  return (
+    <PaneIcon
+      className={className}
+      panes={[
+        { x: 1.75, y: 2.25, w: 5.25, h: 11.5, filled: true },
+        { x: 9, y: 2.25, w: 5.25, h: 11.5 }
+      ]}
+    />
+  )
+}
+
 export function SplitDownIcon({ className }: { className?: string }) {
   return (
     <PaneIcon
@@ -51,6 +63,18 @@ export function SplitDownIcon({ className }: { className?: string }) {
       panes={[
         { x: 2.25, y: 1.75, w: 11.5, h: 5.25 },
         { x: 2.25, y: 9, w: 11.5, h: 5.25, filled: true }
+      ]}
+    />
+  )
+}
+
+export function SplitUpIcon({ className }: { className?: string }) {
+  return (
+    <PaneIcon
+      className={className}
+      panes={[
+        { x: 2.25, y: 1.75, w: 11.5, h: 5.25, filled: true },
+        { x: 2.25, y: 9, w: 11.5, h: 5.25 }
       ]}
     />
   )

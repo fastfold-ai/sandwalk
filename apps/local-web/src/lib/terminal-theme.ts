@@ -303,20 +303,56 @@ const PALETTE_ANSI: Partial<
   }
 }
 
-function cssHsl(token: `--${string}`, fallback: string): string {
-  if (typeof document === 'undefined') return fallback
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(token)
-    .trim()
-  return raw ? `hsl(${raw})` : fallback
+/**
+ * xterm only parses `#rrggbb` and comma-separated `rgb()` / `rgba()`.
+ * `hsl(0 0% 100%)` and any color with alpha fall through to a canvas
+ * probe that rejects transparency, and the viewport's stylesheet
+ * background is `#000`. A translucent white (`rgba(246, 246, 247, 0.62)`)
+ * therefore composites over that black and paints a flat `#989898`.
+ * Always hand xterm an opaque hex, or a comma-rgba for selections.
+ */
+function hslChannelsToHex(raw: string): string | null {
+  const match = raw.trim().match(/^([\d.]+)\s+([\d.]+)%\s+([\d.]+)%$/)
+  if (!match) return null
+  const h = Number(match[1])
+  const s = Number(match[2]) / 100
+  const l = Number(match[3]) / 100
+  const chroma = s * Math.min(l, 1 - l)
+  const channel = (n: number) => {
+    const k = (n + h / 30) % 12
+    const color = l - chroma * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+    return Math.round(255 * color)
+  }
+  const hex = [channel(0), channel(8), channel(4)]
+    .map(value => value.toString(16).padStart(2, '0'))
+    .join('')
+  return `#${hex.toUpperCase()}`
 }
 
-function cssHslAlpha(token: `--${string}`, alpha: number, fallback: string): string {
+function hexToRgba(hex: string, alpha: number): string {
+  const n = Number.parseInt(hex.slice(1), 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function cssTokenHex(token: `--${string}`, fallback: string): string {
   if (typeof document === 'undefined') return fallback
   const raw = getComputedStyle(document.documentElement)
     .getPropertyValue(token)
     .trim()
-  return raw ? `hsl(${raw} / ${alpha})` : fallback
+  if (!raw) return fallback
+  return hslChannelsToHex(raw) ?? fallback
+}
+
+function cssTokenRgba(
+  token: `--${string}`,
+  alpha: number,
+  fallback: string
+): string {
+  const hex = cssTokenHex(token, '')
+  return hex ? hexToRgba(hex, alpha) : fallback
 }
 
 export function readDocumentPalette(): ThemePaletteId {
@@ -333,6 +369,127 @@ export function readDocumentPalette(): ThemePaletteId {
     return attr
   }
   return 'default'
+}
+
+export const TERMINAL_THEME_STORAGE_KEY = 'sandwalk.terminal-theme'
+export const TERMINAL_THEME_EVENT = 'sandwalk:terminal-theme'
+export const TERMINAL_SURFACE_MENU_EVENT = 'sandwalk:terminal-theme-menu'
+export const TERMINAL_PASTE_EVENT = 'sandwalk:terminal-paste'
+export const TERMINAL_COPY_EVENT = 'sandwalk:terminal-copy'
+
+export const TERMINAL_SCHEMES = [
+  { id: 'auto', label: 'Match app' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+  { id: 'solarized-light', label: 'Solarized Light' },
+  { id: 'solarized-dark', label: 'Solarized Dark' },
+  { id: 'dracula', label: 'Dracula' }
+] as const
+
+export type TerminalSchemeId = (typeof TERMINAL_SCHEMES)[number]['id']
+
+const SOLARIZED_ANSI: AnsiTheme = {
+  black: '#073642',
+  red: '#DC322F',
+  green: '#859900',
+  yellow: '#B58900',
+  blue: '#268BD2',
+  magenta: '#D33682',
+  cyan: '#2AA198',
+  white: '#EEE8D5',
+  brightBlack: '#002B36',
+  brightRed: '#CB4B16',
+  brightGreen: '#586E75',
+  brightYellow: '#657B83',
+  brightBlue: '#839496',
+  brightMagenta: '#6C71C4',
+  brightCyan: '#93A1A1',
+  brightWhite: '#FDF6E3'
+}
+
+const DRACULA_ANSI: AnsiTheme = {
+  black: '#21222C',
+  red: '#FF5555',
+  green: '#50FA7B',
+  yellow: '#F1FA8C',
+  blue: '#BD93F9',
+  magenta: '#FF79C6',
+  cyan: '#8BE9FD',
+  white: '#F8F8F2',
+  brightBlack: '#6272A4',
+  brightRed: '#FF6E6E',
+  brightGreen: '#69FF94',
+  brightYellow: '#FFFFA5',
+  brightBlue: '#D6ACFF',
+  brightMagenta: '#FF92DF',
+  brightCyan: '#A4FFFF',
+  brightWhite: '#FFFFFF'
+}
+
+function solidTheme(
+  background: string,
+  foreground: string,
+  cursor: string,
+  ansi: AnsiTheme
+): ITheme {
+  return {
+    background,
+    foreground,
+    cursor,
+    cursorAccent: background,
+    selectionBackground: hexToRgba(cursor, 0.28),
+    selectionForeground: foreground,
+    ...ansi
+  }
+}
+
+const PRESET_THEMES: Record<Exclude<TerminalSchemeId, 'auto'>, ITheme> = {
+  light: solidTheme('#FAFAFA', '#24292F', '#0969DA', DEFAULT_LIGHT_ANSI),
+  dark: solidTheme('#0D1117', '#E6EDF3', '#58A6FF', DEFAULT_DARK_ANSI),
+  'solarized-light': solidTheme('#FDF6E3', '#657B83', '#268BD2', SOLARIZED_ANSI),
+  'solarized-dark': solidTheme('#002B36', '#839496', '#268BD2', SOLARIZED_ANSI),
+  dracula: solidTheme('#282A36', '#F8F8F2', '#F8F8F2', DRACULA_ANSI)
+}
+
+export function isTerminalSchemeId(value: string): value is TerminalSchemeId {
+  return TERMINAL_SCHEMES.some(scheme => scheme.id === value)
+}
+
+export function getTerminalScheme(): TerminalSchemeId {
+  if (typeof localStorage === 'undefined') return 'auto'
+  try {
+    const value = localStorage.getItem(TERMINAL_THEME_STORAGE_KEY)
+    if (value && isTerminalSchemeId(value)) return value
+  } catch {
+    // Private mode or a blocked storage API — follow the app theme.
+  }
+  return 'auto'
+}
+
+export function setTerminalScheme(scheme: TerminalSchemeId): void {
+  localStorage.setItem(TERMINAL_THEME_STORAGE_KEY, scheme)
+  window.dispatchEvent(new Event(TERMINAL_THEME_EVENT))
+}
+
+/** Open the terminal context menu at a right-click on the surface. */
+export function openTerminalThemeMenu(x: number, y: number, terminalId: string) {
+  window.dispatchEvent(
+    new CustomEvent(TERMINAL_SURFACE_MENU_EVENT, {
+      detail: { x, y, terminalId }
+    })
+  )
+}
+
+export function requestTerminalPaste(terminalId: string) {
+  window.dispatchEvent(
+    new CustomEvent(TERMINAL_PASTE_EVENT, { detail: { terminalId } })
+  )
+}
+
+export function requestTerminalCopy(terminalId: string) {
+  window.dispatchEvent(
+    new CustomEvent(TERMINAL_COPY_EVENT, { detail: { terminalId } })
+  )
 }
 
 /** Desktop liquid glass is on and the window is focused. */
@@ -352,36 +509,54 @@ export function isDocumentDark(): boolean {
   )
 }
 
-/** Build an xterm theme from the active light/dark mode + color palette. */
-export function buildTerminalTheme(
+/** Swatch shown next to a scheme in the terminal theme menu. */
+export function terminalSchemeSwatch(
+  scheme: TerminalSchemeId,
   dark: boolean = isDocumentDark(),
   palette: ThemePaletteId = readDocumentPalette()
+): string {
+  if (scheme === 'auto') {
+    return String(buildTerminalTheme(dark, palette, 'auto').background)
+  }
+  return String(PRESET_THEMES[scheme].background)
+}
+
+/**
+ * Build an xterm theme. `auto` follows light/dark + the app palette.
+ * Any other scheme is a fixed terminal palette, independent of the app.
+ * Backgrounds are always opaque — see `hslChannelsToHex`.
+ */
+export function buildTerminalTheme(
+  dark: boolean = isDocumentDark(),
+  palette: ThemePaletteId = readDocumentPalette(),
+  scheme: TerminalSchemeId = getTerminalScheme()
 ): ITheme {
+  if (scheme !== 'auto') return { ...PRESET_THEMES[scheme] }
+
   const ansi =
     (palette === 'default' ? undefined : PALETTE_ANSI[palette])?.[
       dark ? 'dark' : 'light'
     ] ?? (dark ? DEFAULT_DARK_ANSI : DEFAULT_LIGHT_ANSI)
 
+  // Same frost bases as the shell, but opaque. Translucent white over
+  // xterm's black viewport is what made the pane a flat gray.
   const background = isLiquidGlassActive()
     ? dark
-      ? 'rgba(28, 28, 31, 0.55)'
-      : 'rgba(246, 246, 247, 0.62)'
-    : cssHsl('--card', dark ? '#0D1117' : '#FAFAFA')
-  const foreground = cssHsl(
+      ? '#1C1C1F'
+      : '#F6F6F7'
+    : cssTokenHex('--card', dark ? '#0D1117' : '#FAFAFA')
+  const foreground = cssTokenHex(
     '--foreground',
     dark ? '#E6EDF3' : '#24292F'
   )
-  const cursor = cssHsl(
-    '--primary',
-    dark ? '#58A6FF' : '#0969DA'
-  )
+  const cursor = cssTokenHex('--primary', dark ? '#58A6FF' : '#0969DA')
 
   return {
     background,
     foreground,
     cursor,
     cursorAccent: background,
-    selectionBackground: cssHslAlpha(
+    selectionBackground: cssTokenRgba(
       '--primary',
       dark ? 0.28 : 0.22,
       dark ? 'rgba(88, 166, 255, 0.28)' : 'rgba(9, 105, 218, 0.22)'
@@ -423,11 +598,13 @@ function startThemeWatcher() {
   })
   window.addEventListener(THEME_CHANGE_EVENT, schedule)
   window.addEventListener(PALETTE_CHANGE_EVENT, schedule)
+  window.addEventListener(TERMINAL_THEME_EVENT, schedule)
   themeWatcherStop = () => {
     if (frame) cancelAnimationFrame(frame)
     observer.disconnect()
     window.removeEventListener(THEME_CHANGE_EVENT, schedule)
     window.removeEventListener(PALETTE_CHANGE_EVENT, schedule)
+    window.removeEventListener(TERMINAL_THEME_EVENT, schedule)
   }
 }
 

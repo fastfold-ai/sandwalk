@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   buildTerminalTheme,
+  getTerminalScheme,
   isDocumentDark,
   readDocumentPalette,
+  setTerminalScheme,
+  TERMINAL_THEME_EVENT,
+  TERMINAL_THEME_STORAGE_KEY,
   watchTerminalTheme
 } from './terminal-theme'
 import { PALETTE_CHANGE_EVENT, THEME_CHANGE_EVENT } from './theme'
@@ -123,11 +127,35 @@ describe('terminal-theme', () => {
       } as CSSStyleDeclaration)
 
     const theme = buildTerminalTheme(true, 'default')
-    expect(theme.background).toBe('hsl(0 0% 10%)')
-    expect(theme.foreground).toBe('hsl(0 0% 98%)')
-    expect(theme.cursor).toBe('hsl(210 100% 56%)')
-    expect(theme.selectionBackground).toBe('hsl(210 100% 56% / 0.28)')
+    expect(theme.background).toBe('#1A1A1A')
+    expect(theme.foreground).toBe('#FAFAFA')
+    expect(theme.cursor).toBe('#1F8FFF')
+    expect(theme.selectionBackground).toBe('rgba(31, 143, 255, 0.28)')
     spy.mockRestore()
+  })
+
+  it('keeps the liquid-glass background opaque so it does not blend over black', () => {
+    document.documentElement.classList.add('sandwalk-mac-glass-active')
+    const light = buildTerminalTheme(false, 'default')
+    expect(light.background).toBe('#F6F6F7')
+    const dark = buildTerminalTheme(true, 'default')
+    expect(dark.background).toBe('#1C1C1F')
+  })
+
+  it('stores a terminal scheme and uses it instead of the app theme', () => {
+    expect(getTerminalScheme()).toBe('auto')
+    setTerminalScheme('dracula')
+    expect(localStorage.getItem(TERMINAL_THEME_STORAGE_KEY)).toBe('dracula')
+    expect(getTerminalScheme()).toBe('dracula')
+
+    document.documentElement.classList.add('sandwalk-mac-glass-active')
+    const theme = buildTerminalTheme(false, 'default')
+    expect(theme.background).toBe('#282A36')
+    expect(theme.green).toBe('#50FA7B')
+    expect(theme.foreground).toBe('#F8F8F2')
+
+    localStorage.setItem(TERMINAL_THEME_STORAGE_KEY, 'nope')
+    expect(getTerminalScheme()).toBe('auto')
   })
 
   it('watches window theme events and cleans up on stop', async () => {
@@ -136,6 +164,7 @@ describe('terminal-theme', () => {
 
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT))
     window.dispatchEvent(new Event(PALETTE_CHANGE_EVENT))
+    window.dispatchEvent(new Event(TERMINAL_THEME_EVENT))
     expect(onChange).not.toHaveBeenCalled()
     await new Promise(resolve => requestAnimationFrame(resolve))
     expect(onChange).toHaveBeenCalledTimes(1)

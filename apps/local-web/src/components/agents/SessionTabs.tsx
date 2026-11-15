@@ -92,6 +92,7 @@ import {
   TabContextSubmenu,
   TabInlineColorRow
 } from './tab-context-menu'
+import { TerminalThemeSubmenu } from './TerminalThemeSubmenu'
 import { TerminalTypeIcon } from './TerminalTypeIcon'
 
 /** Height of the two chrome-tab overflow buttons (all-tabs + new-agent). */
@@ -1297,6 +1298,8 @@ export function SessionTabs({
               }}
             />
           ) : null}
+          <TabContextSeparator />
+          <TerminalThemeSubmenu onDone={() => setMenu(null)} />
           <TabContextSeparator />
           <div className="text-muted-foreground/80 px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide">
             Color

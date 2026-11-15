@@ -7,6 +7,7 @@ import {
   TabContextSeparator,
   TabInlineColorRow
 } from './tab-context-menu'
+import { TerminalThemeSubmenu } from './TerminalThemeSubmenu'
 
 export function TerminalTabContextMenu({
   menu,
@@ -39,6 +40,8 @@ export function TerminalTabContextMenu({
           onRename(tab)
         }}
       />
+      <TabContextSeparator />
+      <TerminalThemeSubmenu onDone={onClose} />
       <TabContextSeparator />
       <TabInlineColorRow
         value={tabColors[menu.id] || null}

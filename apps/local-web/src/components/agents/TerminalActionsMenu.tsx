@@ -4,6 +4,7 @@ import { Archive, Folder, Pencil, Pin, Trash2, X } from 'lucide-react'
 import { ConvertTerminalItem } from '@/components/agents/ExternalAgentMenuBlocks'
 import { ProjectPicker } from '@/components/agents/ProjectPicker'
 import { SplitMenuBlock } from '@/components/agents/split-menu'
+import { TerminalThemeSubmenu } from '@/components/agents/TerminalThemeSubmenu'
 import {
   TabContextItem,
   TabContextSeparator,
@@ -74,6 +75,8 @@ export function TerminalActionsMenu({
         label={terminal.organizeLabel === 'pinned' ? 'Unpin' : 'Pin'}
         onClick={onTogglePin}
       />
+      <TabContextSeparator />
+      <TerminalThemeSubmenu />
       <TabContextSeparator />
       <div className="text-muted-foreground/80 px-2 pb-0.5 pt-0.5 text-[10px] font-semibold uppercase tracking-wide">
         Color

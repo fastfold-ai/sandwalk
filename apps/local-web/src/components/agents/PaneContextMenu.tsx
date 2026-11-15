@@ -1,6 +1,8 @@
 import { X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
+import { useTerminalsStore } from '@/lib/terminals-store'
+
 import type { PaneContextMenuDetail } from './ChatTilingContainer'
 import { SplitMenuBlock } from './split-menu'
 import {
@@ -8,6 +10,7 @@ import {
   TabContextMenuShell,
   TabContextSeparator
 } from './tab-context-menu'
+import { TerminalThemeSubmenu } from './TerminalThemeSubmenu'
 
 /**
  * Global listener + floating menu triggered by a right-click on any
@@ -38,11 +41,21 @@ export function PaneContextMenu() {
   }, [])
 
   const close = useCallback(() => setState(null), [])
+  const paneId = state?.chatId ?? null
+  const isTerminal = useTerminalsStore(store =>
+    paneId != null && store.terminals.some(terminal => terminal.id === paneId)
+  )
 
   if (!state) return null
 
   return (
     <TabContextMenuShell x={state.x} y={state.y} onClose={close}>
+      {isTerminal ? (
+        <>
+          <TerminalThemeSubmenu />
+          <TabContextSeparator />
+        </>
+      ) : null}
       <SplitMenuBlock
         sourceId={state.chatId}
         onSplitPane={(id, direction, target) => {

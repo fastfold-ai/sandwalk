@@ -21,7 +21,8 @@ import { takeTerminalStartup } from '@/lib/terminal-startup'
 import {
   buildTerminalTheme,
   isDocumentDark,
-  isLiquidGlassActive,
+  openTerminalThemeMenu,
+  TERMINAL_PASTE_EVENT,
   watchTerminalTheme
 } from '@/lib/terminal-theme'
 import { useTerminalsStore } from '@/lib/terminals-store'
@@ -270,7 +271,6 @@ export function TerminalPortalHost({
   const setGpuRenderer = (on: boolean) => {
     const term = termRef.current
     if (!term || !attachedRef.current) return
-    if (on && isLiquidGlassActive()) on = false
     if (on) {
       if (webglRef.current) return
       try {
@@ -320,6 +320,7 @@ export function TerminalPortalHost({
     if (pendingTheme && termRef.current) {
       pendingThemeRef.current = null
       termRef.current.options.theme = pendingTheme
+      if (pendingTheme.background) host.style.backgroundColor = pendingTheme.background
     }
     setGpuRenderer(true)
     host.style.position = 'fixed'
@@ -357,7 +358,9 @@ export function TerminalPortalHost({
         '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       theme: buildTerminalTheme(isDocumentDark()),
       convertEol: false,
-      allowTransparency: true,
+      // Opaque theme colors. Transparency composites over the viewport's
+      // default black and turns a light theme into a flat gray pane.
+      allowTransparency: false,
       scrollback: 5000,
       smoothScrollDuration: 0
     })
@@ -377,8 +380,9 @@ export function TerminalPortalHost({
       }
       pendingThemeRef.current = null
       term.options.theme = theme
-      // WebGL paints an opaque clear color, which hides the glass.
-      if (isLiquidGlassActive()) setGpuRenderer(false)
+      if (hostRef.current && theme.background) {
+        hostRef.current.style.backgroundColor = theme.background
+      }
     })
 
     // Keystrokes typed before the PTY WebSocket is open (the restored
@@ -724,6 +728,17 @@ export function TerminalPortalHost({
       else unlistenForceSave = unlisten
     })
 
+    const onPasteRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ terminalId?: string }>).detail
+      if (detail?.terminalId !== terminalId) return
+      void navigator.clipboard.readText().then(text => {
+        if (text) term.paste(text)
+      }).catch(() => {
+        // Clipboard permission denied.
+      })
+    }
+    window.addEventListener(TERMINAL_PASTE_EVENT, onPasteRequest)
+
     // Cleanup en unmount real (el terminal se eliminó del store).
     return () => {
       cancelled = true
@@ -739,6 +754,7 @@ export function TerminalPortalHost({
       clearInterval(snapshotInterval)
       unlistenForceSave?.()
       stopThemeWatch()
+      window.removeEventListener(TERMINAL_PASTE_EVENT, onPasteRequest)
       if (rafRef.current != null) {
         window.cancelAnimationFrame(rafRef.current)
         rafRef.current = null
@@ -787,6 +803,9 @@ export function TerminalPortalHost({
     if (!attachedRef.current) {
       term.open(host)
       attachedRef.current = true
+      if (term.options.theme?.background) {
+        host.style.backgroundColor = term.options.theme.background
+      }
       // The GPU renderer is attached by `applyPosition` once the terminal is
       // actually visible (see `setGpuRenderer`), not for every mounted tab.
     } else if (term.element && term.element.parentElement !== host) {
@@ -803,12 +822,9 @@ export function TerminalPortalHost({
       entry?.onFocus()
     }
     const onContextMenu = (event: MouseEvent) => {
-      const entry = registry.getPlaceholder(terminalId)
-      if (entry?.onContextMenu) {
-        event.preventDefault()
-        event.stopPropagation()
-        entry.onContextMenu(event)
-      }
+      event.preventDefault()
+      event.stopPropagation()
+      openTerminalThemeMenu(event.clientX, event.clientY, terminalId)
     }
     host.addEventListener('mousedown', onMouseDown)
     host.addEventListener('contextmenu', onContextMenu)

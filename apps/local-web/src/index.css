@@ -284,8 +284,10 @@ html.sandwalk-mac-glass.sandwalk-mac-glass-active.dark [data-pane-kind] {
   border-color: rgb(255 255 255 / 0.08);
 }
 
-/* The xterm canvas sits in a fixed portal over the pane. Blur whatever is
- * behind it; the theme background is translucent while liquid glass is on. */
+/* The xterm canvas sits in a fixed portal over the pane. The terminal
+ * background itself is opaque (a translucent theme composites over xterm's
+ * black viewport and turns the pane gray). Blur is only the glass behind
+ * the host's rounded edge. */
 html.sandwalk-mac-glass.sandwalk-mac-glass-active:not(.sandwalk-liquid-glass-off)
   [data-terminal-portal-host] {
   -webkit-backdrop-filter: blur(28px) saturate(1.4);
