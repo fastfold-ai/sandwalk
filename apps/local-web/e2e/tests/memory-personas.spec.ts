@@ -78,7 +78,8 @@ test.describe('Memory, Omnigraph Cookbooks, and Persona Specialists UI', () => {
 
     // Switch to Living Wiki tab — verify Split/Preview/Edit + Full Screen + To Skill
     await page.getByRole('button', { name: /Living Wiki/i }).click()
-    await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible()
+    // Exact: a model card named "…-preview" is also a button on this page.
+    await expect(page.getByRole('button', { name: 'Preview', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Split' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Full Screen' })).toBeVisible()
     await page.getByRole('button', { name: 'Full Screen' }).click()

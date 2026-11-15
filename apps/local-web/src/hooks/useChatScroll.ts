@@ -6,6 +6,8 @@ import {
   useState
 } from 'react'
 
+import { markChatScrolledUp } from '@/hooks/useChatHistoryWindow'
+
 type UseChatScrollArgs = {
   sessionId: string | null
   messagesLoaded: boolean
@@ -78,6 +80,7 @@ export function useChatScroll({
       stickToBottom: stick,
       scrollTop: viewport.scrollTop
     }
+    markChatScrolledUp(id, !stick)
     setShowScrollToBottom(distance > NEAR_BOTTOM_PX)
   }, [])
 
@@ -92,6 +95,7 @@ export function useChatScroll({
     stickToBottomRef.current = true
     if (id) {
       memoryRef.current[id] = { stickToBottom: true, scrollTop: 0 }
+      markChatScrolledUp(id, false)
     }
     setShowScrollToBottom(false)
   }, [])

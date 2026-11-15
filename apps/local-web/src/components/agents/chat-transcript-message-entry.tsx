@@ -125,6 +125,7 @@ export function ChatTranscriptMessageEntry({
 
   return (
     <div
+      data-chat-turn={isUser ? message.id : undefined}
       className={cn(
         'fade-in slide-in-from-bottom-1 animate-in mx-auto w-full max-w-[44rem] duration-150',
         isUser ? 'flex justify-end px-2' : ''

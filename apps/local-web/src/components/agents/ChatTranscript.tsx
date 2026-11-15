@@ -18,9 +18,11 @@ import { AgentStatusText } from '@/components/agents/AgentStatusText'
 import { BuildPlanStatusCard } from '@/components/agents/BuildPlanStatusCard'
 import {
   buildChatTimelineItems,
+  type ChatTimelineItem,
   reuseTimelineItems
 } from '@/components/agents/chat-transcript-timeline'
 import { ChatTranscriptTimelineItem } from '@/components/agents/chat-transcript-timeline-item'
+import { ChatTranscriptScrubber } from '@/components/agents/ChatTranscriptScrubber'
 import { HitlDecisionCard } from '@/components/agents/hitl/HitlDecisionCard'
 import { LiveToolStack } from '@/components/agents/live-tool-stack'
 import { MarkdownContent } from '@/components/agents/MarkdownContent'
@@ -29,7 +31,9 @@ import { TodoListInline } from '@/components/agents/TodoListInline'
 import { type TranscriptTool } from '@/components/agents/ToolCard'
 import { type TranscriptEntry } from '@/components/agents/transcript'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useChatHistoryWindow } from '@/hooks/useChatHistoryWindow'
 import { useStableCallback } from '@/hooks/useStableCallback'
+import { chatScrubberEnabled } from '@/lib/chat-scrubber'
 import { perfCount } from '@/lib/perf-probe'
 import { cn } from '@/lib/utils'
 
@@ -42,6 +46,14 @@ const EMPTY_SKILLS: AgentSkill[] = []
 const EMPTY_MCP_SERVERS: McpServer[] = []
 const EMPTY_WORKSPACE_FILES: WorkspaceFile[] = []
 const EMPTY_MENTION_CHATS: AgentSession[] = []
+
+function isUserRow(item: ChatTimelineItem): boolean {
+  return (
+    item.kind === 'entry' &&
+    item.entry.kind === 'message' &&
+    item.entry.message.role === 'user'
+  )
+}
 
 type ChatTranscriptProps = {
   chatScrollRef: RefObject<HTMLDivElement | null>
@@ -80,6 +92,8 @@ type ChatTranscriptProps = {
   mcpServers?: McpServer[]
   workspaceFiles?: WorkspaceFile[]
   mentionChats?: AgentSession[]
+  /** Leave room at the end for a chip floating above the composer. */
+  reserveFloatingChip?: boolean
 }
 
 export function ChatTranscript({
@@ -116,7 +130,8 @@ export function ChatTranscript({
   skills = EMPTY_SKILLS,
   mcpServers = EMPTY_MCP_SERVERS,
   workspaceFiles = EMPTY_WORKSPACE_FILES,
-  mentionChats = EMPTY_MENTION_CHATS
+  mentionChats = EMPTY_MENTION_CHATS,
+  reserveFloatingChip = false
 }: ChatTranscriptProps) {
   perfCount('render.ChatTranscript')
   // Keep item object identity across rebuilds so memoized rows skip work;
@@ -186,6 +201,13 @@ export function ChatTranscript({
     }
   }, [chatScrollRef, sessionId, conversationTimeline])
 
+  const { shown: shownItems, jumpToTurn } = useChatHistoryWindow({
+    items: timelineItems,
+    enabled: chatScrubberEnabled(messages.length),
+    sessionId,
+    scrollRef: chatScrollRef
+  })
+
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
       {/* Top edge fade — hides when scrolled to the top. */}
@@ -210,8 +232,11 @@ export function ChatTranscript({
         data-transcript=""
       >
         <div className="mx-auto flex w-full max-w-[44rem] flex-col px-5 py-6">
-          <div className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden">
-            {timelineItems.map(timelineItem => (
+          <div
+            className="mb-4 flex min-w-0 flex-1 flex-col gap-y-2 empty:hidden"
+            data-chat-rows=""
+          >
+            {shownItems.map(timelineItem => (
               <ChatTranscriptTimelineItem
                 key={timelineItem.key}
                 timelineItem={timelineItem}
@@ -232,8 +257,17 @@ export function ChatTranscript({
                 onInterrupt={stableInterrupt}
                 hiddenPlanPaths={hiddenPlanPaths}
                 skills={skills}
-                mcpServers={mcpServers}
-                workspaceFiles={workspaceFiles}
+                // Only user rows read these (mention chips). They load
+                // after the chat opens, and passing them to every row
+                // re-rendered the markdown of the whole history.
+                mcpServers={
+                  isUserRow(timelineItem) ? mcpServers : EMPTY_MCP_SERVERS
+                }
+                workspaceFiles={
+                  isUserRow(timelineItem)
+                    ? workspaceFiles
+                    : EMPTY_WORKSPACE_FILES
+                }
                 mentionChats={mentionChats}
                 onResendMessage={onResendMessage}
               />
@@ -315,10 +349,20 @@ export function ChatTranscript({
           <div
             ref={chatEndRef}
             aria-hidden
-            className="h-px w-full shrink-0"
+            className={cn(
+              'w-full shrink-0',
+              // A chip floating over the transcript must not cover the last
+              // message's actions when the chat is scrolled to the end.
+              reserveFloatingChip ? 'h-8' : 'h-px'
+            )}
           />
         </div>
       </ScrollArea>
+      <ChatTranscriptScrubber
+        messages={messages}
+        scrollRef={chatScrollRef}
+        onJump={jumpToTurn}
+      />
       {showScrollToBottom ? (
         <button
           type="button"

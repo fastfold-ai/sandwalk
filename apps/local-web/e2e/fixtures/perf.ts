@@ -32,6 +32,8 @@ declare global {
     __sandwalkBench?: {
       longTasks: number
       longTaskMs: number
+      /** Longest single task: the worst freeze the user would feel. */
+      maxLongTaskMs: number
       frames: number
       rafId: number | null
       observer: PerformanceObserver | null
@@ -39,14 +41,15 @@ declare global {
   }
 }
 
-async function startCollectors(page: Page): Promise<void> {
+export async function startCollectors(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const state = { longTasks: 0, longTaskMs: 0, frames: 0, rafId: null as number | null, observer: null as PerformanceObserver | null }
+    const state = { longTasks: 0, longTaskMs: 0, maxLongTaskMs: 0, frames: 0, rafId: null as number | null, observer: null as PerformanceObserver | null }
     try {
       const observer = new PerformanceObserver(list => {
         for (const entry of list.getEntries()) {
           state.longTasks += 1
           state.longTaskMs += entry.duration
+          state.maxLongTaskMs = Math.max(state.maxLongTaskMs, entry.duration)
         }
       })
       observer.observe({ type: 'longtask', buffered: false })
@@ -64,13 +67,14 @@ async function startCollectors(page: Page): Promise<void> {
   })
 }
 
-async function stopCollectors(page: Page): Promise<{ longTasks: number; longTaskMs: number; frames: number; counters: PerfCounters }> {
+export async function stopCollectors(page: Page): Promise<{ longTasks: number; longTaskMs: number; frames: number; counters: PerfCounters }> {
   return page.evaluate(() => {
     const state = window.__sandwalkBench
     if (!state) return { longTasks: 0, longTaskMs: 0, frames: 0, counters: {} }
     if (state.rafId != null) window.cancelAnimationFrame(state.rafId)
     state.observer?.disconnect()
     const counters = window.__sandwalkPerf?.snapshot() ?? {}
+    counters['longTask.maxMs'] = Math.round(state.maxLongTaskMs)
     window.__sandwalkBench = undefined
     return { longTasks: state.longTasks, longTaskMs: Math.round(state.longTaskMs), frames: state.frames, counters }
   })
