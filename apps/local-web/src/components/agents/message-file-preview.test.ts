@@ -28,6 +28,28 @@ describe('responseImageSources', () => {
     expect(sources.paths).toEqual(['artifacts/images/star.png'])
     expect(sources.urls).toEqual([])
   })
+
+  it('drops the remote image link when the file was saved', () => {
+    const sources = responseImageSources(
+      'Saved to /Users/a/.sandwalk/workspaces/abc/artifacts/images/red_circle.webp',
+      ['Image URL: https://example.com/image.webp'],
+      undefined,
+      ['https://example.com/image.webp', 'data:image/webp;base64,aaaa']
+    )
+    expect(sources.paths).toEqual(['artifacts/images/red_circle.webp'])
+    expect(sources.urls).toEqual([])
+  })
+
+  it('keeps one remote url when nothing was saved', () => {
+    const sources = responseImageSources(
+      '',
+      ['Image URL: https://example.com/image.webp'],
+      undefined,
+      ['data:image/webp;base64,aaaa', 'https://example.com/image.webp']
+    )
+    expect(sources.paths).toEqual([])
+    expect(sources.urls).toEqual(['https://example.com/image.webp'])
+  })
 })
 
 describe('messageFilePreviewKind', () => {

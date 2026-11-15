@@ -77,11 +77,14 @@ export function responseImageSources(
       addUrl(match[1])
     }
   }
-  // A saved workspace file and its data URL are the same picture.
-  const visibleUrls = paths.length
-    ? urls.filter(url => !url.startsWith('data:'))
-    : urls
-  return { paths: paths.slice(0, 4), urls: visibleUrls.slice(0, 4) }
+  // A saved workspace file, the tool's data URL, and its "Image URL:" link
+  // are the same picture. Keep the file. With no file, one remote URL is enough.
+  if (paths.length > 0) {
+    return { paths: paths.slice(0, 4), urls: [] }
+  }
+  const remote = urls.find(url => url.startsWith('http'))
+  const only = remote ? [remote] : urls.slice(0, 1)
+  return { paths: [], urls: only }
 }
 
 export function messageFilePreviewKind(path: string): MessagePreviewKind | null {
