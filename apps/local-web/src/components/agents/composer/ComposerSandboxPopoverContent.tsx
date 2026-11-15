@@ -29,7 +29,8 @@ export function ComposerSandboxPopoverContent({
   onConfirm,
   onSandboxStart,
   onSandboxStop,
-  onSandboxRestart
+  onSandboxRestart,
+  variant = 'chooser'
 }: {
   sandboxStatus: SessionSandboxStatus | null
   sandboxPhase: SandboxActionPhase
@@ -47,21 +48,45 @@ export function ComposerSandboxPopoverContent({
   onSandboxStart?: () => void | Promise<void>
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
+  /**
+   * `chooser` (the + menu) decides whether the chat uses Modal at all.
+   * `edit` (inside the sandbox card) is already about a Modal sandbox, so
+   * it shows only that sandbox's settings.
+   */
+  variant?: 'chooser' | 'edit'
 }) {
+  const chooser = variant === 'chooser'
+  const actions = (
+    <ComposerSandboxActions
+      sandboxStatus={sandboxStatus}
+      sandboxDraft={sandboxDraft}
+      sandboxPhase={sandboxPhase}
+      sandboxDraftDirty={sandboxDraftDirty}
+      sandboxConfirming={sandboxConfirming}
+      appliedSandboxBackend={appliedSandboxBackend}
+      onConfirm={onConfirm}
+      onSandboxStart={onSandboxStart}
+      onSandboxStop={onSandboxStop}
+      onSandboxRestart={onSandboxRestart}
+      inCard={!chooser}
+    />
+  )
   return (
     <>
-      <ComposerSandboxHeader onClose={onClose} />
-      <div className="space-y-1.5 p-2">
-        <ComposerSandboxBackendToggle
-          sandboxStatus={sandboxStatus}
-          sandboxDraft={sandboxDraft}
-          sandboxPhase={sandboxPhase}
-          sandboxConfirming={sandboxConfirming}
-          onClose={onClose}
-          onDraftChange={onDraftChange}
-        />
+      {chooser ? <ComposerSandboxHeader onClose={onClose} /> : null}
+      <div className={chooser ? 'space-y-1.5 p-2' : 'space-y-2.5 px-2.5 py-2.5'}>
+        {chooser ? (
+          <ComposerSandboxBackendToggle
+            sandboxStatus={sandboxStatus}
+            sandboxDraft={sandboxDraft}
+            sandboxPhase={sandboxPhase}
+            sandboxConfirming={sandboxConfirming}
+            onClose={onClose}
+            onDraftChange={onDraftChange}
+          />
+        ) : null}
 
-        {sandboxDraft.backend === 'builtin' ? (
+        {chooser && sandboxDraft.backend === 'builtin' ? (
           <ComposerSandboxLocalInfo
             localSystem={localSystem}
             localSystemLoading={localSystemLoading}
@@ -74,20 +99,11 @@ export function ComposerSandboxPopoverContent({
           sandboxPhase={sandboxPhase}
           sandboxConfirming={sandboxConfirming}
           onDraftChange={onDraftChange}
+          wide={!chooser}
+          footer={chooser ? undefined : actions}
         />
 
-        <ComposerSandboxActions
-          sandboxStatus={sandboxStatus}
-          sandboxDraft={sandboxDraft}
-          sandboxPhase={sandboxPhase}
-          sandboxDraftDirty={sandboxDraftDirty}
-          sandboxConfirming={sandboxConfirming}
-          appliedSandboxBackend={appliedSandboxBackend}
-          onConfirm={onConfirm}
-          onSandboxStart={onSandboxStart}
-          onSandboxStop={onSandboxStop}
-          onSandboxRestart={onSandboxRestart}
-        />
+        {chooser ? actions : null}
       </div>
     </>
   )

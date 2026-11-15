@@ -213,6 +213,8 @@ export function createSessionSandboxActions({
     gpuClass: string
     cpuCores: number
     ramGb: number
+    idleTtlSeconds?: number
+    maxLifetimeSeconds?: number
   }) => {
     try {
       const next = await client.updateSandboxSettings(changes)
@@ -228,7 +230,11 @@ export function createSessionSandboxActions({
               cpuImage: next.cpuImage,
               gpuImage: next.gpuImage,
               baseImage:
-                next.computeType === 'gpu' ? next.gpuImage : next.cpuImage
+                next.computeType === 'gpu' ? next.gpuImage : next.cpuImage,
+              configuredIdleTimeoutSeconds: next.idleTtlSeconds,
+              configuredMaxLifetimeSeconds:
+                next.maxLifetimeSeconds ??
+                current.configuredMaxLifetimeSeconds
             }
           : current
       )

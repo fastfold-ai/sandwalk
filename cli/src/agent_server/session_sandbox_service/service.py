@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent.config import Config
@@ -10,11 +11,48 @@ from agent.sandbox_backend import (
     resolve_deepagents_backend,
     unregister_handle,
 )
+from agent.sandbox_backend.activity import SandboxActivity
+from agent.sandbox_backend.handle import (
+    SandboxStop,
+    clear_last_stop,
+    get_last_stop,
+    modal_sandbox_finished,
+    record_sandbox_stop,
+)
 from agent_server.models import SessionSandboxStatus
 from agent_server.sandbox_events import sandbox_event_bus
 from agent_server.sandbox_settings_service import SandboxSettingsService
 from agent_server.session_sandbox_service.backend import effective_backend
 from agent_server.store import AgentStore
+
+
+def _duration(seconds: int) -> str:
+    if seconds % 3600 == 0:
+        hours = seconds // 3600
+        return f"{hours} hour" if hours == 1 else f"{hours} hours"
+    if seconds >= 60:
+        return f"{round(seconds / 60)} min"
+    return f"{seconds} s"
+
+
+def _stop_detail(stop: SandboxStop) -> str:
+    if stop.reason == "idle" and stop.idle_timeout_seconds:
+        return (
+            "Modal stopped this sandbox after "
+            f"{_duration(stop.idle_timeout_seconds)} without activity."
+        )
+    if stop.reason == "time_limit" and stop.max_lifetime_seconds:
+        return (
+            "This sandbox reached its "
+            f"{_duration(stop.max_lifetime_seconds)} time limit."
+        )
+    if stop.reason == "timeout":
+        return "Modal stopped this sandbox on a timeout."
+    return "This sandbox ended on its own."
+
+
+def _utc(timestamp: float) -> datetime:
+    return datetime.fromtimestamp(timestamp, tz=UTC)
 
 
 class SessionSandboxService:
@@ -35,16 +73,36 @@ class SessionSandboxService:
         status = "ready"
         detail: str | None = None
         provider_name = None
+        lifecycle: dict[str, object] = {}
         if backend == "modal":
             if not settings.modal_configured:
                 status = "unavailable"
                 detail = "Modal tokens are not configured."
             elif handle is not None and handle.kind == "modal":
-                status = "running"
-                provider_name = handle.provider_sandbox_name
+                # The handle only says this server started a sandbox. Modal
+                # ends it on its own (idle timeout, time limit), so ask.
+                if modal_sandbox_finished(handle) is True:
+                    record_sandbox_stop(handle)
+                    unregister_handle(session_id)
+                    status = "stopped"
+                else:
+                    status = "running"
+                    provider_name = handle.provider_sandbox_name
+                    lifecycle = self._running_lifecycle(handle)
             else:
                 status = "stopped"
-                detail = "Modal sandbox is not running for this chat."
+            if status == "stopped":
+                stop = get_last_stop(session_id)
+                if stop is None:
+                    detail = "Modal sandbox is not running for this chat."
+                else:
+                    detail = _stop_detail(stop)
+                    lifecycle = {
+                        "stopped_at": _utc(stop.stopped_at),
+                        "stop_reason": stop.reason,
+                        "idle_timeout_seconds": stop.idle_timeout_seconds,
+                        "max_lifetime_seconds": stop.max_lifetime_seconds,
+                    }
         elif handle is not None and handle.kind == "builtin":
             status = "ready"
         compute_type = str(settings.compute_type or "cpu").strip().lower() or "cpu"
@@ -72,7 +130,37 @@ class SessionSandboxService:
             gpu_image=gpu_image,
             base_image=base_image,
             detail=detail,
+            configured_idle_timeout_seconds=getattr(settings, "idle_ttl_seconds", None),
+            configured_max_lifetime_seconds=getattr(
+                settings, "max_lifetime_seconds", None
+            ),
+            **lifecycle,  # type: ignore[arg-type]
         )
+
+    @staticmethod
+    def _running_lifecycle(handle: object) -> dict[str, object]:
+        """Uptime and the lifetime rules of a running Modal sandbox."""
+        out: dict[str, object] = {}
+        started = getattr(handle, "started_at", None)
+        extras = getattr(handle, "extras", None)
+        if isinstance(started, (int, float)):
+            out["started_at"] = _utc(started)
+        if not isinstance(extras, dict):
+            return out
+        idle = extras.get("idle_timeout_seconds")
+        limit = extras.get("max_lifetime_seconds")
+        if isinstance(idle, int) and idle > 0:
+            out["idle_timeout_seconds"] = idle
+        if isinstance(limit, int) and limit > 0:
+            out["max_lifetime_seconds"] = limit
+            # A sandbox reattached by name was created earlier than we know.
+            if extras.get("created_here") and isinstance(started, (int, float)):
+                out["expires_at"] = _utc(started + limit)
+        activity = extras.get("activity")
+        if isinstance(activity, SandboxActivity):
+            out["last_active_at"] = _utc(activity.last_active_at)
+            out["busy"] = activity.busy
+        return out
 
     def _publish(self, status: SessionSandboxStatus) -> None:
         try:
@@ -157,6 +245,8 @@ class SessionSandboxService:
         if handle is not None:
             handle.terminate()
             unregister_handle(session_id)
+        # The user stopped it; there is nothing to explain afterwards.
+        clear_last_stop(session_id)
         result = self.status(session_id)
         self._publish(result)
         return result

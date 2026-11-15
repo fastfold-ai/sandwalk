@@ -120,6 +120,24 @@ class SessionSandboxStatus(ApiModel):
     # Active base image for the current compute mode (CPU or GPU).
     base_image: str = "python:3.12-slim"
     detail: str | None = None
+    # When this server attached to the running sandbox. None unless running.
+    started_at: datetime | None = None
+    # What the next Modal sandbox will be created with. A running sandbox
+    # keeps the limits it started with; Modal cannot change them afterwards.
+    configured_idle_timeout_seconds: int | None = None
+    configured_max_lifetime_seconds: int | None = None
+    # Lifetime rules of the running (or just-ended) Modal sandbox.
+    idle_timeout_seconds: int | None = None
+    max_lifetime_seconds: int | None = None
+    # Hard stop time. Only known for a sandbox this server created.
+    expires_at: datetime | None = None
+    # Last command this server sent, and whether one is running now. Modal
+    # does not report idle time; the idle countdown is built from these.
+    last_active_at: datetime | None = None
+    busy: bool = False
+    # Set when Modal ended the sandbox on its own (not a user Stop).
+    stopped_at: datetime | None = None
+    stop_reason: Literal["idle", "time_limit", "timeout", "ended"] | None = None
 
 
 class SessionList(ApiModel):

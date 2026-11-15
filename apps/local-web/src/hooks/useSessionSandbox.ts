@@ -101,7 +101,9 @@ export function useSessionSandbox({
               settings.computeType === 'gpu'
                 ? settings.gpuImage
                 : settings.cpuImage,
-            detail: null
+            detail: null,
+            configuredIdleTimeoutSeconds: settings.idleTtlSeconds,
+            configuredMaxLifetimeSeconds: settings.maxLifetimeSeconds ?? null
           }
           setSessionSandboxStatus(status)
           return status
@@ -150,6 +152,19 @@ export function useSessionSandbox({
     sessionSandboxPhase,
     sessionSandboxStatus?.status
   ])
+
+  // Modal ends a sandbox on its idle timeout without notifying anyone. While
+  // one is shown as running, re-ask so the chat stops showing it once it is gone.
+  const sandboxRunning =
+    sessionSandboxStatus?.backend === 'modal' &&
+    sessionSandboxStatus?.status === 'running'
+  useEffect(() => {
+    if (!sessionId || !health || !sandboxRunning) return
+    const timer = window.setInterval(() => {
+      void refreshSessionSandbox(sessionId)
+    }, 30_000)
+    return () => window.clearInterval(timer)
+  }, [health, refreshSessionSandbox, sandboxRunning, sessionId])
 
   const {
     selectSessionSandboxBackend,

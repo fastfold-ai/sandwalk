@@ -19,6 +19,7 @@ import type { NavigateFunction } from 'react-router-dom'
 import { AgentComposerSlot } from '@/components/agents/AgentComposerSlot'
 import { AuraIconPulse } from '@/components/agents/AuraIconPulse'
 import { ChatTranscript } from '@/components/agents/ChatTranscript'
+import { sandboxChipVisible } from '@/components/agents/composer/sandbox-utils'
 import {
   EmptyStartActions,
   EmptyStartTip,
@@ -368,6 +369,10 @@ export function SessionChatBody({
               skills={agentComposerSlotProps.skills}
               mcpServers={agentComposerSlotProps.mcpServers}
               workspaceFiles={agentComposerSlotProps.workspaceFiles}
+              reserveFloatingChip={sandboxChipVisible(
+                agentComposerSlotProps.sessionSandboxStatus,
+                agentComposerSlotProps.sessionSandboxPhase
+              )}
             />
           ) : null}
         </div>

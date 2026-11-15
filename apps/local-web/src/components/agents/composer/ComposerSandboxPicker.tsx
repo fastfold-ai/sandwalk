@@ -11,6 +11,7 @@ import {
   draftFromSandboxStatus,
   type SandboxActionPhase,
   type SandboxComputeChange,
+  sandboxDraftChangesSettings,
   sandboxStatusDotClass,
   sandboxStatusLabel
 } from '@/components/agents/composer/sandbox-utils'
@@ -19,16 +20,13 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover'
-import {
-  DEFAULT_GPU_PRESET,
-  matchGpuPreset
-} from '@/lib/sandbox-presets'
 import { cn } from '@/lib/utils'
 
 export function ComposerSandboxPicker({
   sandboxStatus = null,
   sandboxPhase = 'idle',
   embedded = false,
+  variant = 'chooser',
   onRequestClose,
   onSandboxBackendSelect,
   onSandboxComputeChange,
@@ -42,6 +40,8 @@ export function ComposerSandboxPicker({
   sandboxPhase?: SandboxActionPhase
   /** Render only the panel, for a parent menu flyout. */
   embedded?: boolean
+  /** `edit`: settings of an existing Modal sandbox, without the on/off switch. */
+  variant?: 'chooser' | 'edit'
   onRequestClose?: () => void
   onSandboxBackendSelect: (
     backend: 'builtin' | 'modal'
@@ -64,6 +64,21 @@ export function ComposerSandboxPicker({
   const [localSystem, setLocalSystem] = useState<ServerSystemInfo | null>(null)
   const [localSystemLoading, setLocalSystemLoading] = useState(false)
   const refreshedOpenRef = useRef(false)
+  // Status is re-fetched while a sandbox runs (uptime, idle time). Only a
+  // change to what this form edits may reset the draft, or an edit in
+  // progress would be thrown away on every refresh.
+  const statusRef = useRef(sandboxStatus)
+  statusRef.current = sandboxStatus
+  const settingsKey = [
+    sandboxStatus?.backend,
+    sandboxStatus?.computeType,
+    sandboxStatus?.gpuClass,
+    sandboxStatus?.cpuCores,
+    sandboxStatus?.ramGb,
+    sandboxStatus?.configuredIdleTimeoutSeconds,
+    sandboxStatus?.configuredMaxLifetimeSeconds,
+    sandboxStatus?.modalConfigured
+  ].join('|')
 
   useEffect(() => {
     if (!embedded && !sandboxPickerOpen) {
@@ -76,7 +91,7 @@ export function ComposerSandboxPicker({
       refreshedOpenRef.current = true
       void onRefreshSandbox?.()
     }
-    setSandboxDraft(draftFromSandboxStatus(sandboxStatus))
+    setSandboxDraft(draftFromSandboxStatus(statusRef.current))
     if (!onLoadLocalSystem) {
       setLocalSystem(null)
       return
@@ -96,22 +111,14 @@ export function ComposerSandboxPicker({
     return () => {
       cancelled = true
     }
-  }, [embedded, sandboxPickerOpen, onLoadLocalSystem, onRefreshSandbox, sandboxStatus])
+  }, [embedded, sandboxPickerOpen, onLoadLocalSystem, onRefreshSandbox, settingsKey])
 
   const appliedSandboxBackend =
     sandboxStatus?.backend === 'modal' ? 'modal' : 'builtin'
   const sandboxDraftDirty = useMemo(() => {
     if (sandboxDraft.backend !== appliedSandboxBackend) return true
     if (sandboxDraft.backend !== 'modal') return false
-    return (
-      sandboxDraft.computeType !==
-        (sandboxStatus?.computeType === 'gpu' ? 'gpu' : 'cpu') ||
-      sandboxDraft.gpuClass !==
-        (matchGpuPreset(String(sandboxStatus?.gpuClass || ''))?.gpu ??
-          DEFAULT_GPU_PRESET.gpu) ||
-      Number(sandboxDraft.cpuCores) !== Number(sandboxStatus?.cpuCores) ||
-      Number(sandboxDraft.ramGb) !== Number(sandboxStatus?.ramGb)
-    )
+    return sandboxDraftChangesSettings(sandboxDraft, sandboxStatus)
   }, [appliedSandboxBackend, sandboxDraft, sandboxStatus])
 
   async function confirmSandboxDraft() {
@@ -121,20 +128,18 @@ export function ComposerSandboxPicker({
     setSandboxConfirming(true)
     try {
       if (sandboxDraft.backend === 'modal' && onSandboxComputeChange) {
-        const computeDirty =
-          sandboxDraft.computeType !==
-            (sandboxStatus?.computeType === 'gpu' ? 'gpu' : 'cpu') ||
-          sandboxDraft.gpuClass !==
-            (matchGpuPreset(String(sandboxStatus?.gpuClass || ''))?.gpu ??
-              DEFAULT_GPU_PRESET.gpu) ||
-          Number(sandboxDraft.cpuCores) !== Number(sandboxStatus?.cpuCores) ||
-          Number(sandboxDraft.ramGb) !== Number(sandboxStatus?.ramGb)
-        if (computeDirty || sandboxDraft.backend !== appliedSandboxBackend) {
+        const settingsDirty = sandboxDraftChangesSettings(
+          sandboxDraft,
+          sandboxStatus
+        )
+        if (settingsDirty || sandboxDraft.backend !== appliedSandboxBackend) {
           await onSandboxComputeChange({
             computeType: sandboxDraft.computeType,
             gpuClass: sandboxDraft.gpuClass,
             cpuCores: sandboxDraft.cpuCores,
-            ramGb: sandboxDraft.ramGb
+            ramGb: sandboxDraft.ramGb,
+            idleTtlSeconds: sandboxDraft.idleTimeoutSeconds,
+            maxLifetimeSeconds: sandboxDraft.maxLifetimeSeconds
           })
         }
       }
@@ -167,10 +172,17 @@ export function ComposerSandboxPicker({
       onSandboxStart={onSandboxStart}
       onSandboxStop={onSandboxStop}
       onSandboxRestart={onSandboxRestart}
+      variant={variant}
     />
   )
 
-  if (embedded) return <div className="w-[16.5rem]">{panel}</div>
+  if (embedded) {
+    return (
+      <div className={variant === 'edit' ? 'w-full' : 'w-[16.5rem]'}>
+        {panel}
+      </div>
+    )
+  }
 
   return (
     <Popover open={sandboxPickerOpen} onOpenChange={setSandboxPickerOpen}>

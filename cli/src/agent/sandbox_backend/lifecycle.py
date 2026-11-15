@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from agent.sandbox_backend.activity import SandboxActivity
 from agent.sandbox_backend.filesystem_io import _patch_modal_filesystem_io
 from agent.sandbox_backend.provisioning import _ensure_modal_tokens, _safe_sandbox_name
 from agent.sandbox_backend.runtime import _run_modal_blocking
@@ -45,6 +46,8 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
     from agent.sandbox_backend.profile import (
         sandbox_compute_type,
         sandbox_gpu_class,
+        sandbox_idle_timeout_seconds,
+        sandbox_max_lifetime_seconds,
         sandbox_profile_fingerprint,
     )
     from agent.sandbox_deps import require_modal_deps
@@ -56,8 +59,8 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
     _ensure_modal_tokens(config)
     app_name = str(config.get("sandbox.modal_app") or "sandwalk").strip() or "sandwalk"
     name = _safe_sandbox_name(session_id)
-    idle_ttl = int(config.get("sandbox.idle_ttl_seconds") or 600)
-    timeout = max(idle_ttl + 60, int(config.get("sandbox.timeout") or 30) * 60)
+    idle_ttl = sandbox_idle_timeout_seconds(config)
+    timeout = sandbox_max_lifetime_seconds(config)
     cpu = float(config.get("sandbox.cpu_cores") or 2.0)
     ram_gb = float(config.get("sandbox.ram_gb") or 8.0)
     memory_mb = max(512, int(ram_gb * 1024))
@@ -108,20 +111,38 @@ def _create_or_reuse_modal_sandbox_impl(config: Any, *, session_id: str | None):
         created = True
 
     backend = ModalSandbox(sandbox=modal_sandbox)
-    _wrap_modal_backend_for_async(backend, modal_sandbox)
+    activity = SandboxActivity()
+    _wrap_modal_backend_for_async(backend, modal_sandbox, activity)
     # Fingerprint is attached by resolve() onto SandboxHandle.extras.
     backend._sandwalk_profile_fingerprint = fingerprint  # type: ignore[attr-defined]
+    # Lifetime rules this sandbox runs under, copied onto the handle by
+    # resolve(). ``created_here`` is False for a sandbox reattached by name:
+    # its real creation time is unknown, so no hard-limit countdown for it.
+    backend._sandwalk_lifecycle = {  # type: ignore[attr-defined]
+        "idle_timeout_seconds": idle_ttl,
+        "max_lifetime_seconds": timeout,
+        "created_here": created,
+        "activity": activity,
+    }
     return backend, modal_sandbox, name, created
 
 
-def _wrap_modal_backend_for_async(backend: Any, modal_sandbox: Any) -> None:
+def _wrap_modal_backend_for_async(
+    backend: Any, modal_sandbox: Any, activity: SandboxActivity | None = None
+) -> None:
     """Ensure langchain_modal sync methods never block an asyncio event loop."""
     original_execute = backend.execute
 
     def execute(command: str, *, timeout: int | None = None) -> Any:
-        return _run_modal_blocking(
-            lambda: original_execute(command, timeout=timeout)
-        )
+        if activity is None:
+            return _run_modal_blocking(
+                lambda: original_execute(command, timeout=timeout)
+            )
+        # A running command is what keeps Modal's idle timer from firing.
+        with activity.track():
+            return _run_modal_blocking(
+                lambda: original_execute(command, timeout=timeout)
+            )
 
     backend.execute = execute  # type: ignore[method-assign]
     _patch_modal_filesystem_io(backend, modal_sandbox)

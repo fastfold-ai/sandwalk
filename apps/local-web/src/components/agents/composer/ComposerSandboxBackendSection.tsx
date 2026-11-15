@@ -29,6 +29,10 @@ export function ComposerSandboxHeader({ onClose }: { onClose: () => void }) {
   )
 }
 
+/**
+ * Local is the default and needs no configuring, so this is one switch for
+ * the only thing to choose: run this chat's code in a Modal sandbox or not.
+ */
 export function ComposerSandboxBackendToggle({
   sandboxStatus,
   sandboxDraft,
@@ -44,61 +48,49 @@ export function ComposerSandboxBackendToggle({
   onClose: () => void
   onDraftChange: (updater: (current: SandboxDraft) => SandboxDraft) => void
 }) {
+  const configured = sandboxStatus?.modalConfigured === true
+  const on = configured && sandboxDraft.backend === 'modal'
+  const disabled = !configured || sandboxPhase !== 'idle' || sandboxConfirming
   return (
     <>
-      <div className="inline-flex w-full rounded-md border p-0.5">
+      <div className="flex items-center justify-between gap-2 px-0.5 py-0.5">
+        <span
+          className={cn(
+            'flex items-center gap-1.5 text-[11px] font-medium',
+            !configured && 'text-muted-foreground'
+          )}
+        >
+          <ModalGlyph className={cn('size-3', !configured && 'opacity-70')} />
+          Modal sandbox
+        </span>
         <button
           type="button"
-          disabled={sandboxPhase !== 'idle' || sandboxConfirming}
+          role="switch"
+          aria-checked={on}
+          aria-label="Use Modal sandbox"
+          disabled={disabled}
+          className={cn(
+            'relative h-4 w-7 shrink-0 rounded-full transition-colors',
+            on ? 'bg-foreground' : 'bg-muted-foreground/30',
+            disabled && 'cursor-not-allowed opacity-60'
+          )}
           onClick={() =>
             onDraftChange(current => ({
               ...current,
-              backend: 'builtin'
+              backend: current.backend === 'modal' ? 'builtin' : 'modal'
             }))
           }
-          className={cn(
-            'flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium transition-colors',
-            sandboxDraft.backend === 'builtin'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
-            (sandboxPhase !== 'idle' || sandboxConfirming) &&
-              'cursor-not-allowed opacity-60'
-          )}
         >
-          <span className="bg-muted-foreground/40 size-1.5 rounded-full" />
-          Local
-        </button>
-        {sandboxStatus?.modalConfigured !== true ? (
-          <div className="text-muted-foreground flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] opacity-60">
-            <ModalGlyph className="size-3 opacity-70" />
-            Modal
-          </div>
-        ) : (
-          <button
-            type="button"
-            disabled={sandboxPhase !== 'idle' || sandboxConfirming}
-            onClick={() =>
-              onDraftChange(current => ({
-                ...current,
-                backend: 'modal'
-              }))
-            }
+          <span
             className={cn(
-              'flex flex-1 items-center justify-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium transition-colors',
-              sandboxDraft.backend === 'modal'
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-              (sandboxPhase !== 'idle' || sandboxConfirming) &&
-                'cursor-not-allowed opacity-60'
+              'bg-background absolute top-0.5 left-0.5 size-3 rounded-full shadow-sm transition-transform',
+              on && 'translate-x-3'
             )}
-          >
-            <ModalGlyph className="size-3" />
-            Modal
-          </button>
-        )}
+          />
+        </button>
       </div>
 
-      {sandboxStatus?.modalConfigured !== true ? (
+      {!configured ? (
         <p className="text-muted-foreground px-0.5 text-[10px] leading-snug">
           Modal not set up.{' '}
           <Link

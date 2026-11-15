@@ -3371,7 +3371,8 @@ export class LocalAgentClient
         gpu_class: changes.gpuClass,
         cpu_cores: changes.cpuCores,
         ram_gb: changes.ramGb,
-        idle_ttl_seconds: changes.idleTtlSeconds
+        idle_ttl_seconds: changes.idleTtlSeconds,
+        max_lifetime_seconds: changes.maxLifetimeSeconds
       }),
       headers: { 'content-type': 'application/json' },
       signal

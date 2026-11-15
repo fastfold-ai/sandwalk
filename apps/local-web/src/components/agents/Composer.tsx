@@ -17,6 +17,7 @@ import {
   ComposerHashMenu,
   type ComposerHashMenuHandle
 } from '@/components/agents/composer/ComposerHashMenu'
+import { ComposerSandboxChip } from '@/components/agents/composer/ComposerSandboxChip'
 import {
   ComposerSlashMenu,
   type ComposerSlashMenuHandle
@@ -309,6 +310,19 @@ export function Composer({
             {voice.error}
           </div>
         ) : null}
+        <div className="relative">
+        <ComposerSandboxChip
+          sandboxStatus={sandboxStatus}
+          sandboxPhase={sandboxPhase}
+          embedded={embedded}
+          onSandboxBackendSelect={onSandboxBackendSelect}
+          onSandboxComputeChange={onSandboxComputeChange}
+          onSandboxStart={onSandboxStart}
+          onSandboxStop={onSandboxStop}
+          onSandboxRestart={onSandboxRestart}
+          onLoadLocalSystem={onLoadLocalSystem}
+          onRefreshSandbox={onRefreshSandbox}
+        />
         <form
           onSubmit={event => {
             event.preventDefault()
@@ -452,6 +466,7 @@ export function Composer({
             </>
           )}
         </form>
+        </div>
       </div>
     </div>
   )

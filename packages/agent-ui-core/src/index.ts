@@ -1118,6 +1118,8 @@ export type SandboxSettings = {
   cpuCores: number
   ramGb: number
   idleTtlSeconds: number
+  /** Hard stop for a Modal sandbox, in seconds. Modal allows up to 24 hours. */
+  maxLifetimeSeconds?: number
   modalConfigured: boolean
 }
 
@@ -1157,6 +1159,24 @@ export type SessionSandboxStatus = {
   /** Active base image for the current compute mode (CPU or GPU). */
   baseImage?: string
   detail: string | null
+  /** ISO time the server attached to the running sandbox. Absent unless running. */
+  startedAt?: string | null
+  /** Limits the next Modal sandbox is created with. A running one keeps its own. */
+  configuredIdleTimeoutSeconds?: number | null
+  configuredMaxLifetimeSeconds?: number | null
+  /** Modal stops the sandbox after this long with no running command. */
+  idleTimeoutSeconds?: number | null
+  /** Modal stops the sandbox this long after it was created, busy or not. */
+  maxLifetimeSeconds?: number | null
+  /** ISO hard stop time. Only known for a sandbox this server created. */
+  expiresAt?: string | null
+  /** ISO time of the last command sent. The idle countdown is built from it. */
+  lastActiveAt?: string | null
+  /** A command is running now, so the idle timer is not counting. */
+  busy?: boolean
+  /** ISO time Modal ended the sandbox on its own. Absent after a user Stop. */
+  stoppedAt?: string | null
+  stopReason?: 'idle' | 'time_limit' | 'timeout' | 'ended' | null
   type?: 'sandbox_status'
   ready?: boolean
 }

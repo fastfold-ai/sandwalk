@@ -57,6 +57,8 @@ class SandboxSettingsService:
         if compute_type not in _VALID_COMPUTE:
             compute_type = "cpu"
         configured, _detail = modal_tokens_present(config)
+        from agent.sandbox_backend.profile import sandbox_max_lifetime_seconds
+
         return SandboxSettings(
             backend=backend,
             modal_app=str(config.get("sandbox.modal_app") or "sandwalk"),
@@ -83,6 +85,7 @@ class SandboxSettingsService:
                 maximum=86400,
                 default=600,
             ),
+            max_lifetime_seconds=sandbox_max_lifetime_seconds(config),
             modal_configured=configured,
         )
 
@@ -139,6 +142,18 @@ class SandboxSettingsService:
                     minimum=60,
                     maximum=86400,
                     default=600,
+                ),
+            )
+        if payload.max_lifetime_seconds is not None:
+            from agent.sandbox_backend.profile import MODAL_MAX_LIFETIME_SECONDS
+
+            config.set(
+                "sandbox.max_lifetime_seconds",
+                _clamp_int(
+                    payload.max_lifetime_seconds,
+                    minimum=300,
+                    maximum=MODAL_MAX_LIFETIME_SECONDS,
+                    default=1800,
                 ),
             )
         config.save()

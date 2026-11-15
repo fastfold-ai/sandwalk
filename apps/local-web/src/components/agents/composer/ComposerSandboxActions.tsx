@@ -6,6 +6,7 @@ import {
   type SandboxDraft
 } from '@/components/agents/composer/sandbox-utils'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export function ComposerSandboxActions({
   sandboxStatus,
@@ -17,7 +18,8 @@ export function ComposerSandboxActions({
   onConfirm,
   onSandboxStart,
   onSandboxStop,
-  onSandboxRestart
+  onSandboxRestart,
+  inCard = false
 }: {
   sandboxStatus: SessionSandboxStatus | null
   sandboxDraft: SandboxDraft
@@ -29,6 +31,11 @@ export function ComposerSandboxActions({
   onSandboxStart?: () => void | Promise<void>
   onSandboxStop?: () => void | Promise<void>
   onSandboxRestart?: () => void | Promise<void>
+  /**
+   * Inside the sandbox card: the row above already offers Start and Stop, so
+   * keep only Confirm and Restart, sized to their labels at the row's end.
+   */
+  inCard?: boolean
 }) {
   const showModalControls =
     sandboxDraft.backend === 'modal' &&
@@ -37,11 +44,19 @@ export function ComposerSandboxActions({
 
   return (
     <>
-      <div className="flex items-center gap-1 pt-0.5">
+      <div
+        className={cn(
+          'flex items-center gap-1',
+          inCard ? 'shrink-0 flex-row-reverse' : 'pt-0.5'
+        )}
+      >
         <Button
           type="button"
           size="sm"
-          className="h-7 flex-1 px-2 text-[11px]"
+          className={cn(
+            'h-7 text-[11px]',
+            inCard ? 'px-4' : 'flex-1 px-2'
+          )}
           disabled={
             sandboxPhase !== 'idle' ||
             sandboxConfirming ||
@@ -76,27 +91,30 @@ export function ComposerSandboxActions({
             </Button>
           ) : sandboxStatus.status === 'running' ? (
             <>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="text-destructive hover:text-destructive h-7 px-2 text-[11px]"
-                onClick={() => void onSandboxStop?.()}
-              >
-                Stop
-              </Button>
+              {inCard ? null : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive hover:text-destructive h-7 px-2 text-[11px]"
+                  onClick={() => void onSandboxStop?.()}
+                >
+                  Stop
+                </Button>
+              )}
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
                 className="h-7 px-2"
                 aria-label="Restart sandbox"
+                title="Restart sandbox"
                 onClick={() => void onSandboxRestart?.()}
               >
                 <RefreshCw className="size-3" />
               </Button>
             </>
-          ) : (
+          ) : inCard ? null : (
             <Button
               type="button"
               size="sm"
@@ -115,7 +133,8 @@ export function ComposerSandboxActions({
         ) : null}
       </div>
 
-      {sandboxStatus?.detail &&
+      {!inCard &&
+      sandboxStatus?.detail &&
       sandboxStatus.status !== 'running' &&
       appliedSandboxBackend === 'modal' ? (
         <p className="text-muted-foreground px-0.5 text-[10px] leading-snug">

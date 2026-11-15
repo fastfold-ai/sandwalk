@@ -22,6 +22,9 @@ DEFAULTS_AGENT = {
     "sandbox.cpu_cores": 2.0,
     "sandbox.ram_gb": 8.0,
     "sandbox.idle_ttl_seconds": 600,
+    # Hard stop for a Modal sandbox, in seconds (Modal allows up to 24 hours).
+    # Unset keeps the old rule: ``sandbox.timeout`` read as minutes (30 min).
+    "sandbox.max_lifetime_seconds": None,
 
     "agent.max_iterations": 3,
     # Tool-calling strategy for the deepagents runtime: "ptc" (Programmatic Tool

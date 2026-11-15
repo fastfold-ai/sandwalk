@@ -93,6 +93,8 @@ class SandboxSettings(ApiModel):
     cpu_cores: float = 2.0
     ram_gb: float = 8.0
     idle_ttl_seconds: int = 600
+    # Hard stop for a Modal sandbox, in seconds. Modal allows up to 24 hours.
+    max_lifetime_seconds: int = 1800
     modal_configured: bool = False
 
 
@@ -107,6 +109,7 @@ class UpdateSandboxSettingsRequest(ApiModel):
     cpu_cores: float | None = None
     ram_gb: float | None = None
     idle_ttl_seconds: int | None = None
+    max_lifetime_seconds: int | None = None
 
 
 class SandboxProbeStep(ApiModel):

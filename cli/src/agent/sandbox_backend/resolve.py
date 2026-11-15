@@ -13,6 +13,7 @@ from typing import Any
 
 from deepagents.backends import FilesystemBackend
 
+from agent.sandbox_backend.activity import SandboxActivity
 from agent.sandbox_backend.handle import (
     SandboxHandle,
     get_active_handle,
@@ -37,6 +38,10 @@ def _modal_handle_is_alive(handle: SandboxHandle) -> bool:
             proc.wait()
 
         _run_modal_blocking(_probe)
+        # The probe is a command, so it resets Modal's idle timer too.
+        activity = handle.extras.get("activity")
+        if isinstance(activity, SandboxActivity):
+            activity.touch()
         return True
     except Exception:  # noqa: BLE001 — treat any probe failure as dead
         return False
@@ -149,6 +154,9 @@ def resolve_deepagents_backend(
     )
     backend = wrap_backend_for_host_workspace(backend, workspace_root)
     extras: dict[str, Any] = {"profile_fingerprint": desired_fingerprint}
+    lifecycle = getattr(modal_backend, "_sandwalk_lifecycle", None)
+    if isinstance(lifecycle, dict):
+        extras.update(lifecycle)
     if skills_root is not None:
         extras["skills_root"] = str(skills_root)
     handle = SandboxHandle(
